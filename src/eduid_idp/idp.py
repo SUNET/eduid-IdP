@@ -106,6 +106,7 @@ class Service(object):
         self.logger = idp_app.logger
         self.IDP = idp_app.IDP
         self.AUTHN_BROKER = idp_app.AUTHN_BROKER
+        self.config = idp_app.config
         self.user = user
 
     def unpack_redirect(self):
@@ -218,7 +219,7 @@ class Service(object):
     def not_authn(self, key, requested_authn_context):
         ruri = geturl(self.environ, query=False)
         return do_authentication(self.environ, self.start_response,
-                                 self.logger, self.AUTHN_BROKER,
+                                 self.logger, self.config, self.AUTHN_BROKER,
                                  authn_context=requested_authn_context,
                                  key=key, redirect_uri=ruri)
 
@@ -440,7 +441,7 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def do_authentication(environ, start_response, logger, AUTHN_BROKER,
+def do_authentication(environ, start_response, logger, config, AUTHN_BROKER,
                       authn_context, key, redirect_uri):
     """
     Display the login form
@@ -451,7 +452,7 @@ def do_authentication(environ, start_response, logger, AUTHN_BROKER,
     if len(auth_info):
         method, reference = auth_info[0]
         logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
-        return method(environ, start_response, reference, key, redirect_uri, logger)
+        return method(environ, start_response, reference, key, redirect_uri, logger, config)
     else:
         resp = Unauthorized("No usable authentication method")
         return resp(environ, start_response)
@@ -465,12 +466,17 @@ PASSWD = {"roland": "dianakra",
 
 
 def username_password_authn(environ, start_response, reference, key,
-                            redirect_uri, logger):
+                            redirect_uri, logger, config):
     """
     Display the login form
     """
     logger.info("The login page")
     headers = []
+
+    static_fn = static_filename(config, 'login.html')
+    logger.debug("LOGIN FILENAME {!r}".format(static_fn))
+    if static_fn:
+        return static_file(environ, start_response, static_fn)
 
     resp = Response(mako_template="login.mako", template_lookup=LOOKUP,
                     headers=headers)
@@ -846,11 +852,46 @@ LOOKUP = TemplateLookup(directories=[ROOT + 'templates', ROOT + 'htdocs'],
 
 # ----------------------------------------------------------------------------
 
+def static_filename(config, path):
+    if not isinstance(path, basestring):
+        return False
+    if not config.static_dir:
+        return False
+    try:
+        filename = os.path.join(config.static_dir, path)
+        os.stat(filename)
+        return filename
+    except OSError:
+        return None
+
+def static_file(environ, start_response, filename):
+    try:
+        text = open(filename).read()
+        if filename.endswith(".ico"):
+            resp = Response(text, headers=[('Content-Type', "image/x-icon")])
+        elif filename.endswith(".html"):
+            resp = Response(text, headers=[('Content-Type', 'text/html')])
+        elif filename.endswith(".css"):
+            resp = Response(text, headers=[('Content-Type', 'text/css')])
+        elif filename.endswith(".js"):
+            # Content-Type: application/javascript; charset=utf-8
+            resp = Response(text, headers=[('Content-Type', 'application/javascript')])
+        elif filename.endswith(".txt"):
+            resp = Response(text, headers=[('Content-Type', 'text/plain')])
+        else:
+            resp = Response(text, headers=[('Content-Type', 'text/xml')])
+    except IOError:
+        resp = NotFound()
+    return resp(environ, start_response)
+
+
 class IdPApplication(object):
 
     def __init__(self, logger, config):
         self.logger = logger
         self.config = config
+        self.response_status = None
+        self.start_response = None
 
         import socket
         authn_authority = "http://%s" % socket.gethostname()
@@ -892,6 +933,11 @@ class IdPApplication(object):
                 user = self.IDP.cache.uid2user[query["id"][0]]
             except KeyError:
                 user = None
+
+        static_fn = static_filename(self.config, path)
+        self.logger.debug("STATIC FILENAME {!r}".format(static_fn))
+        if static_fn:
+            return static_file(environ, start_response, static_fn)
 
         url_patterns = AUTHN_URLS
         if not user:

@@ -45,6 +45,7 @@ _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'listen_addr': '0.0.0.0',
                     'listen_port': '8088',
                     'pysaml2_config': 'idp_conf.py', # path prepended in IdPConfig.__init__()
+                    'static_dir': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -116,3 +117,10 @@ class IdPConfig():
         pysaml2 configuration file. Separate config file with SAML related parameters.
         """
         return self.config.get(self.section, 'pysaml2_config')
+
+    @property
+    def static_dir(self):
+        """
+        Directory with static files to be served.
+        """
+        return self.config.get(self.section, 'static_dir')
