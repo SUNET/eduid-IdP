@@ -5,6 +5,7 @@ import re
 import sys
 import time
 import base64
+import pprint
 import logging
 import argparse
 from hashlib import sha1
@@ -101,7 +102,7 @@ class Service(object):
 
     def __init__(self, environ, start_response, idp_app, user=None):
         self.environ = environ
-        idp_app.logger.debug("ENVIRON: %s" % environ)
+        idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
         self.start_response = start_response
         self.logger = idp_app.logger
         self.IDP = idp_app.IDP
@@ -328,7 +329,7 @@ class SSO(Service):
         return self.response(self.binding_out, http_args)
 
     def _store_request(self, _dict):
-        self.logger.debug("_store_request: %s" % _dict)
+        self.logger.debug("_store_request:\n{!s}".format(pprint.pformat(_dict)))
         key = sha1(_dict["SAMLRequest"]).hexdigest()
         # store the AuthnRequest
         self.IDP.ticket[key] = _dict
@@ -915,6 +916,7 @@ class IdPApplication(object):
 
         path = environ.get('PATH_INFO', '').lstrip('/')
         kaka = environ.get("HTTP_COOKIE", None)
+        self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
         if kaka:
@@ -924,7 +926,7 @@ class IdPApplication(object):
         else:
             try:
                 query = parse_qs(environ["QUERY_STRING"])
-                self.logger.debug("QUERY: %s" % query)
+                self.logger.debug("QUERY:\n{!s}".format(pprint.pformat(query)))
                 user = self.IDP.cache.uid2user[query["id"][0]]
             except KeyError:
                 user = None
