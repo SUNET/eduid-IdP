@@ -473,31 +473,34 @@ def username_password_authn(environ, start_response, reference, key,
     logger.info("The login page")
     headers = []
 
-    static_fn = static_filename(config, 'login.html')
-    logger.debug("LOGIN FILENAME {!r}".format(static_fn))
-    if static_fn:
-        return static_file(environ, start_response, static_fn)
-
-    resp = Response(mako_template="login.mako", template_lookup=LOOKUP,
-                    headers=headers)
-
     argv = {
         "action": "/verify",
-        "login": "",
+        "username": "",
         "password": "",
         "key": key,
         "authn_reference": reference,
         "redirect_uri": redirect_uri
     }
-    logger.info("do_authentication argv: %s" % argv)
-    return resp(environ, start_response, **argv)
+    logger.info("do_authentication argv:\n{!s}".format(pprint.pformat(argv)))
+
+    static_fn = static_filename(config, 'login.html')
+
+    if static_fn:
+        res = static_file(environ, start_response, static_fn)
+        if len(res) == 1:
+            res=res[0]
+        # apply simplistic HTML formatting to template in 'res'
+        return res.format(**argv)
+
+    return not_found(environ, start_response)
 
 
 def verify_username_and_password(dic):
     global PASSWD
     # verify username and password
-    if PASSWD[dic["login"][0]] == dic["password"][0]:
-        return True, dic["login"][0]
+    username_param = dic["username"][0]
+    if PASSWD[username_param] == dic["password"][0]:
+        return True, username_param
     else:
         return False, ""
 
@@ -843,14 +846,6 @@ NON_AUTHN_URLS = [
 # ----------------------------------------------------------------------------
 
 
-from mako.lookup import TemplateLookup
-
-ROOT = './'
-LOOKUP = TemplateLookup(directories=[ROOT + 'templates', ROOT + 'htdocs'],
-                        module_directory=ROOT + 'modules',
-                        input_encoding='utf-8', output_encoding='utf-8')
-
-# ----------------------------------------------------------------------------
 
 def static_filename(config, path):
     if not isinstance(path, basestring):
