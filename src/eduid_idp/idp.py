@@ -935,6 +935,8 @@ class IdPApplication(object):
         self.logger.debug("STATIC FILENAME {!r}".format(static_fn))
         if static_fn:
             return static_file(environ, start_response, static_fn)
+        if path.startswith("static/") or path == "favicon.ico":
+            return not_found(environ, start_response)
 
         url_patterns = AUTHN_URLS
         if not user:
