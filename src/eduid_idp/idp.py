@@ -343,6 +343,10 @@ class SSO(Service):
             self.req_info = _info["req_info"]
             del self.IDP.ticket[_info["key"]]
         except KeyError:
+            if not "SAMLRequest" in _info:
+                resp = BadRequest("Missing SAMLRequest, please re-initiate login")
+                return resp(self.environ, self.start_response)
+
             self.req_info = self.IDP.parse_authn_request(_info["SAMLRequest"],
                                                     BINDING_HTTP_REDIRECT)
             _req = self.req_info.message
