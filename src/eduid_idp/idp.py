@@ -199,24 +199,6 @@ class Service(object):
         _dict = self.unpack_either()
         return self.operation(_dict, BINDING_SOAP)
 
-    # def not_authn(self, key):
-    #     """
-    #
-    #
-    #     :return:
-    #     """
-    #     loc = "http://%s/login" % (self.environ["HTTP_HOST"])
-    #     loc += "?%s" % urllib.urlencode({"came_from": self.environ[
-    #         "PATH_INFO"], "key": key})
-    #     headers = [('Content-Type', 'text/plain')]
-    #
-    #     logger.debug("location: %s" % loc)
-    #     logger.debug("headers: %s" % headers)
-    #
-    #     resp = Redirect(loc, headers=headers)
-    #
-    #     return resp(self.environ, self.start_response)
-
     def not_authn(self, key, requested_authn_context):
         ruri = geturl(self.environ, query=False)
         return do_authentication(self.environ, self.start_response,
@@ -226,22 +208,8 @@ class Service(object):
 
 
 # -----------------------------------------------------------------------------
-
-REPOZE_ID_EQUIVALENT = "uid"
-FORM_SPEC = """<form name="myform" method="post" action="%s">
-   <input type="hidden" name="SAMLResponse" value="%s" />
-   <input type="hidden" name="RelayState" value="%s" />
-</form>"""
-
-# -----------------------------------------------------------------------------
 # === Single log in ====
 # -----------------------------------------------------------------------------
-
-
-class AuthenticationNeeded(Exception):
-    def __init__(self, authn_context=None, *args, **kwargs):
-        Exception.__init__(*args, **kwargs)
-        self.authn_context = authn_context
 
 
 class SSO(Service):
@@ -309,8 +277,6 @@ class SSO(Service):
             identity = USERS[self.user]
             self.logger.info("Identity: %s" % (identity,))
 
-            if REPOZE_ID_EQUIVALENT:
-                identity[REPOZE_ID_EQUIVALENT] = self.user
             try:
                 _resp = self.IDP.create_authn_response(
                     identity, userid=self.user,
@@ -400,42 +366,6 @@ class SSO(Service):
             key = self._store_request(_info)
             return self.not_authn(key, _req.requested_authn_context)
 
-    # def artifact(self):
-    #     # Can be either by HTTP_Redirect or HTTP_POST
-    #     _req = self._store_request(self.unpack_either())
-    #     if isinstance(_req, basestring):
-    #         return self.not_authn(_req)
-    #     return self.artifact_operation(_req)
-
-    def ecp(self):
-        # The ECP interface
-        self.logger.info("--- ECP SSO ---")
-        resp = None
-
-        try:
-            authz_info = self.environ["HTTP_AUTHORIZATION"]
-            if authz_info.startswith("Basic "):
-                _info = base64.b64decode(authz_info[6:])
-                self.logger.debug("Authz_info: %s" % _info)
-                try:
-                    (user, passwd) = _info.split(":")
-                    if PASSWD[user] != passwd:
-                        resp = Unauthorized()
-                    self.user = user
-                except ValueError:
-                    resp = Unauthorized()
-            else:
-                resp = Unauthorized()
-        except KeyError:
-            resp = Unauthorized()
-
-        if resp:
-            return resp(self.environ, self.start_response)
-
-        _dict = self.unpack_soap()
-        self.response_bindings = [BINDING_PAOS]
-        # Basic auth ?!
-        return self.operation(_dict, BINDING_SOAP)
 
 # -----------------------------------------------------------------------------
 # === Authentication ====
@@ -545,12 +475,6 @@ def not_found(environ, start_response):
 # === Single log out ===
 # -----------------------------------------------------------------------------
 
-#def _subject_sp_info(req_info):
-#    # look for the subject
-#    subject = req_info.subject_id()
-#    subject = subject.text.strip()
-#    sp_entity_id = req_info.message.issuer.text.strip()
-#    return subject, sp_entity_id
 
 class SLO(Service):
     def do(self, request, binding, relay_state=""):
@@ -591,169 +515,6 @@ class SLO(Service):
         if delco:
             hinfo["headers"].append(delco)
         self.logger.info("Header: %s" % (hinfo["headers"],))
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
-
-# ----------------------------------------------------------------------------
-# Manage Name ID service
-# ----------------------------------------------------------------------------
-
-
-class NMI(Service):
-
-    def do(self, query, binding, relay_state=""):
-        self.logger.info("--- Manage Name ID Service ---")
-        req = self.IDP.parse_manage_name_id_request(query, binding)
-        request = req.message
-
-        # Do the necessary stuff
-        name_id = self.IDP.ident.handle_manage_name_id_request(
-            request.name_id, request.new_id, request.new_encrypted_id,
-            request.terminate)
-
-        self.logger.debug("New NameID: %s" % name_id)
-
-        _resp = self.IDP.create_manage_name_id_response(request)
-
-        # It's using SOAP binding
-        hinfo = self.IDP.apply_binding(BINDING_SOAP, "%s" % _resp, "",
-                                  relay_state, response=True)
-
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
-
-# ----------------------------------------------------------------------------
-# === Assertion ID request ===
-# ----------------------------------------------------------------------------
-
-
-# Only URI binding
-class AIDR(Service):
-    def do(self, aid, binding, relay_state=""):
-        self.logger.info("--- Assertion ID Service ---")
-
-        try:
-            assertion = self.IDP.create_assertion_id_request_response(aid)
-        except Unknown:
-            resp = NotFound(aid)
-            return resp(self.environ, self.start_response)
-
-        hinfo = self.IDP.apply_binding(BINDING_URI, "%s" % assertion, response=True)
-
-        self.logger.debug("HINFO: %s" % hinfo)
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
-
-    def operation(self, _dict, binding, **kwargs):
-        self.logger.debug("_operation: %s" % _dict)
-        if not _dict or "ID" not in _dict:
-            resp = BadRequest('Error parsing request or no request')
-            return resp(self.environ, self.start_response)
-
-        return self.do(_dict["ID"], binding, **kwargs)
-
-
-# ----------------------------------------------------------------------------
-# === Artifact resolve service ===
-# ----------------------------------------------------------------------------
-
-class ARS(Service):
-    def do(self, request, binding, relay_state=""):
-        _req = self.IDP.parse_artifact_resolve(request, binding)
-
-        msg = self.IDP.create_artifact_response(_req, _req.artifact.text)
-
-        hinfo = self.IDP.apply_binding(BINDING_SOAP, "%s" % msg, "", "",
-                                  response=True)
-
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
-
-# ----------------------------------------------------------------------------
-# === Authn query service ===
-# ----------------------------------------------------------------------------
-
-
-# Only SOAP binding
-class AQS(Service):
-    def do(self, request, binding, relay_state=""):
-        self.logger.info("--- Authn Query Service ---")
-        _req = self.IDP.parse_authn_query(request, binding)
-        _query = _req.message
-
-        msg = self.IDP.create_authn_query_response(_query.subject,
-                                              _query.requested_authn_context,
-                                              _query.session_index)
-
-        self.logger.debug("response: %s" % msg)
-        hinfo = self.IDP.apply_binding(BINDING_SOAP, "%s" % msg, "", "",
-                                  response=True)
-
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
-
-
-# ----------------------------------------------------------------------------
-# === Attribute query service ===
-# ----------------------------------------------------------------------------
-
-
-# Only SOAP binding
-class ATTR(Service):
-    def do(self, request, binding, relay_state=""):
-        self.logger.info("--- Attribute Query Service ---")
-
-        _req = self.IDP.parse_attribute_query(request, binding)
-        _query = _req.message
-
-        name_id = _query.subject.name_id
-        uid = name_id.text
-        self.logger.debug("Local uid: %s" % uid)
-        identity = EXTRA[uid]
-
-        # Comes in over SOAP so only need to construct the response
-        args = self.IDP.response_args(_query, [BINDING_SOAP])
-        msg = self.IDP.create_attribute_response(identity,
-                                            name_id=name_id, **args)
-
-        self.logger.debug("response: %s" % msg)
-        hinfo = self.IDP.apply_binding(BINDING_SOAP, "%s" % msg, "", "",
-                                  response=True)
-
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
-
-# ----------------------------------------------------------------------------
-# Name ID Mapping service
-# When an entity that shares an identifier for a principal with an identity
-# provider wishes to obtain a name identifier for the same principal in a
-# particular format or federation namespace, it can send a request to
-# the identity provider using this protocol.
-# ----------------------------------------------------------------------------
-
-
-class NIM(Service):
-    def do(self, query, binding, relay_state=""):
-        req = self.IDP.parse_name_id_mapping_request(query, binding)
-        request = req.message
-        # Do the necessary stuff
-        try:
-            name_id = self.IDP.ident.handle_name_id_mapping_request(
-                request.name_id, request.name_id_policy)
-        except Unknown:
-            resp = BadRequest("Unknown entity")
-            return resp(self.environ, self.start_response)
-        except PolicyError:
-            resp = BadRequest("Unknown entity")
-            return resp(self.environ, self.start_response)
-
-        info = self.IDP.response_args(request)
-        _resp = self.IDP.create_name_id_mapping_response(name_id, **info)
-
-        # Only SOAP
-        hinfo = self.IDP.apply_binding(BINDING_SOAP, "%s" % _resp, "", "",
-                                  response=True)
-
         resp = Response(hinfo["data"], headers=hinfo["headers"])
         return resp(self.environ, self.start_response)
 
@@ -809,39 +570,20 @@ AUTHN_URLS = [
     (r'sso/post/(.*)$', (SSO, "post")),
     (r'sso/redirect$', (SSO, "redirect")),
     (r'sso/redirect/(.*)$', (SSO, "redirect")),
-    (r'sso/art$', (SSO, "artifact")),
-    (r'sso/art/(.*)$', (SSO, "artifact")),
+    (r'sso/art$', (SSO, "artifact")),		# seldomly used, but part of standard
+    (r'sso/art/(.*)$', (SSO, "artifact")),	# seldomly used, but part of standard
     # slo
     (r'slo/redirect$', (SLO, "redirect")),
     (r'slo/redirect/(.*)$', (SLO, "redirect")),
     (r'slo/post$', (SLO, "post")),
     (r'slo/post/(.*)$', (SLO, "post")),
-    (r'slo/soap$', (SLO, "soap")),
-    (r'slo/soap/(.*)$', (SLO, "soap")),
-    #
-    (r'airs$', (AIDR, "uri")),
-    (r'ars$', (ARS, "soap")),
-    # mni
-    (r'mni/post$', (NMI, "post")),
-    (r'mni/post/(.*)$', (NMI, "post")),
-    (r'mni/redirect$', (NMI, "redirect")),
-    (r'mni/redirect/(.*)$', (NMI, "redirect")),
-    (r'mni/art$', (NMI, "artifact")),
-    (r'mni/art/(.*)$', (NMI, "artifact")),
-    (r'mni/soap$', (NMI, "soap")),
-    (r'mni/soap/(.*)$', (NMI, "soap")),
-    # nim
-    (r'nim$', (NIM, "soap")),
-    (r'nim/(.*)$', (NIM, "soap")),
-    #
-    (r'aqs$', (AQS, "soap")),
-    (r'attr$', (ATTR, "soap"))
+    (r'slo/soap$', (SLO, "soap")),		# SOAP is commonly used for SLO
+    (r'slo/soap/(.*)$', (SLO, "soap")),		# SOAP is commonly used for SLO
 ]
 
 NON_AUTHN_URLS = [
-    (r'login?(.*)$', do_authentication),
     (r'verify?(.*)$', do_verify),
-    (r'sso/ecp$', (SSO, "ecp")),
+    #(r'sso/ecp$', (SSO, "ecp")),   # ECP is for eduID > 1
 ]
 
 # ----------------------------------------------------------------------------
@@ -947,11 +689,11 @@ class IdPApplication(object):
         for regex, callback in url_patterns:
             match = re.search(regex, path)
             if match is not None:
-                try:
-                    environ['myapp.url_args'] = match.groups()[0]
-                except IndexError:
-                    environ['myapp.url_args'] = path
-
+                # The 'myapp' thingy is unused legacy according to Roland
+                #try:
+                #    environ['myapp.url_args'] = match.groups()[0]
+                #except IndexError:
+                #    environ['myapp.url_args'] = path
                 self.logger.debug("Callback: %s" % (callback,))
                 if isinstance(callback, tuple):
                     cls = callback[0](environ, start_response, self, user)
