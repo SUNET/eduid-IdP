@@ -1,4 +1,68 @@
 #!/usr/bin/env python
+#
+# XXX check ../ handling in static file handling
+
+
+"""
+eduID IdP application
+
+
+General user<->IdP interaction flow :
+
+
+  1) User visits protected page at SP, which redirects user to
+     URL /sso/redirect?SAMLRequest=base64-AuthnRequest
+
+  2) URL /sso/redirect is handled by SSO.redirect()
+
+     SSO.redirect() creates SHA-1 of SAML AuthnRequest and uses this as key to store
+     some info in a cache called IDP.ticket. The information stored includes all the
+     URI parameters.
+
+     The key is passed to the login form HTML template as {{key}}.
+
+     Another hash, a reference to the authn context is generated (by pysaml2
+     authn_context code) and passed to the template as {{authn_reference}}.
+
+     The current URL is included in the HTML form as {{redirect_uri}}.
+
+  3) User fills out login form an POSTs it to URL /verify
+
+  4) URL /verify is handled by do_verify()
+
+     do_verify() tries to authenticate user based on filled out HTML form contents.
+
+     If successful, a random user identifier is created and a mapping between the
+     random uid and the real authenticated users username is stored in the IDP.cache.
+
+     The random user identifier and the authn_reference from step 2 is stored in a
+     browser cookie called `idpauthn'.
+
+     The user is HTTP redirected back to the URL of step 2 through the `redirect_uri'
+     HTML parameter (included in the HTML form by step 2). The random user identifier
+     is passed as URL parameter `id', and the `authn_reference' from step 2 is passed
+     as URL parameter `key'.
+
+  5) URL /sso/redirect (re-visited) is handled by SSO.redirect()
+
+     Since the query string includes a `key' that can be used to look up info from
+     IDP.ticket this time, processing is continued in SSO.do() (via SSO.operation()).
+     The info in IDP.ticket is pruned first.
+
+     SSO.do() gets the original URI parameters from step 2 that were stored in
+     IDP.ticket, and rounds up identity information for the user.
+
+     SSO.do() effectively uses IdPApplication.application() to determine which
+     user is logged in. This will be either from the idpauthn cookie being set,
+     and containing a random user identifier that can be looked up in IDP.cache
+     to get a real username, or from IDP.cache using the `id' URI parameter.
+
+     An AuthnResponse is created using pysaml2 create_authn_response(), and this
+     is where the `authn_reference' from step 2 seems to come into play. The authn
+     reference is used to locate the correct authn instance (the same one used
+     in step 2) with the AUTHN_BROKER.
+
+"""
 
 import os
 import re
@@ -143,7 +207,7 @@ class Service(object):
         return _dict
 
     def operation(self, _dict, binding):
-        self.logger.debug("_operation: %s" % _dict)
+        self.logger.debug("_operation:\n{!s}".format(pprint.pformat(_dict)))
         if not _dict:
             resp = BadRequest('Error parsing request or no request')
             return resp(self.environ, self.start_response)
@@ -200,11 +264,25 @@ class Service(object):
         return self.operation(_dict, BINDING_SOAP)
 
     def not_authn(self, key, requested_authn_context):
-        ruri = geturl(self.environ, query=False)
-        return do_authentication(self.environ, self.start_response,
-                                 self.logger, self.config, self.AUTHN_BROKER,
-                                 authn_context=requested_authn_context,
-                                 key=key, redirect_uri=ruri)
+        """
+        Authenticate user. Either, the user hasn't logged in yet,
+        or the service provider forces re-authentication.
+        """
+        redirect_uri = geturl(self.environ, query=False)
+
+        self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
+
+        auth_info = self.AUTHN_BROKER.pick(requested_authn_context)
+
+        if len(auth_info):
+            method, reference = auth_info[0]
+            self.logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
+            # `method' is, for example, the function username_password_authn
+            return method(self.environ, self.start_response, reference, key,
+                          redirect_uri, self.logger, self.config)
+        else:
+            resp = Unauthorized("No usable authentication method")
+            return resp(environ, start_response)
 
 
 # -----------------------------------------------------------------------------
@@ -235,10 +313,12 @@ class SSO(Service):
 
         if not self.req_info:
             self.req_info = self.IDP.parse_authn_request(query, binding)
+        else:
+            self.logger.debug("verify_request did not really parse the query supplied, found self.req_info")
 
-        self.logger.info("parsed OK")
+        self.logger.info("SAML query parsed OK")
         _authn_req = self.req_info.message
-        self.logger.debug("%s" % _authn_req)
+        self.logger.debug("AuthnRequest {!r} :\n{!s}".format(_authn_req, _authn_req))
 
         self.binding_out, self.destination = self.IDP.pick_binding(
             "assertion_consumer_service",
@@ -246,7 +326,7 @@ class SSO(Service):
             entity_id=_authn_req.issuer.text)
 
         self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
-                                                       self.destination))
+                                                            self.destination))
 
         resp_args = {}
         try:
@@ -254,14 +334,16 @@ class SSO(Service):
             _resp = None
         except UnknownPrincipal, excp:
             _resp = self.IDP.create_error_response(_authn_req.id,
-                                              self.destination, excp)
+                                                   self.destination, excp)
         except UnsupportedBinding, excp:
             _resp = self.IDP.create_error_response(_authn_req.id,
-                                              self.destination, excp)
+                                                   self.destination, excp)
 
         return resp_args, _resp
 
     def do(self, query, binding_in, relay_state=""):
+        self.logger.debug("\n\n---\n\n")
+        self.logger.debug("--- In SSO.do() ---")
         try:
             resp_args, _resp = self.verify_request(query, binding_in)
         except UnknownPrincipal, excp:
@@ -275,28 +357,34 @@ class SSO(Service):
 
         if not _resp:
             identity = USERS[self.user]
-            self.logger.info("Identity: %s" % (identity,))
+            self.logger.info("Identity:\n{!s}".format(pprint.pformat(identity)))
 
             try:
+                _authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
+                self.logger.debug("Re-created authn {!r} using idp.authn_ref {!r}".format(
+                        _authn, self.environ["idp.authn_ref"]))
+                self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
                 _resp = self.IDP.create_authn_response(
                     identity, userid=self.user,
-                    authn=self.AUTHN_BROKER[self.environ["idp.authn_ref"]],
+                    authn=_authn,
                     **resp_args)
             except Exception, excp:
                 self.logger.error(exception_trace(excp))
                 resp = ServiceError("Exception: %s" % (excp,))
                 return resp(self.environ, self.start_response)
 
-        self.logger.info("AuthNResponse: %s" % _resp)
+        self.logger.info("AuthNResponse {!r} :\n{!s}".format(_resp, _resp))
+        # Create the Javascript self-posting form that will take the user back to the SP
+        # with a SAMLResponse
         http_args = self.IDP.apply_binding(self.binding_out,
-                                      "%s" % _resp, self.destination,
-                                      relay_state, response=True)
-        self.logger.debug("HTTPargs: %s" % http_args)
+                                           "%s" % _resp, self.destination,
+                                           relay_state, response=True)
+        self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
         return self.response(self.binding_out, http_args)
 
     def _store_request(self, _dict):
-        self.logger.debug("_store_request:\n{!s}".format(pprint.pformat(_dict)))
         key = sha1(_dict["SAMLRequest"]).hexdigest()
+        self.logger.debug("_store_request (key {!r}):\n{!s}".format(key, pprint.pformat(_dict)))
         # store the AuthnRequest
         self.IDP.ticket[key] = _dict
         return key
@@ -305,12 +393,21 @@ class SSO(Service):
         """ This is the HTTP-redirect endpoint """
         self.logger.info("--- In SSO Redirect ---")
         _info = self.unpack_redirect()
+        self.logger.debug("FREDRIK: Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
+        _key = None
         try:
-            _info = self.IDP.ticket[_info["key"]]
+            _key = _info["key"]
+            _info = self.IDP.ticket[_key]
+            self.logger.debug("FREDRIK: Retreived IDP.ticket(key={!r}) :\n{!s}".format(
+                    _key, pprint.pformat(_info)))
             self.req_info = _info["req_info"]
-            del self.IDP.ticket[_info["key"]]
+            self.logger.debug("FREDRIK: Pruning IDP.ticket(key={!r})".format(_key))
+            del self.IDP.ticket[_key]
         except KeyError:
+            self.logger.debug("FREDRIK: Key {!r} not found in IDP.ticket :\n{!s}".format(
+                     _key, pprint.pformat(self.IDP.ticket)))
+
             if not "SAMLRequest" in _info:
                 resp = BadRequest("Missing SAMLRequest, please re-initiate login")
                 return resp(self.environ, self.start_response)
@@ -318,6 +415,8 @@ class SSO(Service):
             self.req_info = self.IDP.parse_authn_request(_info["SAMLRequest"],
                                                     BINDING_HTTP_REDIRECT)
             _req = self.req_info.message
+
+            self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(_req, _req))
 
             if "SigAlg" in _info and "Signature" in _info:  # Signed request
                 issuer = _req.issuer.text
@@ -330,19 +429,30 @@ class SSO(Service):
                 if not verified_ok:
                     resp = BadRequest("Message signature verification failure")
                     return resp(self.environ, self.start_response)
+            else:
+                self.logger.debug("No signature in SAMLRequest")
+
+            # convey failcount to login form rendering function
+            if "FailCount" in _info:
+                self.logger.debug("CONVEYING FAILCOUNT: {!r}".format(_info["FailCount"]))
+                self.environ['idp.FailCount'] = _info["FailCount"]
 
             if self.user:
                 if _req.force_authn:
+                    self.logger.info("Forcing authentication for user {!r}".format(self.user))
                     _info["req_info"] = self.req_info
                     key = self._store_request(_info)
                     return self.not_authn(key, _req.requested_authn_context)
                 else:
+                    self.logger.debug("Continuing with user {!r}".format(self.user))
                     return self.operation(_info, BINDING_HTTP_REDIRECT)
             else:
+                self.logger.info("Not authenticated")
                 _info["req_info"] = self.req_info
                 key = self._store_request(_info)
                 return self.not_authn(key, _req.requested_authn_context)
         else:
+            self.logger.debug("Continuing based on stored Authn request {!r}".format(self.req_info))
             return self.operation(_info, BINDING_HTTP_REDIRECT)
 
     def post(self):
@@ -372,54 +482,40 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def do_authentication(environ, start_response, logger, config, AUTHN_BROKER,
-                      authn_context, key, redirect_uri):
-    """
-    Display the login form
-    """
-    logger.debug("Do authentication")
-    auth_info = AUTHN_BROKER.pick(authn_context)
-
-    if len(auth_info):
-        method, reference = auth_info[0]
-        logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
-        return method(environ, start_response, reference, key, redirect_uri, logger, config)
-    else:
-        resp = Unauthorized("No usable authentication method")
-        return resp(environ, start_response)
-
-
-# -----------------------------------------------------------------------------
-
-PASSWD = {"roland": "dianakra",
-          "babs": "howes",
-          "upper": "crust"}
-
-
 def username_password_authn(environ, start_response, reference, key,
                             redirect_uri, logger, config):
     """
     Display the login form
     """
-    logger.info("The login page")
-    headers = []
-
     argv = {
         "action": "/verify",
         "username": "",
         "password": "",
         "key": key,
         "authn_reference": reference,
-        "redirect_uri": redirect_uri
+        "redirect_uri": redirect_uri,
+        "alert_msg": "",
     }
-    logger.info("do_authentication argv:\n{!s}".format(pprint.pformat(argv)))
+
+    _fc = environ.get("idp.FailCount")
+    if _fc:
+        try:
+            _fc = int(_fc)
+        except ValueError:
+            logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
+            pass
+        else:
+            if _fc > 0:
+                argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
+
+    logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
     static_fn = static_filename(config, 'login.html')
 
     if static_fn:
         res = static_file(environ, start_response, static_fn)
         if len(res) == 1:
-            res=res[0]
+            res = res[0]
         # apply simplistic HTML formatting to template in 'res'
         return res.format(**argv)
 
@@ -427,7 +523,10 @@ def username_password_authn(environ, start_response, reference, key,
 
 
 def verify_username_and_password(dic):
-    global PASSWD
+    PASSWD = {"roland": "dianakra",
+              "babs": "howes",
+              "upper": "crust"}
+
     # verify username and password
     username_param = dic["username"][0]
     if PASSWD[username_param] == dic["password"][0]:
@@ -436,25 +535,45 @@ def verify_username_and_password(dic):
         return False, ""
 
 
-def do_verify(environ, start_response, idp_app, _):
+def do_verify(environ, start_response, idp_app, _user):
     query = parse_qs(get_post(environ))
 
-    idp_app.logger.debug("do_verify: %s" % query)
+    # XXX remove password from query before logging
+    idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(query)))
+
+    idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
 
     try:
+        # XXX need to verify that UsernamePassword is an appropriate authn context here I think
         _ok, user = verify_username_and_password(query)
     except KeyError:
         _ok = False
         user = None
 
     if not _ok:
-        resp = Unauthorized("Unknown user or wrong password")
+        idp_app.logger.info("Unknown user or wrong password")
+        if "HTTP_REFERER" in environ:
+            _qs = environ["HTTP_REFERER"]
+            _fc = environ.get("idp.FailCount", 0)
+            try:
+                _fc = int(_fc)
+            except ValueError:
+                logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
+
+            # XXX should unpack-append-repack properly instead of string format
+            lox = "%s&FailCount=%s" % (query["redirect_uri"][0], _fc + 1)
+            resp = Redirect(lox, content="text/html")
+        else:
+            resp = Unauthorized("Unknown user or wrong password")
     else:
+        idp_app.logger.debug("FREDRIK: User {!r} authenticated OK".format(user))
         uid = rndstr(24)
         idp_app.IDP.cache.uid2user[uid] = user
         idp_app.IDP.cache.user2uid[user] = uid
         idp_app.logger.debug("Register %s under '%s'" % (user, uid))
 
+        idp_app.logger.debug("FREDRIK: Storing uid={!r} and authn_reference={!r} in idpauthn cookie".format(
+                uid, query["authn_reference"][0]))
         kaka = set_cookie("idpauthn", "/", idp_app.logger, uid, query["authn_reference"][0])
 
         lox = "%s?id=%s&key=%s" % (query["redirect_uri"][0], uid,
@@ -492,6 +611,8 @@ class SLO(Service):
         if msg.name_id:
             lid = self.IDP.ident.find_local_id(msg.name_id)
             self.logger.info("local identifier: %s" % lid)
+            self.logger.debug("Purging from cache, uid : {!s}".format(self.IDP.cache.uid2user[self.IDP.cache.user2uid[lid]]))
+            self.logger.debug("Purging from cache, lid : {!s}".format(self.IDP.cache.user2uid[lid]))
             del self.IDP.cache.uid2user[self.IDP.cache.user2uid[lid]]
             del self.IDP.cache.user2uid[lid]
             # remove the authentication
@@ -530,6 +651,7 @@ def info_from_cookie(kaka, IDP, logger):
         if morsel:
             try:
                 key, ref = base64.b64decode(morsel.value).split(":")
+                logger.debug("FREDRIK: Decoded idpauthn cookie into key={!r}, ref={!r}".format(key, ref))
                 return IDP.cache.uid2user[key], ref
             except KeyError:
                 return None, None
@@ -559,6 +681,7 @@ def set_cookie(name, _, logger, *args):
     cookie[name]['path'] = "/"
     cookie[name]["expires"] = _expiration(5)  # 5 minutes from now
     logger.debug("Cookie expires: %s" % cookie[name]["expires"])
+    logger.debug("set KAKA: %s" % cookie)
     return tuple(cookie.output().split(": ", 1))
 
 # ----------------------------------------------------------------------------
@@ -607,6 +730,8 @@ def static_file(environ, start_response, filename):
         text = open(filename).read()
         if filename.endswith(".ico"):
             resp = Response(text, headers=[('Content-Type', "image/x-icon")])
+        elif filename.endswith(".png"):
+            resp = Response(text, headers=[('Content-Type', 'image/png')])
         elif filename.endswith(".html"):
             resp = Response(text, headers=[('Content-Type', 'text/html')])
         elif filename.endswith(".css"):
@@ -635,13 +760,30 @@ class IdPApplication(object):
         authn_authority = "http://%s" % socket.gethostname()
 
         self.AUTHN_BROKER = AuthnBroker()
+        #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
         self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), username_password_authn, 10, authn_authority)
         self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
 
         self.IDP = server.Server(config.pysaml2_config, cache=Cache())
         self.IDP.ticket = {}
 
+    def my_start_response(self, status, headers):
+        self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
+        self.response_status = status
+        return self.start_response(status, headers)
+
     def application(self, environ, start_response):
+        self.start_response = start_response
+        res = self.application2(environ, self.my_start_response)
+        if isinstance(res, list):
+            res = ''.join(res)
+        if len(res) < 200:
+            self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(self.response_status, res))
+        else:
+            self.logger.debug("FREDRIK: APP RESPONSE {!r} : {!r} bytes".format(self.response_status, len(res)))
+        return res
+
+    def application2(self, environ, start_response):
         """
         The main WSGI application. Dispatch the current request to
         the functions from above and store the regular expression
@@ -662,20 +804,23 @@ class IdPApplication(object):
         self.logger.info("<application> PATH: %s" % path)
 
         if kaka:
-            self.logger.info("= KAKA =")
+            self.logger.debug("= KAKA =")
             user, authn_ref = info_from_cookie(kaka, self.IDP, self.logger)
+            self.logger.debug("FREDRIK: Decoded info from cookie : user={!r}, authn_ref={!r}".format(user, authn_ref))
             environ["idp.authn_ref"] = authn_ref
         else:
             try:
                 query = parse_qs(environ["QUERY_STRING"])
                 self.logger.debug("QUERY:\n{!s}".format(pprint.pformat(query)))
                 user = self.IDP.cache.uid2user[query["id"][0]]
+                self.logger.debug("FREDRIK: Looked up user={!r} from cache(id={!r})".format(user, query["id"][0]))
             except KeyError:
+                self.logger.debug("FREDRIK: No user")
                 user = None
 
         static_fn = static_filename(self.config, path)
-        self.logger.debug("STATIC FILENAME {!r}".format(static_fn))
         if static_fn:
+            self.logger.debug("SERVING STATIC FILE {!r}".format(static_fn))
             return static_file(environ, start_response, static_fn)
         if path.startswith("static/") or path == "favicon.ico":
             return not_found(environ, start_response)
@@ -685,9 +830,12 @@ class IdPApplication(object):
             self.logger.info("-- No USER --")
             # insert NON_AUTHN_URLS first in case there is no user
             url_patterns = NON_AUTHN_URLS + url_patterns
+        else:
+            self.logger.info("FREDRIK: USER {!r}".format(user))
 
         for regex, callback in url_patterns:
             match = re.search(regex, path)
+            self.logger.debug("match path {!r} to re {!r} -> {!r}".format(path, regex, match))
             if match is not None:
                 # The 'myapp' thingy is unused legacy according to Roland
                 #try:
@@ -718,7 +866,7 @@ def main(myname = 'eduid.saml2.idp'):
     config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
     if config.debug:
         logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s %(name)s: %(levelname)s %(message)s')
+        formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
         stream_h = logging.StreamHandler(sys.stderr)
         stream_h.setFormatter(formatter)
         logger.addHandler(stream_h)
