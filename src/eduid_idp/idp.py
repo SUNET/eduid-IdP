@@ -384,7 +384,7 @@ class SSO(Service):
 
     def _store_request(self, _dict):
         key = sha1(_dict["SAMLRequest"]).hexdigest()
-        self.logger.debug("_store_request (key {!r}):\n{!s}".format(key, pprint.pformat(_dict)))
+        self.logger.debug("_store_request in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(_dict)))
         # store the AuthnRequest
         self.IDP.ticket[key] = _dict
         return key
@@ -803,6 +803,13 @@ class IdPApplication(object):
         self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
+        static_fn = static_filename(self.config, path)
+        if static_fn:
+            self.logger.debug("SERVING STATIC FILE {!r}".format(static_fn))
+            return static_file(environ, start_response, static_fn)
+        if path.startswith("static/") or path == "favicon.ico":
+            return not_found(environ, start_response)
+
         if kaka:
             self.logger.debug("= KAKA =")
             user, authn_ref = info_from_cookie(kaka, self.IDP, self.logger)
@@ -817,13 +824,6 @@ class IdPApplication(object):
             except KeyError:
                 self.logger.debug("FREDRIK: No user")
                 user = None
-
-        static_fn = static_filename(self.config, path)
-        if static_fn:
-            self.logger.debug("SERVING STATIC FILE {!r}".format(static_fn))
-            return static_file(environ, start_response, static_fn)
-        if path.startswith("static/") or path == "favicon.ico":
-            return not_found(environ, start_response)
 
         url_patterns = AUTHN_URLS
         if not user:
