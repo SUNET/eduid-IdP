@@ -143,6 +143,31 @@ class Cache(object):
         self.user2uid = {}
         self.uid2user = {}
 
+class TicketCache():
+
+    def __init__(self, logger):
+        self.logger = logger
+        self._data = {}
+
+    def key(self, SAMLRequest):
+        return sha1(SAMLRequest).hexdigest()
+
+    def add(self, key, info):
+        assert("SAMLRequest" in info)
+        self._data[key] = info
+
+    def get(self, key):
+        return self._data.get(key)
+
+    def items(self):
+        return self._data
+
+    def delete(self, key):
+        if key in self._data:
+            del self._data[key]
+        else:
+            self.logger.debug("FREDRIK: FAILED DELETING {!r} FROM\n{!s}".format(
+                    key, pprint.pformat(self._data)))
 
 def _expiration(timeout, tformat="%a, %d-%b-%Y %H:%M:%S GMT"):
     """
@@ -301,6 +326,7 @@ class SSO(Service):
         self.destination = None
         self.req_info = None
 
+
     def verify_request(self, query, binding):
         """
         :param query: The SAML query, transport encoded
@@ -313,10 +339,11 @@ class SSO(Service):
 
         if not self.req_info:
             self.req_info = self.IDP.parse_authn_request(query, binding)
+            self.logger.info("SAML query parsed OK")
         else:
-            self.logger.debug("verify_request did not really parse the query supplied, found self.req_info")
+            self.logger.debug("verify_request acting on previously parsed self.req_info {!s}".format(
+                    self.req_info))
 
-        self.logger.info("SAML query parsed OK")
         _authn_req = self.req_info.message
         self.logger.debug("AuthnRequest {!r} :\n{!s}".format(_authn_req, _authn_req))
 
@@ -340,6 +367,7 @@ class SSO(Service):
                                                    self.destination, excp)
 
         return resp_args, _resp
+
 
     def do(self, query, binding_in, relay_state=""):
         self.logger.debug("\n\n---\n\n")
@@ -370,8 +398,12 @@ class SSO(Service):
                     **resp_args)
             except Exception, excp:
                 self.logger.error(exception_trace(excp))
+                self.logger.debug("AuthN-by-ref {!r} not found in list :\n{!s}".format(
+                        self.environ["idp.authn_ref"], pprint.pformat(self.AUTHN_BROKER.db["info"])))
                 resp = ServiceError("Exception: %s" % (excp,))
                 return resp(self.environ, self.start_response)
+
+        # XXX clean IDP.ticket here!
 
         self.logger.info("AuthNResponse {!r} :\n{!s}".format(_resp, _resp))
         # Create the Javascript self-posting form that will take the user back to the SP
@@ -382,12 +414,6 @@ class SSO(Service):
         self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
         return self.response(self.binding_out, http_args)
 
-    def _store_request(self, _dict):
-        key = sha1(_dict["SAMLRequest"]).hexdigest()
-        self.logger.debug("_store_request in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(_dict)))
-        # store the AuthnRequest
-        self.IDP.ticket[key] = _dict
-        return key
 
     def redirect(self):
         """ This is the HTTP-redirect endpoint """
@@ -395,65 +421,33 @@ class SSO(Service):
         _info = self.unpack_redirect()
         self.logger.debug("FREDRIK: Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        _key = None
-        try:
-            _key = _info["key"]
-            _info = self.IDP.ticket[_key]
-            self.logger.debug("FREDRIK: Retreived IDP.ticket(key={!r}) :\n{!s}".format(
-                    _key, pprint.pformat(_info)))
-            self.req_info = _info["req_info"]
-            self.logger.debug("FREDRIK: Pruning IDP.ticket(key={!r})".format(_key))
-            del self.IDP.ticket[_key]
-        except KeyError:
-            self.logger.debug("FREDRIK: Key {!r} not found in IDP.ticket :\n{!s}".format(
-                     _key, pprint.pformat(self.IDP.ticket)))
+        _res, _ticket = self._get_ticket(_info)
+        if not _res:
+            # result was an WSGI error response function
+            return _ticket(self.environ, self.start_response)
+        self.req_info = _ticket['req_info']
 
-            if not "SAMLRequest" in _info:
-                resp = BadRequest("Missing SAMLRequest, please re-initiate login")
-                return resp(self.environ, self.start_response)
+        _fc = _ticket.get("FailCount", 0)
+        if _fc:
+            self.environ['idp.FailCount'] = _fc
 
-            self.req_info = self.IDP.parse_authn_request(_info["SAMLRequest"],
-                                                    BINDING_HTTP_REDIRECT)
-            _req = self.req_info.message
+        # re-insert in IDP.ticket cache
+        _ticket["FailCount"] = _fc + 1
+        key = self._store_ticket(_ticket)
 
-            self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(_req, _req))
-
-            if "SigAlg" in _info and "Signature" in _info:  # Signed request
-                issuer = _req.issuer.text
-                _certs = self.IDP.metadata.certs(issuer, "any", "signing")
-                verified_ok = False
-                for cert in _certs:
-                    if verify_redirect_signature(_info, cert):
-                        verified_ok = True
-                        break
-                if not verified_ok:
-                    resp = BadRequest("Message signature verification failure")
-                    return resp(self.environ, self.start_response)
-            else:
-                self.logger.debug("No signature in SAMLRequest")
-
-            # convey failcount to login form rendering function
-            if "FailCount" in _info:
-                self.logger.debug("CONVEYING FAILCOUNT: {!r}".format(_info["FailCount"]))
-                self.environ['idp.FailCount'] = _info["FailCount"]
-
-            if self.user:
-                if _req.force_authn:
-                    self.logger.info("Forcing authentication for user {!r}".format(self.user))
-                    _info["req_info"] = self.req_info
-                    key = self._store_request(_info)
-                    return self.not_authn(key, _req.requested_authn_context)
-                else:
-                    self.logger.debug("Continuing with user {!r}".format(self.user))
-                    return self.operation(_info, BINDING_HTTP_REDIRECT)
-            else:
-                self.logger.info("Not authenticated")
-                _info["req_info"] = self.req_info
-                key = self._store_request(_info)
-                return self.not_authn(key, _req.requested_authn_context)
+        if not self.user:
+            self.logger.info("Not authenticated")
+            return self.not_authn(key, self.req_info.message.requested_authn_context)
         else:
-            self.logger.debug("Continuing based on stored Authn request {!r}".format(self.req_info))
-            return self.operation(_info, BINDING_HTTP_REDIRECT)
+            self.logger.debug("Continuing with user {!r}".format(self.user))
+
+        if self.req_info.message.force_authn:
+            self.logger.info("Forcing authentication for user {!r}".format(self.user))
+            return self.not_authn(key, self.req_info.message.requested_authn_context)
+
+        self.logger.debug("Continuing with Authn request {!r}".format(self.req_info))
+        return self.operation(_ticket, BINDING_HTTP_REDIRECT)
+
 
     def post(self):
         """
@@ -467,14 +461,108 @@ class SSO(Service):
         if self.user:
             if _req.force_authn:
                 _info["req_info"] = self.req_info
-                key = self._store_request(_info)
+                key = self._store_ticket(_info)
                 return self.not_authn(key, _req.requested_authn_context)
             else:
                 return self.operation(_info, BINDING_HTTP_POST)
         else:
             _info["req_info"] = self.req_info
-            key = self._store_request(_info)
+            key = self._store_ticket(_info)
             return self.not_authn(key, _req.requested_authn_context)
+
+
+    def _store_ticket(self, _ticket):
+        """
+        Add an entry to the IDP.ticket cache.
+
+        Ticket must contain SAMLRequest and is typically
+
+        {'RelayState': '/path',
+         'SAMLRequest': 'nVLB...==',
+         'req_info': <saml2.request.AuthnRequest object>,
+         ...
+        }
+
+        :returns: Key as string
+        """
+        key = self.IDP.ticket.key(_ticket["SAMLRequest"])
+        self.logger.debug("_store_ticket in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(_ticket)))
+        # store the AuthnRequest
+        self.IDP.ticket.add(key, _ticket)
+        return key
+
+
+    def _get_ticket(self, _info):
+        """
+        _info is redirect HTTP query parameters.
+
+        Will include a 'key' parameter, or a 'SAMLRequest'.
+
+        Ticket is typically
+
+        {'RelayState': '/path',
+         'SAMLRequest': 'nVLB...==',
+         'req_info': <saml2.request.AuthnRequest object>,
+         ...
+        }
+
+        :returns: ResultBool, Ticket as dict
+        """
+        # Try ticket-cache lookup based on key, or key derived from SAMLRequest
+        _key = None
+        if "key" in _info:
+            _key = _info["key"]
+        elif "SAMLRequest" in _info:
+            _key = self.IDP.ticket.key(_info["SAMLRequest"])
+        else:
+            return False, BadRequest("Missing SAMLRequest, please re-initiate login")
+        # lookup
+        _data = self.IDP.ticket.get(_key)
+
+        if _data is None:
+            self.logger.debug("FREDRIK: Key {!r} not found in IDP.ticket :\n{!s}".format(
+                     _key, pprint.pformat(self.IDP.ticket.items())))
+            if "key" in _info:
+                return False, BadRequest("Missing IdP ticket, please re-initiate login")
+             # cache miss, parse SAMLRequest
+            _data = _info
+            _data["req_info"] = self._parse_SAMLRequest(_info)
+        else:
+            self.logger.debug("FREDRIK: Retreived IDP.ticket(key={!r}) :\n{!s}".format(
+                    _key, pprint.pformat(_data)))
+
+        return True, _data
+
+
+    def _parse_SAMLRequest(self, _info):
+        """
+        Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
+        instance.
+
+        If the SAMLRequest is signed, the signature is validated and a BadRequest()
+        returned on failure.
+
+        :returns: AuthnRequest or BadRequest() instance
+        """
+        _req_info = self.IDP.parse_authn_request(_info["SAMLRequest"], BINDING_HTTP_REDIRECT)
+
+        self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
+                _req_info.message, _req_info.message))
+
+        if "SigAlg" in _info and "Signature" in _info:  # Signed request
+            issuer = _req_info.message.issuer.text
+            _certs = self.IDP.metadata.certs(issuer, "any", "signing")
+            verified_ok = False
+            for cert in _certs:
+                if verify_redirect_signature(_info, cert):
+                    verified_ok = True
+                    break
+            if not verified_ok:
+                resp = BadRequest("Message signature verification failure")
+                return resp(self.environ, self.start_response)
+        else:
+            self.logger.debug("No signature in SAMLRequest")
+        return _req_info
 
 
 # -----------------------------------------------------------------------------
@@ -497,16 +585,15 @@ def username_password_authn(environ, start_response, reference, key,
         "alert_msg": "",
     }
 
-    _fc = environ.get("idp.FailCount")
-    if _fc:
-        try:
-            _fc = int(_fc)
-        except ValueError:
-            logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
-            pass
-        else:
-            if _fc > 0:
-                argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
+    _fc = environ.get("idp.FailCount", 0)
+    try:
+        _fc = int(_fc)
+    except ValueError:
+        logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
+        pass
+    else:
+        if _fc > 0:
+            argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
 
     logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
@@ -560,8 +647,7 @@ def do_verify(environ, start_response, idp_app, _user):
             except ValueError:
                 logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
 
-            # XXX should unpack-append-repack properly instead of string format
-            lox = "%s&FailCount=%s" % (query["redirect_uri"][0], _fc + 1)
+            lox = "%s" % (environ["HTTP_REFERER"])
             resp = Redirect(lox, content="text/html")
         else:
             resp = Unauthorized("Unknown user or wrong password")
@@ -644,14 +730,20 @@ class SLO(Service):
 # Cookie handling
 # ----------------------------------------------------------------------------
 def info_from_cookie(kaka, IDP, logger):
-    logger.debug("KAKA: %s" % kaka)
+    """
+    Decode information stored in a browser cookie.
+
+    XXX this cookie needs to be MAC:d - or better.
+
+    :returns: Username, AuthnRef
+    """
+    logger.debug("Parsing cookie(s): %s" % kaka)
     if kaka:
         cookie_obj = SimpleCookie(kaka)
         morsel = cookie_obj.get("idpauthn", None)
         if morsel:
             try:
                 key, ref = base64.b64decode(morsel.value).split(":")
-                logger.debug("FREDRIK: Decoded idpauthn cookie into key={!r}, ref={!r}".format(key, ref))
                 return IDP.cache.uid2user[key], ref
             except KeyError:
                 return None, None
@@ -765,7 +857,7 @@ class IdPApplication(object):
         self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
 
         self.IDP = server.Server(config.pysaml2_config, cache=Cache())
-        self.IDP.ticket = {}
+        self.IDP.ticket = TicketCache(logger)
 
     def my_start_response(self, status, headers):
         self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
@@ -811,14 +903,16 @@ class IdPApplication(object):
             return not_found(environ, start_response)
 
         if kaka:
-            self.logger.debug("= KAKA =")
+            # XXX retreiving the authn_ref from an unsecured cookie lets malicious people
+            # 'upgrade' their logins to higher authentication contexts!
             user, authn_ref = info_from_cookie(kaka, self.IDP, self.logger)
-            self.logger.debug("FREDRIK: Decoded info from cookie : user={!r}, authn_ref={!r}".format(user, authn_ref))
+            self.logger.debug("Decoded info from idpauthn cookie : user={!r}, authn_ref={!r}".format(
+                    user, authn_ref))
             environ["idp.authn_ref"] = authn_ref
         else:
             try:
                 query = parse_qs(environ["QUERY_STRING"])
-                self.logger.debug("QUERY:\n{!s}".format(pprint.pformat(query)))
+                self.logger.debug("FREDRIK: QUERY:\n{!s}".format(pprint.pformat(query)))
                 user = self.IDP.cache.uid2user[query["id"][0]]
                 self.logger.debug("FREDRIK: Looked up user={!r} from cache(id={!r})".format(user, query["id"][0]))
             except KeyError:
