@@ -84,8 +84,6 @@ from Cookie import SimpleCookie
 
 from saml2 import server
 from saml2 import BINDING_HTTP_ARTIFACT
-from saml2 import BINDING_URI
-from saml2 import BINDING_PAOS
 from saml2 import BINDING_SOAP
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
@@ -103,11 +101,9 @@ from saml2.httputil import Redirect
 from saml2.httputil import Unauthorized
 from saml2.httputil import BadRequest
 from saml2.httputil import ServiceError
-from saml2.ident import Unknown
 from saml2.s_utils import rndstr, exception_trace
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
-from saml2.s_utils import PolicyError
 from saml2.sigver import verify_redirect_signature
 
 default_config_file = "/opt/eduid/conf/idp.ini"
@@ -993,7 +989,6 @@ def main(myname = 'eduid.saml2.idp'):
 
 if __name__ == '__main__':
     from idp_user import USERS
-    from idp_user import EXTRA
 
     try:
         progname = os.path.basename(sys.argv[0])
