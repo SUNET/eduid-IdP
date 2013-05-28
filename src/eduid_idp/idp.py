@@ -371,11 +371,11 @@ class SSO(Service):
         try:
             resp_args, _resp = self.verify_request(query, binding_in)
         except UnknownPrincipal, excp:
-            self.logger.error("UnknownPrincipal: %s" % (excp,))
+            self.logger.error("Could not verify request: UnknownPrincipal: %s" % (excp,))
             resp = ServiceError("UnknownPrincipal: %s" % (excp,))
             return resp(self.environ, self.start_response)
         except UnsupportedBinding, excp:
-            self.logger.error("UnsupportedBinding: %s" % (excp,))
+            self.logger.error("Could not verify request: UnsupportedBinding: %s" % (excp,))
             resp = ServiceError("UnsupportedBinding: %s" % (excp,))
             return resp(self.environ, self.start_response)
 
@@ -393,7 +393,7 @@ class SSO(Service):
                     authn=_authn,
                     **resp_args)
             except Exception, excp:
-                self.logger.error(exception_trace(excp))
+                self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
                 self.logger.debug("AuthN-by-ref {!r} not found in list :\n{!s}".format(
                         self.environ["idp.authn_ref"], pprint.pformat(self.AUTHN_BROKER.db["info"])))
                 resp = ServiceError("Exception: %s" % (excp,))
