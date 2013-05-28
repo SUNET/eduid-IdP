@@ -380,18 +380,15 @@ class SSO(Service):
             return resp(self.environ, self.start_response)
 
         if not _resp:
-            identity = USERS[self.user]
-            self.logger.info("Identity:\n{!s}".format(pprint.pformat(identity)))
+            self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
 
             try:
                 _authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
                 self.logger.debug("Re-created authn {!r} using idp.authn_ref {!r}".format(
                         _authn, self.environ["idp.authn_ref"]))
                 self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
-                _resp = self.IDP.create_authn_response(
-                    identity, userid=self.user,
-                    authn=_authn,
-                    **resp_args)
+                _resp = self.IDP.create_authn_response(self.user.identity, userid=self.user.username,
+                                                       authn=_authn, **resp_args)
             except Exception, excp:
                 self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
                 self.logger.debug("AuthN-by-ref {!r} not found in list :\n{!s}".format(
@@ -604,17 +601,14 @@ def username_password_authn(environ, start_response, reference, key,
     return not_found(environ, start_response)
 
 
-def verify_username_and_password(dic):
-    PASSWD = {"roland": "dianakra",
-              "babs": "howes",
-              "upper": "crust"}
+def verify_username_and_password(dic, idp_app):
+    username = dic["username"][0]
+    password = dic["password"][0]
 
-    # verify username and password
-    username_param = dic["username"][0]
-    if PASSWD[username_param] == dic["password"][0]:
-        return True, username_param
-    else:
-        return False, ""
+    res = idp_app.userdb.verify_username_and_password(username, password)
+    if res:
+        return True, res
+    return False, ""
 
 
 def do_verify(environ, start_response, idp_app, _user):
@@ -627,7 +621,7 @@ def do_verify(environ, start_response, idp_app, _user):
 
     try:
         # XXX need to verify that UsernamePassword is an appropriate authn context here I think
-        _ok, user = verify_username_and_password(query)
+        _ok, user = verify_username_and_password(query, idp_app)
     except KeyError:
         _ok = False
         user = None
@@ -851,13 +845,18 @@ class IdPApplication(object):
         self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), username_password_authn, 10, authn_authority)
         self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
 
+        self.logger.debug("FREDRIK: PYSAML2 CONFIG {!r}".format(config.pysaml2_config))
         self.IDP = server.Server(config.pysaml2_config, cache=Cache())
         self.IDP.ticket = TicketCache(logger)
+
+        self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
+
 
     def my_start_response(self, status, headers):
         self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
         self.response_status = status
         return self.start_response(status, headers)
+
 
     def application(self, environ, start_response):
         self.start_response = start_response
@@ -987,8 +986,6 @@ def main(myname = 'eduid.saml2.idp'):
 
 
 if __name__ == '__main__':
-    from idp_user import USERS
-
     try:
         progname = os.path.basename(sys.argv[0])
         if main(progname):

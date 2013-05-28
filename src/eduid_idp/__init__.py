@@ -38,3 +38,4 @@ __license__ = 'BSD'
 __authors__ = ['Fredrik Thulin']
 
 import eduid_idp.config
+import eduid_idp.idp_user
