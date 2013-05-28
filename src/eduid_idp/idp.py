@@ -303,7 +303,7 @@ class Service(object):
                           redirect_uri, self.logger, self.config)
         else:
             resp = Unauthorized("No usable authentication method")
-            return resp(environ, start_response)
+            return resp(self.environ, self.start_response)
 
 
 # -----------------------------------------------------------------------------
@@ -586,7 +586,6 @@ def username_password_authn(environ, start_response, reference, key,
         _fc = int(_fc)
     except ValueError:
         logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
-        pass
     else:
         if _fc > 0:
             argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
@@ -641,7 +640,7 @@ def do_verify(environ, start_response, idp_app, _user):
             try:
                 _fc = int(_fc)
             except ValueError:
-                logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
+                idp_app.logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
 
             lox = "%s" % (environ["HTTP_REFERER"])
             resp = Redirect(lox, content="text/html")
