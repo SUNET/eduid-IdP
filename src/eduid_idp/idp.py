@@ -328,10 +328,11 @@ class SSO(Service):
         :param query: The SAML query, transport encoded
         :param binding: Which binding the query came in over
         """
+        resp_args = {}
         if not query:
             self.logger.info("Missing QUERY")
             resp = Unauthorized('Unknown user')
-            return resp(self.environ, self.start_response)
+            return resp_args, resp(self.environ, self.start_response)
 
         if not self.req_info:
             self.req_info = self.IDP.parse_authn_request(query, binding)
@@ -351,7 +352,6 @@ class SSO(Service):
         self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
                                                             self.destination))
 
-        resp_args = {}
         try:
             resp_args = self.IDP.response_args(_authn_req)
             _resp = None
