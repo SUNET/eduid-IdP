@@ -10,10 +10,11 @@ README = open(os.path.join(here, 'README')).read()
 version = '0.1dev'
 
 install_requires = [
-    'pysaml2 >= 1.0.1',
+    'pysaml2 >= 1.0.2',
     'pymongo >= 2.4.2',
     'python-memcached',
     'mako',
+    'cherrypy >= 3.2.0',
 ]
 
 setup(name='eduid_idp',
