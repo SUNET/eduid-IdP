@@ -9,3 +9,5 @@ dist/
 idp.log
 idp.log.*
 idp.subject
+*.pem
+metadata.xml
