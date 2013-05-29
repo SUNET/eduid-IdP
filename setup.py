@@ -18,6 +18,11 @@ install_requires = [
     'eduid_am',
 ]
 
+testing_extras = [
+    'nose==1.2.1',
+    'coverage==3.6',
+]
+
 setup(name='eduid_idp',
       version=version,
       description="eduID SAML frontend IdP",
@@ -35,6 +40,9 @@ setup(name='eduid_idp',
       #package_data = { },
       zip_safe=False,
       install_requires=install_requires,
+      extras_require={
+        'testing': testing_extras,
+        },
       entry_points={
         'console_scripts': ['eduid_idp=eduid_idp.idp:main',
                             ]
