@@ -978,6 +978,9 @@ def main(myname = 'eduid.saml2.idp'):
     bind_addr = (config.listen_addr, config.listen_port)
     SRV = cherrypy.wsgiserver.CherryPyWSGIServer(bind_addr, app.application)
 
+    if config.server_cert and config.server_key:
+        SRV.ssl_adapter = cherrypy.wsgiserver.get_ssl_adapter_class(config.ssl_adapter)(
+            config.server_cert, config.server_key, config.cert_chain)
     try:
         SRV.start()
     except KeyboardInterrupt:
