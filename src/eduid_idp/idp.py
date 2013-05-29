@@ -388,7 +388,7 @@ class SSO(Service):
                         _authn, self.environ["idp.authn_ref"]))
                 self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
                 _resp = self.IDP.create_authn_response(self.user.identity, userid=self.user.username,
-                                                       authn=_authn, **resp_args, sign_response=True)
+                                                       authn=_authn, sign_response=True, **resp_args)
             except Exception, excp:
                 self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
                 self.logger.debug("AuthN-by-ref {!r} not found in list :\n{!s}".format(
