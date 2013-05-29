@@ -12,7 +12,7 @@ version = '0.1dev'
 install_requires = [
     'pysaml2 >= 1.0.2',
     'pymongo >= 2.5',
-    'python-memcached',
+    'python-memcached >= 1.5.1',
     'cherrypy >= 3.2.0',
 ]
 
