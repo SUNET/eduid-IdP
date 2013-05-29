@@ -41,7 +41,6 @@ import ConfigParser
 _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'num_threads': '8',
                     'logdir': None,
-                    'mongodb_uri': '127.0.0.1',
                     'listen_addr': '0.0.0.0',
                     'listen_port': '8088',
                     'pysaml2_config': 'idp_conf.py', # path prepended in IdPConfig.__init__()
@@ -50,6 +49,8 @@ _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'server_cert': None,  # SSL cert filename
                     'server_key': None,   # SSL key filename
                     'cert_chain': None,   # SSL certificate chain filename, or None
+                    'userdb_mongo_uri': None,
+                    'userdb_mongo_database': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -86,13 +87,6 @@ class IdPConfig():
         if not res:
             res = None
         return res
-
-    @property
-    def mongodb_uri(self):
-        """
-        MongoDB connection URI (string). See MongoDB documentation for details.
-        """
-        return self.config.get(self.section, 'mongodb_uri')
 
     @property
     def debug(self):
@@ -156,3 +150,17 @@ class IdPConfig():
         SSL certificate chain filename
         """
         return self.config.get(self.section, 'cert_chain')
+
+    @property
+    def userdb_mongo_uri(self):
+        """
+        UserDB MongoDB connection URI (string). See MongoDB documentation for details.
+        """
+        return self.config.get(self.section, 'userdb_mongo_uri')
+
+    @property
+    def userdb_mongo_database(self):
+        """
+        UserDB database name.
+        """
+        return self.config.get(self.section, 'userdb_mongo_database')

@@ -14,6 +14,8 @@ install_requires = [
     'pymongo >= 2.5',
     'python-memcached >= 1.5.1',
     'cherrypy >= 3.2.0',
+    'vccs_client',
+    'eduid_am',
 ]
 
 setup(name='eduid_idp',

@@ -32,6 +32,9 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+import vccs_client
+from eduid_am.celery import celery, get_attribute_manager
+
 USERS = {
     "roland": {
         "sn": "Hedberg",
@@ -76,12 +79,19 @@ PASSWD = {"roland": "dianakra",
           "babs": "howes",
           "upper": "crust"}
 
+class NoSuchUser(Exception):
+    pass
 
 class IdPUser():
 
-    def __init__(self, username):
+    def __init__(self, username, userdb=None):
         self._username = username
-        self._data = USERS[username]
+        if username in USERS:
+            self._data = USERS[username]
+        else:
+            if not userdb:
+                raise NoSuchUser("Local user {!r} does not exist".format(username))
+            self._data = userdb.get_user_by_field('eppn', username)
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -98,15 +108,29 @@ class IdPUser():
     def username(self):
         return self._username
 
+    @property
+    def password_credential_id(self):
+        return int(self._data['eduID_password_credential_id'])
+
 
 class IdPUserDb():
 
     def __init__(self, logger, config):
         self.logger = logger
         self.config = config
+        self.vccs_client = vccs_client.VCCSClient()
+        celery.conf.update({'MONGO_URI', config.userdb_mongo_uri})
+        am = get_attribute_manager(celery)
+        self.userdb = am.conn.get_database(config.userdb_mongo_database)
 
     def verify_username_and_password(self, username, password):
         # verify username and password
-        if PASSWD[username] == password:
-            return IdPUser(username)
+        if username in PASSWD:
+            if PASSWD[username] == password:
+                return IdPUser(username)
+        else:
+            user = IdPUser(username, userdb=self.userdb)
+            factor = vccs_client.VCCSPasswordFactor(password, user.password_credential_id)
+            if self.vccs_client.authenticate(username, [factor]):
+                return user
         return None
