@@ -106,7 +106,7 @@ from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
 from saml2.sigver import verify_redirect_signature
 
-default_config_file = "/opt/eduid/conf/idp.ini"
+default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
 
 
