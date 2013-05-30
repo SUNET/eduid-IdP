@@ -1,7 +1,4 @@
 #!/usr/bin/env python
-#
-# XXX check ../ handling in static file handling
-
 
 """
 eduID IdP application
@@ -846,7 +843,16 @@ class IdPApplication(object):
         self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
 
         self.logger.debug("FREDRIK: PYSAML2 CONFIG {!r}".format(config.pysaml2_config))
-        self.IDP = server.Server(config.pysaml2_config, cache=Cache())
+        old_path = sys.path
+        cfgdir = os.path.dirname(config.pysaml2_config)
+        cfgfile = config.pysaml2_config
+        if cfgdir:
+            # add directory part to sys.path, since pysaml2 'import's it's config
+            sys.path = [cfgdir] + sys.path
+            cfgfile = os.path.basename(config.pysaml2_config)
+        self.IDP = server.Server(cfgfile, cache=Cache())
+        # restore path
+        sys.path = old_path
         self.IDP.ticket = TicketCache(logger)
 
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
