@@ -834,15 +834,6 @@ class IdPApplication(object):
         self.response_status = None
         self.start_response = None
 
-        import socket
-        authn_authority = "http://%s" % socket.gethostname()
-
-        self.AUTHN_BROKER = AuthnBroker()
-        #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
-        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), username_password_authn, 10, authn_authority)
-        self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
-
-        self.logger.debug("FREDRIK: PYSAML2 CONFIG {!r}".format(config.pysaml2_config))
         old_path = sys.path
         cfgdir = os.path.dirname(config.pysaml2_config)
         cfgfile = config.pysaml2_config
@@ -854,6 +845,13 @@ class IdPApplication(object):
         # restore path
         sys.path = old_path
         self.IDP.ticket = TicketCache(logger)
+
+        authn_authority = self.IDP.config.entityid
+
+        self.AUTHN_BROKER = AuthnBroker()
+        #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
+        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), username_password_authn, 10, authn_authority)
+        self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
 
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
