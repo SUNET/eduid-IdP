@@ -41,6 +41,8 @@ import ConfigParser
 _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'num_threads': '8',
                     'logdir': None,
+                    'logfile': None,
+                    'syslog': '1',	# '1' for on, '0' for off
                     'listen_addr': '0.0.0.0',
                     'listen_port': '8088',
                     'pysaml2_config': 'idp_conf.py', # path prepended in IdPConfig.__init__()
@@ -87,6 +89,24 @@ class IdPConfig():
         if not res:
             res = None
         return res
+
+    @property
+    def logfile(self):
+        """
+        Path to application logfile. Something like '/var/log/idp/eduid_idp.log' maybe.
+        """
+        res = self.config.get(self.section, 'logfile')
+        if not res:
+            res = None
+        return res
+
+    @property
+    def syslog(self):
+        """
+        Log to syslog or not.
+        """
+        res = self.config.get(self.section, 'syslog')
+        return bool(int(res))
 
     @property
     def debug(self):

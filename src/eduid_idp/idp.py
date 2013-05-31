@@ -947,21 +947,34 @@ class IdPApplication(object):
 
 
 
-def main(myname = 'eduid.saml2.idp'):
+def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     """
     Initialize everything and start the IdP application.
     """
-    args = parse_args()
+    if not args:
+        args = parse_args()
 
     # initialize various components
-    logger = logging.getLogger(myname)
-    config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
-    if config.debug:
-        logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
-        stream_h = logging.StreamHandler(sys.stderr)
-        stream_h.setFormatter(formatter)
-        logger.addHandler(stream_h)
+    if not logger:
+        logger = logging.getLogger(myname)
+        config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
+        if config.debug:
+            logger.setLevel(logging.DEBUG)
+            # log to stderr when debugging
+            formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
+            stream_h = logging.StreamHandler(sys.stderr)
+            stream_h.setFormatter(formatter)
+            logger.addHandler(stream_h)
+        if config.logfile:
+            formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
+            file_h = logging.FileHandler(config.logfile)
+            file_h.setFormatter(formatter)
+            logger.addHandler(file_h)
+        if config.syslog:
+            syslog_h = logging.handlers.SysLogHandler()
+            formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
+            syslog_h.setFormatter(formatter)
+            logger.addHandler(syslog_h)
 
     cherry_conf = {'server.thread_pool': config.num_threads,
                    'server.socket_port': config.listen_port,
