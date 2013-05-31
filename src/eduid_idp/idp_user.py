@@ -131,7 +131,13 @@ class IdPUserDb():
             if PASSWD[username] == password:
                 return IdPUser(username)
         else:
-            user = IdPUser(username, userdb=self.userdb)
+            try:
+                user = IdPUser(username, userdb=self.userdb)
+            except NoSuchUser:
+                self.logger.info("Unknown user : {!r}".format(username))
+                # XXX we effectively disclose there was no such user by the quick
+                # response in this case. Maybe send bogus auth request to backends?
+                return None
             factor = vccs_client.VCCSPasswordFactor(password, user.password_credential_id)
             if self.vccs_client.authenticate(username, [factor]):
                 return user
