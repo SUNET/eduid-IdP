@@ -34,6 +34,7 @@
 
 import vccs_client
 from eduid_am.celery import celery, get_attribute_manager
+import eduid_am.tasks
 
 USERS = {
     "roland": {
@@ -77,7 +78,9 @@ EXTRA = {
 
 PASSWD = {"roland": "dianakra",
           "babs": "howes",
-          "upper": "crust"}
+          "upper": "crust",
+          "ft": "foobar",
+          }
 
 class NoSuchUser(Exception):
     pass
@@ -121,7 +124,10 @@ class IdPUserDb():
         self.vccs_client = vccs_client.VCCSClient()
         self.userdb = None
         if config.userdb_mongo_uri:
-            celery.conf.update({'MONGO_URI', config.userdb_mongo_uri})
+            settings = {
+                'MONGO_URI': config.userdb_mongo_uri,
+                }
+            celery.conf.update(settings)
             am = get_attribute_manager(celery)
             self.userdb = am.conn.get_database(config.userdb_mongo_database)
 
