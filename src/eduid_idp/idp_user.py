@@ -123,7 +123,7 @@ class IdPUserDb():
         self.config = config
         self.vccs_client = vccs_client.VCCSClient()
         self.userdb = None
-        if config.userdb_mongo_uri:
+        if config.userdb_mongo_uri and config.userdb_mongo_database:
             settings = {
                 'MONGO_URI': config.userdb_mongo_uri,
                 }
