@@ -135,7 +135,7 @@ class IdPUserDb():
         # verify username and password
         if username in PASSWD:
             if PASSWD[username] == password:
-                return IdPUser(username)
+                return IdPUser(username, userdb=self.userdb)
         else:
             try:
                 user = IdPUser(username, userdb=self.userdb)
