@@ -32,6 +32,8 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+import pprint
+
 import vccs_client
 from eduid_am.celery import celery, get_attribute_manager
 import eduid_am.tasks
@@ -79,7 +81,7 @@ EXTRA = {
 PASSWD = {"roland": "dianakra",
           "babs": "howes",
           "upper": "crust",
-          "ft": "foobar",
+          "ft@eduid.se": "foobar",
           }
 
 class NoSuchUser(Exception):
@@ -94,7 +96,9 @@ class IdPUser():
         else:
             if not userdb:
                 raise NoSuchUser("Local user {!r} does not exist".format(username))
-            self._data = userdb.get_user_by_field('eppn', username)
+            self._data = userdb.get_user_by_field('eduPersonPrincipalName', username)
+            if not self._data:
+                raise NoSuchUser("User with eppn {!r} does not exist".format(username))
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -113,7 +117,7 @@ class IdPUser():
 
     @property
     def password_credential_id(self):
-        return int(self._data['eduID_password_credential_id'])
+        return self._data['eduID,private,credential_id']
 
 
 class IdPUserDb():
@@ -129,13 +133,17 @@ class IdPUserDb():
                 }
             celery.conf.update(settings)
             am = get_attribute_manager(celery)
-            self.userdb = am.conn.get_database(config.userdb_mongo_database)
+            self.userdb = am #am.conn.get_database(config.userdb_mongo_database)
 
     def verify_username_and_password(self, username, password):
         # verify username and password
         if username in PASSWD:
             if PASSWD[username] == password:
-                return IdPUser(username, userdb=self.userdb)
+                res = IdPUser(username, userdb=self.userdb)
+                self.logger.debug("verify_username_and_password returning user {!r}".format(res))
+                if res is not None:
+                    self.logger.debug("  user.identity :\n{!s}".format(pprint.pformat(res.identity)))
+                return res
         else:
             try:
                 user = IdPUser(username, userdb=self.userdb)
