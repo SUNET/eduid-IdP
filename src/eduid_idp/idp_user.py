@@ -81,7 +81,6 @@ EXTRA = {
 PASSWD = {"roland": "dianakra",
           "babs": "howes",
           "upper": "crust",
-          "ft@eduid.se": "foobar",
           }
 
 class NoSuchUser(Exception):
@@ -116,8 +115,12 @@ class IdPUser():
         return self._username
 
     @property
-    def password_credential_id(self):
+    def credential_id(self):
         return self._data['eduID,private,credential_id']
+
+    @property
+    def credential_salt(self):
+        return self._data['eduID,private,salt']
 
 
 class IdPUserDb():
@@ -152,7 +155,11 @@ class IdPUserDb():
                 # XXX we effectively disclose there was no such user by the quick
                 # response in this case. Maybe send bogus auth request to backends?
                 return None
-            factor = vccs_client.VCCSPasswordFactor(password, user.password_credential_id)
+            factor = vccs_client.VCCSPasswordFactor(password, user.credential_id,
+                                                    salt=user.credential_salt)
+            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
+                    username, user.credential_id, factor))
             if self.vccs_client.authenticate(username, [factor]):
+                self.logger.debug("VCCS authenticated user {!r}".format(user))
                 return user
         return None
