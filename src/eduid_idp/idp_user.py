@@ -95,9 +95,12 @@ class IdPUser():
         else:
             if not userdb:
                 raise NoSuchUser("Local user {!r} does not exist".format(username))
-            self._data = userdb.get_user_by_field('eduPersonPrincipalName', username)
+            for field in ['email', 'eduPersonPrincipalName']:
+                self._data = userdb.get_user_by_field(field, username)
+                if self._data:
+                    break
             if not self._data:
-                raise NoSuchUser("User with eppn {!r} does not exist".format(username))
+                raise NoSuchUser("User {!r} not found".format(username))
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
