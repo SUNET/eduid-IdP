@@ -72,7 +72,6 @@ import argparse
 from hashlib import sha1
 
 import cherrypy
-import cherrypy.wsgiserver
 
 import eduid_idp
 
@@ -90,14 +89,14 @@ from saml2.authn_context import AuthnBroker
 from saml2.authn_context import PASSWORD
 from saml2.authn_context import UNSPECIFIED
 from saml2.authn_context import authn_context_class_ref
-from saml2.httputil import Response
-from saml2.httputil import NotFound
-from saml2.httputil import geturl
-from saml2.httputil import get_post
-from saml2.httputil import Redirect
-from saml2.httputil import Unauthorized
-from saml2.httputil import BadRequest
-from saml2.httputil import ServiceError
+#from saml2.httputil import Response
+#from saml2.httputil import NotFound
+#from saml2.httputil import geturl
+#from saml2.httputil import get_post
+#from saml2.httputil import Redirect
+#from saml2.httputil import Unauthorized
+#from saml2.httputil import BadRequest
+#from saml2.httputil import ServiceError
 from saml2.s_utils import rndstr, exception_trace
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
@@ -105,6 +104,90 @@ from saml2.sigver import verify_redirect_signature
 
 default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
+
+class Response(object):
+    _template = None
+    _status = '200 OK'
+    _content_type = 'text/html'
+
+    def __init__(self, message=None, **kwargs):
+        self.status = kwargs.get('status', self._status)
+        self.response = kwargs.get('response', self._response)
+        self.template = kwargs.get('template', self._template)
+
+        self.message = message
+
+        self.headers = kwargs.get('headers', [])
+        _content_type = kwargs.get('content', self._content_type)
+        addContentType = True
+        for header in self.headers:
+            if 'content-type' == header[0].lower():
+                addContentType = False
+        if addContentType:
+            self.headers.append(('Content-type', _content_type))
+
+    def __call__(self, environ, start_response, **kwargs):
+        start_response(self.status, self.headers)
+        return self.response(self.message or geturl(environ), **kwargs)
+
+    def _response(self, message="", **argv):
+        if self.template:
+            return [self.template % message]
+        else:
+            if isinstance(message, basestring):
+                return [message]
+            else:
+                return message
+
+class NotFound(Response):
+    _status = '404 NOT FOUND'
+    _template = "<html>The requested resource %s was not found on this server</html>"
+
+def geturl(environ, query=True, path=True):
+    """Rebuilds a request URL (from PEP 333).
+
+    :param query: Is QUERY_STRING included in URI (default: True)
+    :param path: Is path included in URI (default: True)
+    """
+    # For some reason, cherrypy.request.base always have host 127.0.0.1 -
+    # work around that with much more elaborate code, based on pysaml2.
+    #return cherrypy.request.base + cherrypy.request.path_info
+    url = [cherrypy.request.scheme + '://']
+    url.append(cherrypy.request.headers['Host'])
+    url.append(':' + str(cherrypy.request.local.port))
+    if path:
+        url.append('/' + cherrypy.request.path_info)
+        if query:
+            url.append('?' + cherrypy.request.query_string)
+    return ''.join(url)
+
+def get_post(_environ = None):
+    # When the method is POST the query string will be sent
+    # in the HTTP request body
+    return cherrypy.request.body_params
+
+class Redirect(Response):
+    _template = '<html>\n<head><title>Redirecting to %s</title></head>\n' \
+        '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
+        '</body>\n</html>'
+    _status = '302 Found'
+
+    def __call__(self, environ, start_response, **kwargs):
+        location = self.message
+        self.headers.append(('location', location))
+        start_response(self.status, self.headers)
+        return self.response((location, location, location))
+
+class Unauthorized(Response):
+    _status = "401 Unauthorized"
+    _template = "<html>%s</html>"
+
+class BadRequest(Response):
+    _status = "400 Bad Request"
+    _template = "<html>%s</html>"
+
+class ServiceError(Response):
+    _status = '500 Internal Service Error'
 
 
 def parse_args():
@@ -193,22 +276,24 @@ class Service(object):
         self.user = user
 
     def unpack_redirect(self):
-        if "QUERY_STRING" in self.environ:
-            _qs = self.environ["QUERY_STRING"]
+        if cherrypy.request.query_string:
+            _qs = cherrypy.request.query_string
             return dict([(k, v[0]) for k, v in parse_qs(_qs).items()])
         else:
             return None
 
     def unpack_post(self):
-        _dict = parse_qs(get_post(self.environ))
+        #_dict = parse_qs(get_post(self.environ))
+        _dict = get_post()
         self.logger.debug("unpack_post:: %s" % _dict)
         try:
-            return dict([(k, v[0]) for k, v in _dict.items()])
+            return dict([(k, v) for k, v in _dict.items()])
         except Exception:
             return None
 
     def unpack_soap(self):
         try:
+            # XXX suspect this is broken - get_post() returns a dict() now
             query = get_post(self.environ)
             return {"SAMLRequest": query, "RelayState": ""}
         except Exception:
@@ -287,10 +372,12 @@ class Service(object):
         or the service provider forces re-authentication.
         """
         redirect_uri = geturl(self.environ, query=False)
+        self.logger.debug("FREDRIK: REDIRECT URL {!r}".format(redirect_uri))
 
         self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
 
         auth_info = self.AUTHN_BROKER.pick(requested_authn_context)
+        self.logger.debug("FREDRIK: auth_info {!r}".format(auth_info))
 
         if len(auth_info):
             method, reference = auth_info[0]
@@ -534,6 +621,7 @@ class SSO(Service):
 
         :returns: AuthnRequest or BadRequest() instance
         """
+        self.logger.debug("SAML request : {!r}".format(_info["SAMLRequest"]))
         _req_info = self.IDP.parse_authn_request(_info["SAMLRequest"], BINDING_HTTP_REDIRECT)
 
         self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
@@ -599,8 +687,13 @@ def username_password_authn(environ, start_response, reference, key,
 
 
 def verify_username_and_password(dic, idp_app):
-    username = dic["username"][0]
-    password = dic["password"][0]
+    """
+    :params dic: dict() with POST parameters
+    :params idp_app: IdPApplication instance
+    :returns: (verdict, res,) where verdict is bool()
+    """
+    username = dic["username"]
+    password = dic["password"]
 
     res = idp_app.userdb.verify_username_and_password(username, password)
     if res:
@@ -609,7 +702,8 @@ def verify_username_and_password(dic, idp_app):
 
 
 def do_verify(environ, start_response, idp_app, _user):
-    query = parse_qs(get_post(environ))
+    #query = parse_qs(get_post(environ))
+    query = get_post()
 
     # XXX remove password from query before logging
     idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(query)))
@@ -645,11 +739,11 @@ def do_verify(environ, start_response, idp_app, _user):
         idp_app.logger.debug("Register %s under '%s'" % (user, uid))
 
         idp_app.logger.debug("FREDRIK: Storing uid={!r} and authn_reference={!r} in idpauthn cookie".format(
-                uid, query["authn_reference"][0]))
-        kaka = set_cookie("idpauthn", "/", idp_app.logger, uid, query["authn_reference"][0])
+                uid, query["authn_reference"]))
+        kaka = set_cookie("idpauthn", "/", idp_app.logger, uid, query["authn_reference"])
 
-        lox = "%s?id=%s&key=%s" % (query["redirect_uri"][0], uid,
-                                   query["key"][0])
+        lox = "%s?id=%s&key=%s" % (query["redirect_uri"], uid,
+                                   query["key"])
         idp_app.logger.debug("Redirect => %s" % lox)
         resp = Redirect(lox, headers=[kaka], content="text/html")
 
@@ -724,17 +818,15 @@ def info_from_cookie(kaka, IDP, logger):
     :returns: Username, AuthnRef
     """
     logger.debug("Parsing cookie(s): %s" % kaka)
-    if kaka:
-        cookie_obj = SimpleCookie(kaka)
-        morsel = cookie_obj.get("idpauthn", None)
-        if morsel:
-            try:
-                key, ref = base64.b64decode(morsel.value).split(":")
-                return IDP.cache.uid2user[key], ref
-            except KeyError:
-                return None, None
-        else:
-            logger.debug("No idpauthn cookie")
+    _authn = kaka.get("idpauthn")
+    if _authn:
+        try:
+            key, ref = base64.b64decode(_authn.value).split(":")
+            return IDP.cache.uid2user[key], ref
+        except KeyError:
+            return None, None
+    else:
+        logger.debug("No idpauthn cookie")
     return None, None
 
 
@@ -804,26 +896,28 @@ def static_filename(config, path):
         return None
 
 def static_file(environ, start_response, filename):
+    types = {'ico': 'image/x-icon',
+             'png': 'image/png',
+             'html': 'text/html',
+             'css': 'text/css',
+             'js': 'application/javascript',
+             'txt': 'text/plain',
+             'xml': 'text/xml',
+             }
+    ext = filename.rsplit('.', 1)[-1]
+
+    if not ext in types:
+        resp = NotFound()
+        return resp(environ, start_response)
+
     try:
         text = open(filename).read()
-        if filename.endswith(".ico"):
-            resp = Response(text, headers=[('Content-Type', "image/x-icon")])
-        elif filename.endswith(".png"):
-            resp = Response(text, headers=[('Content-Type', 'image/png')])
-        elif filename.endswith(".html"):
-            resp = Response(text, headers=[('Content-Type', 'text/html')])
-        elif filename.endswith(".css"):
-            resp = Response(text, headers=[('Content-Type', 'text/css')])
-        elif filename.endswith(".js"):
-            # Content-Type: application/javascript; charset=utf-8
-            resp = Response(text, headers=[('Content-Type', 'application/javascript')])
-        elif filename.endswith(".txt"):
-            resp = Response(text, headers=[('Content-Type', 'text/plain')])
-        else:
-            resp = Response(text, headers=[('Content-Type', 'text/xml')])
     except IOError:
         resp = NotFound()
-    return resp(environ, start_response)
+        return resp(environ, start_response)
+
+    start_response('200 Ok', [('Content-Type', types[ext])])
+    return [text]
 
 
 class IdPApplication(object):
@@ -855,22 +949,40 @@ class IdPApplication(object):
 
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
+    @cherrypy.expose
+    def default(self, *args, **kwargs):
+        environ = {}
+        return self.application(environ, self.my_start_response)
+
 
     def my_start_response(self, status, headers):
         self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
-        self.response_status = status
-        return self.start_response(status, headers)
-
+        if cherrypy.response.idp_response_status:
+            self.logger.debug("FREDRIK: START RESPONSE {!r} / {!r} WITH PREVIOUS RESPONSE_STATUS {!r} / {!r}".format(
+                    status, headers, cherrypy.response.idp_response_status, cherrypy.response.idp_response_headers))
+            #raise Exception()
+        cherrypy.response.idp_response_status = status
+        cherrypy.response.idp_response_headers = headers
 
     def application(self, environ, start_response):
         self.start_response = start_response
-        res = self.application2(environ, self.my_start_response)
+        self.logger.debug("FREDRIK: PROCESSING START HERE (REQ BASE {!r} LOCAL {!r})".format(cherrypy.request.base, cherrypy.request.local))
+        self.logger.debug("FREDRIK: REQ HEADERS :\n{!s}".format(pprint.pformat(cherrypy.request.headers)))
+        cherrypy.response.idp_response_status = None
+        res = self.application2(environ, start_response)
         if isinstance(res, list):
-            res = ''.join(res)
-        if len(res) < 200:
-            self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(self.response_status, res))
+            res2 = ''.join(res)
+            if len(res2) < 200:
+                self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(cherrypy.response.idp_response_status, res2))
+            else:
+                self.logger.debug("FREDRIK: APP RESPONSE {!r} : {!r} bytes ({!r})".format(cherrypy.response.idp_response_status, len(res2), res2[:20]))
+            res = res2
         else:
-            self.logger.debug("FREDRIK: APP RESPONSE {!r} : {!r} bytes".format(self.response_status, len(res)))
+            self.logger.debug("FREDRIK: NON-LIST APP RESPONSE {!r} : {!r}".format(cherrypy.response.idp_response_status, res))
+        cherrypy.response.status = cherrypy.response.idp_response_status
+        if cherrypy.response.idp_response_headers:
+            for (k, v) in cherrypy.response.idp_response_headers:
+                cherrypy.response.headers[k] = v
         return res
 
     def application2(self, environ, start_response):
@@ -888,8 +1000,9 @@ class IdPApplication(object):
         :return: The response as a list of lines
         """
 
-        path = environ.get('PATH_INFO', '').lstrip('/')
-        kaka = environ.get("HTTP_COOKIE", None)
+        #path = environ.get('PATH_INFO', '').lstrip('/')
+        path = cherrypy.request.path_info.lstrip('/')
+        kaka = cherrypy.request.cookie
         self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
@@ -911,8 +1024,8 @@ class IdPApplication(object):
             try:
                 query = parse_qs(environ["QUERY_STRING"])
                 self.logger.debug("FREDRIK: QUERY:\n{!s}".format(pprint.pformat(query)))
-                user = self.IDP.cache.uid2user[query["id"][0]]
-                self.logger.debug("FREDRIK: Looked up user={!r} from cache(id={!r})".format(user, query["id"][0]))
+                user = self.IDP.cache.uid2user[query["id"]]
+                self.logger.debug("FREDRIK: Looked up user={!r} from cache(id={!r})".format(user, query["id"]))
             except KeyError:
                 self.logger.debug("FREDRIK: No user")
                 user = None
@@ -977,32 +1090,30 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
             logger.addHandler(syslog_h)
 
     cherry_conf = {'server.thread_pool': config.num_threads,
+        	   'server.socket_host': config.listen_addr,
                    'server.socket_port': config.listen_port,
                    # enables X-Forwarded-For, since BCP is to run this server
                    # behind a webserver that handles SSL
                    'tools.proxy.on': True,
                    }
+    if config.server_cert and config.server_key:
+        _ssl_opts = {'server.ssl_module': config.ssl_adapter,
+                     'server.ssl_certificate': config.server_cert,
+                     'server.ssl_private_key': config.server_key,
+                     #'server.ssl_certificate_chain':
+                         }
+        cherry_conf.update(_ssl_opts)
+
     if config.logdir:
         cherry_conf['log.access_file'] = os.path.join(config.logdir, 'access.log')
         cherry_conf['log.error_file'] = os.path.join(config.logdir, 'error.log')
     else:
         sys.stderr.write("NOTE: Config option 'logdir' not set.\n")
+        cherry_conf['log.screen'] = True
+
     cherrypy.config.update(cherry_conf)
 
-#    cherrypy.quickstart(IdPApplication(config))
-
-    app = IdPApplication(logger, config)
-    bind_addr = (config.listen_addr, config.listen_port)
-    SRV = cherrypy.wsgiserver.CherryPyWSGIServer(bind_addr, app.application)
-
-    if config.server_cert and config.server_key:
-        SRV.ssl_adapter = cherrypy.wsgiserver.get_ssl_adapter_class(config.ssl_adapter)(
-            config.server_cert, config.server_key, config.cert_chain)
-    try:
-        SRV.start()
-    except KeyboardInterrupt:
-        SRV.stop()
-        raise
+    cherrypy.quickstart(IdPApplication(logger, config))
 
 
 if __name__ == '__main__':
