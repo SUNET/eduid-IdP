@@ -89,14 +89,6 @@ from saml2.authn_context import AuthnBroker
 from saml2.authn_context import PASSWORD
 from saml2.authn_context import UNSPECIFIED
 from saml2.authn_context import authn_context_class_ref
-#from saml2.httputil import Response
-#from saml2.httputil import NotFound
-#from saml2.httputil import geturl
-#from saml2.httputil import get_post
-#from saml2.httputil import Redirect
-#from saml2.httputil import Unauthorized
-#from saml2.httputil import BadRequest
-#from saml2.httputil import ServiceError
 from saml2.s_utils import rndstr, exception_trace
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
@@ -372,12 +364,10 @@ class Service(object):
         or the service provider forces re-authentication.
         """
         redirect_uri = geturl(self.environ, query=False)
-        self.logger.debug("FREDRIK: REDIRECT URL {!r}".format(redirect_uri))
 
         self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
 
         auth_info = self.AUTHN_BROKER.pick(requested_authn_context)
-        self.logger.debug("FREDRIK: auth_info {!r}".format(auth_info))
 
         if len(auth_info):
             method, reference = auth_info[0]
@@ -951,27 +941,13 @@ class IdPApplication(object):
 
     @cherrypy.expose
     def default(self, *args, **kwargs):
-        environ = {}
-        return self.application(environ, self.my_start_response)
-
-
-    def my_start_response(self, status, headers):
-        self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
-        if cherrypy.response.idp_response_status:
-            self.logger.debug("FREDRIK: START RESPONSE {!r} / {!r} WITH PREVIOUS RESPONSE_STATUS {!r} / {!r}".format(
-                    status, headers, cherrypy.response.idp_response_status, cherrypy.response.idp_response_headers))
-            #raise Exception()
-        cherrypy.response.idp_response_status = status
-        cherrypy.response.idp_response_headers = headers
-
-    def application(self, environ, start_response):
-        self.start_response = start_response
-        self.logger.debug("FREDRIK: PROCESSING START HERE (REQ BASE {!r} LOCAL {!r})".format(cherrypy.request.base, cherrypy.request.local))
-        self.logger.debug("FREDRIK: REQ HEADERS :\n{!s}".format(pprint.pformat(cherrypy.request.headers)))
         cherrypy.response.idp_response_status = None
-        res = self.application2(environ, start_response)
+
+        res = self.application(self.my_start_response)
+        res2 = res
         if isinstance(res, list):
             res2 = ''.join(res)
+        if isinstance(res2, basestring):
             if len(res2) < 200:
                 self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(cherrypy.response.idp_response_status, res2))
             else:
@@ -985,26 +961,32 @@ class IdPApplication(object):
                 cherrypy.response.headers[k] = v
         return res
 
-    def application2(self, environ, start_response):
+    def my_start_response(self, status, headers):
+        self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
+        if cherrypy.response.idp_response_status:
+            self.logger.warning("start_response called twice (now {!r} / {!r}, previous {!r} / {!r})".format(
+                    status, headers, cherrypy.response.idp_response_status, cherrypy.response.idp_response_headers))
+        cherrypy.response.idp_response_status = status
+        cherrypy.response.idp_response_headers = headers
+
+    def application(self, start_response):
         """
-        The main WSGI application. Dispatch the current request to
-        the functions from above and store the regular expression
-        captures in the WSGI environment as  `myapp.url_args` so that
-        the functions from above can access the url placeholders.
+        What used to be the main WSGI application. Dispatch the current
+        request to the functions from above (AUTHN_URLS and NOT_AUTHN_URLS).
 
         If nothing matches call the `not_found` function.
 
-        :param environ: The HTTP application environment
-        :param start_response: The application to run when the handling of the
+        :param start_response: The function to run when the handling of the
         request is done
         :return: The response as a list of lines
         """
 
-        #path = environ.get('PATH_INFO', '').lstrip('/')
         path = cherrypy.request.path_info.lstrip('/')
         kaka = cherrypy.request.cookie
         self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
+
+        environ = {}
 
         static_fn = static_filename(self.config, path)
         if static_fn:
@@ -1042,11 +1024,6 @@ class IdPApplication(object):
             match = re.search(regex, path)
             self.logger.debug("match path {!r} to re {!r} -> {!r}".format(path, regex, match))
             if match is not None:
-                # The 'myapp' thingy is unused legacy according to Roland
-                #try:
-                #    environ['myapp.url_args'] = match.groups()[0]
-                #except IndexError:
-                #    environ['myapp.url_args'] = path
                 self.logger.debug("Callback: %s" % (callback,))
                 if isinstance(callback, tuple):
                     cls = callback[0](environ, start_response, self, user)
