@@ -111,12 +111,9 @@ class Response(object):
 
         self.headers = kwargs.get('headers', [])
         _content_type = kwargs.get('content', self._content_type)
-        addContentType = True
-        for header in self.headers:
-            if 'content-type' == header[0].lower():
-                addContentType = False
-        if addContentType:
-            self.headers.append(('Content-type', _content_type))
+        headers_lc = [x[0].lower() for x in self.headers]
+        if 'content-type' not in headers_lc:
+            self.headers.append(('Content-Type', _content_type))
 
     def __call__(self, environ, start_response, **kwargs):
         start_response(self.status, self.headers)
@@ -212,6 +209,8 @@ class Cache(object):
         self.uid2user = {}
 
 class TicketCache():
+
+    # XXX something needs to clean out old entries from TicketCache!
 
     def __init__(self, logger):
         self.logger = logger
@@ -470,8 +469,6 @@ class SSO(Service):
                 resp = ServiceError("Exception: %s" % (excp,))
                 return resp(self.environ, self.start_response)
 
-        # XXX clean IDP.ticket here!
-
         self.logger.info("AuthNResponse {!r} :\n{!s}".format(_resp, _resp))
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
@@ -489,14 +486,20 @@ class SSO(Service):
         self.logger.debug("FREDRIK: Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
         _res, _ticket = self._get_ticket(_info)
-        if not _res:
-            # result was an WSGI error response function
+        if not _res or isinstance(_ticket, Response):
+            # result is False and/or _ticket is an instance of Response (or BadRequest etc.)
             return _ticket(self.environ, self.start_response)
+
         self.req_info = _ticket['req_info']
 
         _fc = _ticket.get("FailCount", 0)
-        if _fc:
-            self.environ['idp.FailCount'] = _fc
+        try:
+            _fc = int(_fc)
+        except ValueError:
+            logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
+            _fc = 0
+
+        self.environ['idp.FailCount'] = _fc
 
         # re-insert in IDP.ticket cache
         _ticket["FailCount"] = _fc + 1
@@ -653,14 +656,10 @@ def username_password_authn(environ, start_response, reference, key,
         "alert_msg": "",
     }
 
+    # if idp.FailCount is present, it is always an integer
     _fc = environ.get("idp.FailCount", 0)
-    try:
-        _fc = int(_fc)
-    except ValueError:
-        logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
-    else:
-        if _fc > 0:
-            argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
+    if _fc > 0:
+        argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
 
     logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
@@ -709,15 +708,9 @@ def do_verify(environ, start_response, idp_app, _user):
 
     if not _ok:
         idp_app.logger.info("Unknown user or wrong password")
-        if "HTTP_REFERER" in environ:
-            _qs = environ["HTTP_REFERER"]
-            _fc = environ.get("idp.FailCount", 0)
-            try:
-                _fc = int(_fc)
-            except ValueError:
-                idp_app.logger.debug("Bad (non-integer) FailCount : {!r}".format(_fc))
-
-            lox = "%s" % (environ["HTTP_REFERER"])
+        _referer = cherrypy.request.headers.get('Referer')
+        if _referer:
+            lox = str(_referer)
             resp = Redirect(lox, content="text/html")
         else:
             resp = Unauthorized("Unknown user or wrong password")
