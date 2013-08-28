@@ -505,18 +505,17 @@ class SSO(Service):
         _ticket["FailCount"] = _fc + 1
         key = self._store_ticket(_ticket)
 
+        if self.user and not self.req_info.message.force_authn:
+            self.logger.debug("Continuing with Authn request {!r}".format(self.req_info))
+            return self.operation(_ticket, BINDING_HTTP_REDIRECT)
+
         if not self.user:
             self.logger.info("Not authenticated")
-            return self.not_authn(key, self.req_info.message.requested_authn_context)
-        else:
-            self.logger.debug("Continuing with user {!r}".format(self.user))
-
         if self.req_info.message.force_authn:
             self.logger.info("Forcing authentication for user {!r}".format(self.user))
-            return self.not_authn(key, self.req_info.message.requested_authn_context)
 
-        self.logger.debug("Continuing with Authn request {!r}".format(self.req_info))
-        return self.operation(_ticket, BINDING_HTTP_REDIRECT)
+        return self.not_authn(key, self.req_info.message.requested_authn_context)
+
 
 
     def post(self):
@@ -528,17 +527,13 @@ class SSO(Service):
         self.req_info = self.IDP.parse_authn_request(
             _info["SAMLRequest"], BINDING_HTTP_POST)
         _req = self.req_info.message
-        if self.user:
-            if _req.force_authn:
-                _info["req_info"] = self.req_info
-                key = self._store_ticket(_info)
-                return self.not_authn(key, _req.requested_authn_context)
-            else:
-                return self.operation(_info, BINDING_HTTP_POST)
-        else:
-            _info["req_info"] = self.req_info
-            key = self._store_ticket(_info)
-            return self.not_authn(key, _req.requested_authn_context)
+        if self.user and not _req.force_authn:
+            return self.operation(_info, BINDING_HTTP_POST)
+        # Request authentication, either because there was no self.user
+        # or because it was requested using SAML2 ForceAuthn
+        _info["req_info"] = self.req_info
+        key = self._store_ticket(_info)
+        return self.not_authn(key, _req.requested_authn_context)
 
 
     def _store_ticket(self, _ticket):
@@ -717,13 +712,17 @@ def do_verify(environ, start_response, idp_app, _user):
     else:
         idp_app.logger.debug("FREDRIK: User {!r} authenticated OK".format(user))
         uid = rndstr(24)
-        idp_app.IDP.cache.uid2user[uid] = user
+        idp_app.IDP.cache.uid2user[uid] = {'user': user,
+                                           'authn_reference': query["authn_reference"],
+                                           'authn_timestamp': int(time.time()),
+                                           }
         idp_app.IDP.cache.user2uid[user] = uid
         idp_app.logger.debug("Register %s under '%s'" % (user, uid))
 
-        idp_app.logger.debug("FREDRIK: Storing uid={!r} and authn_reference={!r} in idpauthn cookie".format(
-                uid, query["authn_reference"]))
-        kaka = set_cookie("idpauthn", "/", idp_app.logger, uid, query["authn_reference"])
+        idp_app.logger.debug("FREDRIK: Storing uid={!r} in idpauthn cookie".format(
+                uid))
+        #kaka = set_cookie("idpauthn", "/", idp_app.logger, uid, query["authn_reference"])
+        kaka = set_cookie("idpauthn", "/", idp_app.logger, uid)
 
         lox = "%s?id=%s&key=%s" % (query["redirect_uri"], uid,
                                    query["key"])
@@ -798,23 +797,24 @@ def info_from_cookie(kaka, IDP, logger):
 
     XXX this cookie needs to be MAC:d - or better.
 
-    :returns: Username, AuthnRef
+    :returns: User data
     """
     logger.debug("Parsing cookie(s): %s" % kaka)
     _authn = kaka.get("idpauthn")
     if _authn:
         try:
-            key, ref = base64.b64decode(_authn.value).split(":")
-            return IDP.cache.uid2user[key], ref
+            key = base64.b64decode(_authn.value)
+            logger.debug("idpauthn key={!r}".format(key))
+            return IDP.cache.uid2user[key]
         except KeyError:
-            return None, None
+            return None
     else:
         logger.debug("No idpauthn cookie")
-    return None, None
+    return None
 
 
 def delete_cookie(environ, name, logger):
-    kaka = environ.get("HTTP_COOKIE", '')
+    kaka = cherrypy.request.cookie
     logger.debug("delete KAKA: %s" % kaka)
     if kaka:
         cookie_obj = SimpleCookie(kaka)
@@ -988,22 +988,30 @@ class IdPApplication(object):
         if path.startswith("static/") or path == "favicon.ico":
             return not_found(environ, start_response)
 
+        userdata = None
         if kaka:
-            # XXX retreiving the authn_ref from an unsecured cookie lets malicious people
-            # 'upgrade' their logins to higher authentication contexts!
-            user, authn_ref = info_from_cookie(kaka, self.IDP, self.logger)
-            self.logger.debug("Decoded info from idpauthn cookie : user={!r}, authn_ref={!r}".format(
-                    user, authn_ref))
-            environ["idp.authn_ref"] = authn_ref
+            userdata = info_from_cookie(kaka, self.IDP, self.logger)
+            self.logger.debug("Looked up userdata using idpauthn cookie : {!s}".format(pprint.pformat(userdata)))
         else:
-            try:
-                query = parse_qs(environ["QUERY_STRING"])
+            self.logger.debug("No cookie, looking for 'id' parameter in query string :\n{!s}".format(cherrypy.request.query_string))
+            query = {}
+            if cherrypy.request.query_string:
                 self.logger.debug("FREDRIK: QUERY:\n{!s}".format(pprint.pformat(query)))
-                user = self.IDP.cache.uid2user[query["id"]]
-                self.logger.debug("FREDRIK: Looked up user={!r} from cache(id={!r})".format(user, query["id"]))
+                # XXX duplicated code - unpack_redirect()
+                _qs = cherrypy.request.query_string
+                query = dict([(k, v[0]) for k, v in parse_qs(_qs).items()])
+            try:
+                userdata = self.IDP.cache.uid2user[query["id"]]
+                self.logger.debug("Looked up userdata using request id parameter : {!s}".format(pprint.pformat(userdata)))
             except KeyError:
-                self.logger.debug("FREDRIK: No user")
-                user = None
+                # no 'id', or not found in cache
+                pass
+
+        user = None
+        if userdata:
+            user = userdata['user']
+            authn_ref = userdata['authn_reference']
+            environ["idp.authn_ref"] = authn_ref
 
         url_patterns = AUTHN_URLS
         if not user:
