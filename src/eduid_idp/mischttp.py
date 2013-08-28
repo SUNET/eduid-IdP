@@ -49,11 +49,9 @@ class Response(object):
     def _response(self, message="", **argv):
         if self.template:
             return [self.template % message]
-        else:
-            if isinstance(message, basestring):
-                return [message]
-            else:
-                return message
+        elif isinstance(message, basestring):
+            return [message]
+        return message
 
 
 class NotFound(Response):
@@ -163,7 +161,7 @@ def info_from_cookie(kaka, IDP, logger):
     """
     Decode information stored in a browser cookie.
 
-    XXX this cookie needs to be MAC:d - or better.
+    The idpauthn cookie holds a value used to lookup `userdata' in IDP.cache.
 
     :returns: User data
     """
@@ -180,6 +178,9 @@ def info_from_cookie(kaka, IDP, logger):
         logger.debug("No idpauthn cookie")
     return None
 
+
+# XXX cherrypy offers some significantly simpler ways to set cookies using
+# cherrypy.response.cookie - any reason to not use those? /Fredrik 2013-08
 
 def _expiration(timeout, tformat="%a, %d-%b-%Y %H:%M:%S GMT"):
     """
