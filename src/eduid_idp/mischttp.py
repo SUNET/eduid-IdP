@@ -100,7 +100,7 @@ def geturl(environ, query=True, path=True):
     url.append(cherrypy.request.headers['Host'])
     url.append(':' + str(cherrypy.request.local.port))
     if path:
-        url.append('/' + cherrypy.request.path_info)
+        url.append('/' + cherrypy.request.path_info.lstrip('/'))
         if query:
             url.append('?' + cherrypy.request.query_string)
     return ''.join(url)
