@@ -120,6 +120,7 @@ def parse_args():
 
 
 class Cache(object):
+
     def __init__(self):
         self.user2uid = {}
         self.uid2user = {}
@@ -149,14 +150,10 @@ class TicketCache():
         if key in self._data:
             del self._data[key]
         else:
-            self.logger.debug("FREDRIK: FAILED DELETING {!r} FROM\n{!s}".format(
-                    key, pprint.pformat(self._data)))
+            self.logger.debug("Failed deleting {!r} from TicketCache (entry did not exist)".format(key))
 
 
 # -----------------------------------------------------------------------------
-
-
-
 
 
 
@@ -209,6 +206,8 @@ class IdPApplication(object):
 
         authn_authority = self.IDP.config.entityid
 
+        # NOTE: The function pointers supplied to the AUTHN_BROKER is not for authentication,
+        # but for displaying proper login forms it seems.
         self.AUTHN_BROKER = AuthnBroker()
         #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
         self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), eduid_idp.login.username_password_authn, 10, authn_authority)
@@ -259,7 +258,6 @@ class IdPApplication(object):
         """
 
         path = cherrypy.request.path_info.lstrip('/')
-        kaka = cherrypy.request.cookie
         self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
@@ -267,32 +265,16 @@ class IdPApplication(object):
 
         static_fn = eduid_idp.mischttp.static_filename(self.config, path)
         if static_fn:
-            self.logger.debug("SERVING STATIC FILE {!r}".format(static_fn))
+            self.logger.debug("Serving static file {!r}".format(static_fn))
             return eduid_idp.mischttp.static_file(environ, start_response, static_fn)
         if path.startswith("static/") or path == "favicon.ico":
             return eduid_idp.mischttp.not_found(environ, start_response)
 
-        userdata = None
-        if kaka:
-            userdata = eduid_idp.mischttp.info_from_cookie(kaka, self.IDP, self.logger)
-            self.logger.debug("Looked up userdata using idpauthn cookie : {!s}".format(pprint.pformat(userdata)))
-        else:
-            self.logger.debug("No cookie, looking for 'id' parameter in query string :\n{!s}".format(cherrypy.request.query_string))
-            query = eduid_idp.mischttp.parse_query_string()
-            self.logger.debug("FREDRIK: QUERY:\n{!s}".format(pprint.pformat(query)))
-            if query:
-                try:
-                    userdata = self.IDP.cache.uid2user[query["id"]]
-                    self.logger.debug("Looked up userdata using request id parameter : {!s}".format(pprint.pformat(userdata)))
-                except KeyError:
-                    # no 'id', or not found in cache
-                    pass
-
         user = None
+        userdata = self._lookup_userdata()
         if userdata:
             user = userdata['user']
-            authn_ref = userdata['authn_reference']
-            environ["idp.authn_ref"] = authn_ref
+            environ["idp.authn"] = userdata['authn']
 
         url_patterns = AUTHN_URLS
         if not user:
@@ -300,13 +282,13 @@ class IdPApplication(object):
             # insert NON_AUTHN_URLS first in case there is no user
             url_patterns = NON_AUTHN_URLS + url_patterns
         else:
-            self.logger.info("FREDRIK: USER {!r}".format(user))
+            self.logger.info("SSO session for user {!r} found in IdP cache".format(user.username))
 
         for regex, callback in url_patterns:
             match = re.search(regex, path)
-            self.logger.debug("match path {!r} to re {!r} -> {!r}".format(path, regex, match))
+            self.logger.debug("URL routing: match path {!r} to re {!r} -> {!r}".format(path, regex, match))
             if match is not None:
-                self.logger.debug("Callback: %s" % (callback,))
+                self.logger.debug("URL callback found: %s" % (callback,))
                 if isinstance(callback, tuple):
                     cls = callback[0](environ, start_response, self, user)
                     func = getattr(cls, callback[1])
@@ -314,6 +296,29 @@ class IdPApplication(object):
                 return callback(environ, start_response, self, user)
 
         return eduid_idp.mischttp.not_found(environ, start_response)
+
+    def _lookup_userdata(self):
+        kaka = cherrypy.request.cookie
+        userdata = None
+        if kaka:
+            userdata = eduid_idp.mischttp.info_from_cookie(kaka, self.IDP, self.logger)
+            self.logger.debug("Looked up userdata using idpauthn cookie : {!s}".format(
+                    pprint.pformat(userdata)))
+        else:
+            self.logger.debug("No cookie, looking for 'id' parameter in query string :\n{!s}".format(
+                    cherrypy.request.query_string))
+            query = eduid_idp.mischttp.parse_query_string()
+            self.logger.debug("FREDRIK: QUERY:\n{!s}".format(pprint.pformat(query)))
+            if query:
+                try:
+                    userdata = self.IDP.cache.uid2user[query["id"]]
+                    self.logger.debug("Looked up userdata using request id parameter : {!s}".format(
+                            pprint.pformat(userdata)))
+                except KeyError:
+                    # no 'id', or not found in cache
+                    pass
+        return userdata
+
 
 # ----------------------------------------------------------------------------
 

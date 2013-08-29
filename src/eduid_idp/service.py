@@ -90,7 +90,7 @@ class Service(object):
         return resp(self.environ, self.start_response)
 
     def do(self, query, binding, relay_state=""):
-        pass
+        raise NotImplementedError('Subclass should implement function "do"')
 
     def redirect(self):
         """ Expects a HTTP-redirect request """
@@ -122,6 +122,7 @@ class Service(object):
         _dict = self.unpack_either()
         return self.operation(_dict, BINDING_SOAP)
 
+    # XXX is this really something that belongs to the SSO() object, rather than Service()?
     def not_authn(self, key, requested_authn_context):
         """
         Authenticate user. Either, the user hasn't logged in yet,

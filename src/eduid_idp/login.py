@@ -105,16 +105,14 @@ class SSO(Service):
             self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
 
             try:
-                _authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
-                self.logger.debug("Re-created authn {!r} using idp.authn_ref {!r}".format(
-                        _authn, self.environ["idp.authn_ref"]))
+                #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
+                _authn = self.environ["idp.authn"]
+                self.logger.debug("User authenticated using Authn {!r}".format(_authn))
                 self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
                 _resp = self.IDP.create_authn_response(self.user.identity, userid=self.user.username,
                                                        authn=_authn, sign_assertion=True, **resp_args)
             except Exception, excp:
                 self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
-                self.logger.debug("AuthN-by-ref {!r} not found in list :\n{!s}".format(
-                        self.environ["idp.authn_ref"], pprint.pformat(self.AUTHN_BROKER.db["info"])))
                 resp = ServiceError("Exception: %s" % (excp,))
                 return resp(self.environ, self.start_response)
 
@@ -124,7 +122,7 @@ class SSO(Service):
         http_args = self.IDP.apply_binding(self.binding_out,
                                            "%s" % _resp, self.destination,
                                            relay_state, response=True)
-        self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
+        #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
         return self.response(self.binding_out, http_args)
 
 
@@ -150,10 +148,6 @@ class SSO(Service):
 
         self.environ['idp.FailCount'] = _fc
 
-        # re-insert in IDP.ticket cache
-        _ticket["FailCount"] = _fc + 1
-        key = self._store_ticket(_ticket)
-
         if self.user and not self.req_info.message.force_authn:
             self.logger.debug("Continuing with Authn request {!r}".format(self.req_info))
             return self.operation(_ticket, BINDING_HTTP_REDIRECT)
@@ -163,8 +157,11 @@ class SSO(Service):
         if self.req_info.message.force_authn:
             self.logger.info("Forcing authentication for user {!r}".format(self.user))
 
-        return self.not_authn(key, self.req_info.message.requested_authn_context)
+        # re-insert in IDP.ticket cache
+        _ticket["FailCount"] = _fc + 1
+        key = self._store_ticket(_ticket)
 
+        return self.not_authn(key, self.req_info.message.requested_authn_context)
 
 
     def post(self):
@@ -289,7 +286,11 @@ class SSO(Service):
 def username_password_authn(environ, start_response, reference, key,
                             redirect_uri, logger, config):
     """
-    Display the login form
+    Display the login form for standard username-password authentication.
+
+    Service.not_authn() chooses what authentication method to use based on
+    requested AuthnContext and local configuration, and then calls this method
+    to render the login page for this method.
     """
     argv = {
         "action": "/verify",
@@ -338,15 +339,34 @@ def verify_username_and_password(dic, idp_app):
 def do_verify(environ, start_response, idp_app, _user):
     query = eduid_idp.mischttp.get_post()
 
-    # XXX remove password from query before logging
-    idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(query)))
+    _loggable = query.copy()
+    if 'password' in _loggable:
+        _loggable['password'] = '<redacted>'
+    idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
     idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
 
+    # What kind of authentication to perform was chosen by Service.not_authn() when
+    # the login web page was to be rendered. It is passed to us here through an HTTP POST
+    # parameter (authn_reference) so it can't be trusted. XXX is this a problem? Not sure.
+
+    authn_ref = query["authn_reference"]
     try:
-        # XXX need to verify that UsernamePassword is an appropriate authn context here I think
-        _ok, user = verify_username_and_password(query, idp_app)
+        _authn = idp_app.AUTHN_BROKER[authn_ref]
     except KeyError:
+        resp = Unauthorized("Bad authentication reference")
+        return resp(environ, start_response)
+
+    idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(_authn['class_ref'], authn_ref))
+
+    try:
+        if _authn['class_ref'] == 'urn:oasis:names:tc:SAML:2.0:ac:classes:Password':
+            _ok, user = verify_username_and_password(query, idp_app)
+        else:
+            idp_app.logger.info("Authentication for class {!r} not implemented".format(_authn['class_ref']))
+            raise NotImplementedError()
+    except Exception as excp:
+        idp_app.logger.error("Failed authenticating user:\n {!s}".format(exception_trace(excp)))
         _ok = False
         user = None
 
@@ -359,20 +379,16 @@ def do_verify(environ, start_response, idp_app, _user):
         else:
             resp = Unauthorized("Unknown user or wrong password")
     else:
-        idp_app.logger.debug("FREDRIK: User {!r} authenticated OK".format(user))
+        idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
         uid = rndstr(24)
         idp_app.IDP.cache.uid2user[uid] = {'user': user,
-                                           'authn_reference': query["authn_reference"],
+                                           'authn': _authn,
                                            'authn_timestamp': int(time.time()),
                                            }
         idp_app.IDP.cache.user2uid[user] = uid
-        idp_app.logger.debug("Register %s under '%s'" % (user, uid))
+        idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, uid))
 
-        idp_app.logger.debug("FREDRIK: Storing uid={!r} in idpauthn cookie".format(
-                uid))
-        #kaka = set_cookie("idpauthn", "/", idp_app.logger, uid, query["authn_reference"])
         kaka = eduid_idp.mischttp.set_cookie("idpauthn", "/", idp_app.logger, uid)
-
         lox = "%s?id=%s&key=%s" % (query["redirect_uri"], uid,
                                    query["key"])
         idp_app.logger.debug("Redirect => %s" % lox)
