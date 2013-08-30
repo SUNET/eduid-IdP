@@ -73,6 +73,7 @@ General user<->IdP interaction flow :
 import os
 import re
 import sys
+import time
 import pprint
 import logging
 import argparse
@@ -317,6 +318,12 @@ class IdPApplication(object):
                 except KeyError:
                     # no 'id', or not found in cache
                     pass
+        if userdata:
+            _age = (int(time.time()) - userdata['authn_timestamp']) / 60
+            if _age > self.config.sso_session_lifetime:
+                self.logger.info("SSO session expired (age {!r} minutes > {!r})".format(_age, self.config.sso_session_lifetime))
+                return None
+            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(_age, self.config.sso_session_lifetime))
         return userdata
 
 

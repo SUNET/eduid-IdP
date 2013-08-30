@@ -388,7 +388,8 @@ def do_verify(environ, start_response, idp_app, _user):
         idp_app.IDP.cache.user2uid[user] = uid
         idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, uid))
 
-        kaka = eduid_idp.mischttp.set_cookie("idpauthn", "/", idp_app.logger, uid)
+        kaka = eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime,
+                                             "/", idp_app.logger, uid)
         lox = "%s?id=%s&key=%s" % (query["redirect_uri"], uid,
                                    query["key"])
         idp_app.logger.debug("Redirect => %s" % lox)

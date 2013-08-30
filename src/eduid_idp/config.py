@@ -53,6 +53,7 @@ _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'cert_chain': None,   # SSL certificate chain filename, or None
                     'userdb_mongo_uri': None,
                     'userdb_mongo_database': None,
+                    'sso_session_lifetime': '15', # Lifetime of SSO session in minutes
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -184,3 +185,17 @@ class IdPConfig():
         UserDB database name.
         """
         return self.config.get(self.section, 'userdb_mongo_database')
+
+    @property
+    def sso_session_lifetime(self):
+        """
+        Lifetime of SSO session (in minutes).
+
+        If a user has an active SSO session, they will get SAML assertions made
+        without having to authenticate again (unless SP requires it through
+        ForceAuthn).
+
+        The total time a user can access a particular SP would therefor be
+        this value, plus the pysaml2 lifetime of the assertion.
+        """
+        return self.config.getint(self.section, 'sso_session_lifetime')

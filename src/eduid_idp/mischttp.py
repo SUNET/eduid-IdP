@@ -213,12 +213,22 @@ def delete_cookie(environ, name, logger):
     return None
 
 
-def set_cookie(name, _, logger, *args):
+def set_cookie(name, expire, path, logger, *args):
+    """
+    Create Cookies
+
+    :param name: Cookie identifier (string)
+    :param expire: Number of minutes before this cookie goes stale
+    :param path: The path specification for the cookie
+    :param logger: logging instance
+    :return: A tuple to be added to headers
+    """
     cookie = SimpleCookie()
     cookie[name] = base64.b64encode(":".join(args))
-    cookie[name]['path'] = "/"
-    cookie[name]["expires"] = _expiration(5)  # 5 minutes from now
-    logger.debug("Cookie expires: %s" % cookie[name]["expires"])
+    if path:
+        cookie[name]["path"] = path
+    cookie[name]["expires"] = _expiration(expire)
+    logger.debug("Cookie expires ({!r} minutes) : {!s}".format(expire, cookie[name]["expires"]))
     logger.debug("set KAKA: %s" % cookie)
     return tuple(cookie.output().split(": ", 1))
 
