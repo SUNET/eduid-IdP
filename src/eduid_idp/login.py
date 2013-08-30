@@ -8,6 +8,7 @@
 #          Roland Hedberg
 #
 
+import uuid
 import time
 import pprint
 import cherrypy
@@ -380,7 +381,8 @@ def do_verify(environ, start_response, idp_app, _user):
             resp = Unauthorized("Unknown user or wrong password")
     else:
         idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
-        uid = rndstr(24)
+        # NOTE: It is important than noone can guess one of these uids, as that would allow impersonation.
+        uid = str(uuid.uuid4())
         idp_app.IDP.cache.uid2user[uid] = {'user': user,
                                            'authn': _authn,
                                            'authn_timestamp': int(time.time()),
