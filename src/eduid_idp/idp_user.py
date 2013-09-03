@@ -158,6 +158,8 @@ class IdPUserDb():
                 # XXX we effectively disclose there was no such user by the quick
                 # response in this case. Maybe send bogus auth request to backends?
                 return None
+            self.logger.debug("Found user {!r}".format(user))
+            self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user._data)))
             factor = vccs_client.VCCSPasswordFactor(password, user.credential_id,
                                                     salt=user.credential_salt)
             self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
