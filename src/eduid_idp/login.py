@@ -162,7 +162,7 @@ class SSO(Service):
         _ticket["FailCount"] = _fc + 1
         key = self._store_ticket(_ticket)
 
-        return self.not_authn(key, self.req_info.message.requested_authn_context)
+        return self._not_authn(key, self.req_info.message.requested_authn_context)
 
 
     def post(self):
@@ -180,7 +180,7 @@ class SSO(Service):
         # or because it was requested using SAML2 ForceAuthn
         _info["req_info"] = self.req_info
         key = self._store_ticket(_info)
-        return self.not_authn(key, _req.requested_authn_context)
+        return self._not_authn(key, _req.requested_authn_context)
 
 
     def _store_ticket(self, _ticket):
@@ -278,6 +278,28 @@ class SSO(Service):
         return _req_info
 
 
+    def _not_authn(self, key, requested_authn_context):
+        """
+        Authenticate user. Either, the user hasn't logged in yet,
+        or the service provider forces re-authentication.
+        """
+        redirect_uri = eduid_idp.mischttp.geturl(self.environ, query=False)
+
+        self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
+
+        auth_info = self.AUTHN_BROKER.pick(requested_authn_context)
+
+        if len(auth_info):
+            method, reference = auth_info[0]
+            self.logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
+            # `method' is, for example, the function username_password_authn
+            return method(self.environ, self.start_response, reference, key,
+                          redirect_uri, self.logger, self.config)
+        else:
+            resp = Unauthorized("No usable authentication method")
+            return resp(self.environ, self.start_response)
+
+
 
 # -----------------------------------------------------------------------------
 # === Authentication ====
@@ -289,7 +311,7 @@ def username_password_authn(environ, start_response, reference, key,
     """
     Display the login form for standard username-password authentication.
 
-    Service.not_authn() chooses what authentication method to use based on
+    SSO._not_authn() chooses what authentication method to use based on
     requested AuthnContext and local configuration, and then calls this method
     to render the login page for this method.
     """
@@ -347,7 +369,7 @@ def do_verify(environ, start_response, idp_app, _user):
 
     idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
 
-    # What kind of authentication to perform was chosen by Service.not_authn() when
+    # What kind of authentication to perform was chosen by SSO._not_authn() when
     # the login web page was to be rendered. It is passed to us here through an HTTP POST
     # parameter (authn_reference) so it can't be trusted. XXX is this a problem? Not sure.
 

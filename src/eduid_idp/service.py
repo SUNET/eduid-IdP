@@ -121,26 +121,3 @@ class Service(object):
     def uri(self):
         _dict = self.unpack_either()
         return self.operation(_dict, BINDING_SOAP)
-
-    # XXX is this really something that belongs to the SSO() object, rather than Service()?
-    def not_authn(self, key, requested_authn_context):
-        """
-        Authenticate user. Either, the user hasn't logged in yet,
-        or the service provider forces re-authentication.
-        """
-        redirect_uri = eduid_idp.mischttp.geturl(self.environ, query=False)
-
-        self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
-
-        auth_info = self.AUTHN_BROKER.pick(requested_authn_context)
-
-        if len(auth_info):
-            method, reference = auth_info[0]
-            self.logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
-            # `method' is, for example, the function username_password_authn
-            return method(self.environ, self.start_response, reference, key,
-                          redirect_uri, self.logger, self.config)
-        else:
-            resp = Unauthorized("No usable authentication method")
-            return resp(self.environ, self.start_response)
-
