@@ -13,7 +13,7 @@ Code handling Single Log Out requests.
 """
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Response, BadRequest, Unauthorized, ServiceError, delete_cookie
+from eduid_idp.mischttp import Response, BadRequest, ServiceError, delete_cookie
 
 # -----------------------------------------------------------------------------
 # === Single log out ===
@@ -36,12 +36,13 @@ class SLO(Service):
 
         msg = req_info.message
         if msg.name_id:
-            lid = self.IDP.ident.find_local_id(msg.name_id)
-            self.logger.info("local identifier: %s" % lid)
-            self.logger.debug("Purging from cache, uid : {!s}".format(self.IDP.cache.uid2user[self.IDP.cache.user2uid[lid]]))
-            self.logger.debug("Purging from cache, lid : {!s}".format(self.IDP.cache.user2uid[lid]))
-            del self.IDP.cache.uid2user[self.IDP.cache.user2uid[lid]]
-            del self.IDP.cache.user2uid[lid]
+            _lid = self.IDP.ident.find_local_id(msg.name_id)
+            _uid = self.IDP.cache.user2uid[_lid]
+            self.logger.info("local identifier: {!s}".format(_lid))
+            self.logger.debug("Purging from cache, uid : {!s}".format(self.IDP.cache.uid2user[_uid]))
+            self.logger.debug("Purging from cache, lid : {!s}".format(self.IDP.cache.user2uid[_lid]))
+            del self.IDP.cache.uid2user[_uid]
+            del self.IDP.cache.user2uid[_lid]
             # remove the authentication
             try:
                 self.IDP.session_db.remove_authn_statements(msg.name_id)
@@ -59,7 +60,7 @@ class SLO(Service):
             resp = ServiceError("%s" % exc)
             return resp(self.environ, self.start_response)
 
-        delco = delete_cookie(self.environ, "idpauthn", self.logger)
+        delco = delete_cookie("idpauthn", self.logger)
         if delco:
             hinfo["headers"].append(delco)
         self.logger.info("Header: %s" % (hinfo["headers"],))

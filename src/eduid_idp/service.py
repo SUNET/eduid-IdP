@@ -16,7 +16,7 @@ Code handling Single Sign On logins.
 import pprint
 
 import eduid_idp.mischttp
-from eduid_idp.mischttp import Response, BadRequest, Unauthorized, Redirect
+from eduid_idp.mischttp import Response, BadRequest, Redirect
 
 from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_SOAP

@@ -27,8 +27,8 @@ General user<->IdP interaction flow :
 
      The key is passed to the login form HTML template as {{key}}.
 
-     Another hash, a reference to the authn context is generated (by pysaml2
-     authn_context code) and passed to the template as {{authn_reference}}.
+     A reference to the authn context is generated (by pysaml2 authn_context code)
+     and passed to the template as {{authn_reference}}.
 
      The current URL is included in the HTML form as {{redirect_uri}}.
 
@@ -38,16 +38,16 @@ General user<->IdP interaction flow :
 
      do_verify() tries to authenticate user based on filled out HTML form contents.
 
-     If successful, a random user identifier is created and a mapping between the
-     random uid and the real authenticated users username is stored in the IDP.cache.
+     If successful, a random user identifier (UUID) is created and a mapping between
+     the random uid and the real authenticated users username is stored in the
+     IDP.cache.
 
-     The random user identifier and the authn_reference from step 2 is stored in a
-     browser cookie called `idpauthn'.
+     The random user identifier (UUID) is stored in a browser cookie called `idpauthn'.
 
      The user is HTTP redirected back to the URL of step 2 through the `redirect_uri'
      HTML parameter (included in the HTML form by step 2). The random user identifier
-     is passed as URL parameter `id', and the `authn_reference' from step 2 is passed
-     as URL parameter `key'.
+     is passed as URL parameter `id', and the `key' from step 2 is passed as URL
+     parameter `key'.
 
   5) URL /sso/redirect (re-visited) is handled by SSO.redirect()
 
@@ -60,8 +60,9 @@ General user<->IdP interaction flow :
 
      SSO.do() effectively uses IdPApplication.application() to determine which
      user is logged in. This will be either from the idpauthn cookie being set,
-     and containing a random user identifier that can be looked up in IDP.cache
-     to get a real username, or from IDP.cache using the `id' URI parameter.
+     and containing a random user identifier (UUID) that can be looked up in
+     IDP.cache to get a real username, or from IDP.cache using the `id' URI
+     parameter.
 
      An AuthnResponse is created using pysaml2 create_authn_response(), and this
      is where the `authn_reference' from step 2 seems to come into play. The authn
@@ -121,6 +122,11 @@ def parse_args():
 
 
 class Cache(object):
+    """
+    This cache holds all SSO sessions, meaning information about what users
+    have a valid session with the IdP in order to not be authenticated again
+    (until the SSO session expires).
+    """
 
     def __init__(self):
         self.user2uid = {}
@@ -217,7 +223,7 @@ class IdPApplication(object):
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
     @cherrypy.expose
-    def default(self, *args, **kwargs):
+    def default(self, *_args, **_kwargs):
         cherrypy.response.idp_response_status = None
 
         res = self.application(self.my_start_response)
@@ -226,12 +232,16 @@ class IdPApplication(object):
             res2 = ''.join(res)
         if isinstance(res2, basestring):
             if len(res2) < 200:
-                self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(cherrypy.response.idp_response_status, res2))
+                self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(
+                        cherrypy.response.idp_response_status, res2))
             else:
-                self.logger.debug("FREDRIK: APP RESPONSE {!r} : {!r} bytes ({!r})".format(cherrypy.response.idp_response_status, len(res2), res2[:20]))
+                self.logger.debug("FREDRIK: APP RESPONSE {!r} : {!r} bytes ({!r})".format(
+                        cherrypy.response.idp_response_status, len(res2), res2[:20]))
             res = res2
         else:
-            self.logger.debug("FREDRIK: NON-LIST APP RESPONSE {!r} : {!r}".format(cherrypy.response.idp_response_status, res))
+            self.logger.debug("FREDRIK: NON-LIST APP RESPONSE {!r} : {!r}".format(
+                    cherrypy.response.idp_response_status, res))
+        # Return the HTTP response code stored in my_start_response()
         cherrypy.response.status = cherrypy.response.idp_response_status
         if cherrypy.response.idp_response_headers:
             for (k, v) in cherrypy.response.idp_response_headers:
@@ -239,6 +249,9 @@ class IdPApplication(object):
         return res
 
     def my_start_response(self, status, headers):
+        """
+        The IdP used to be a WSGI application, and this function is a remaining trace of that.
+        """
         self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
         if cherrypy.response.idp_response_status:
             self.logger.warning("start_response called twice (now {!r} / {!r}, previous {!r} / {!r})".format(
@@ -321,9 +334,11 @@ class IdPApplication(object):
         if userdata:
             _age = (int(time.time()) - userdata['authn_timestamp']) / 60
             if _age > self.config.sso_session_lifetime:
-                self.logger.info("SSO session expired (age {!r} minutes > {!r})".format(_age, self.config.sso_session_lifetime))
+                self.logger.info("SSO session expired (age {!r} minutes > {!r})".format(
+                        _age, self.config.sso_session_lifetime))
                 return None
-            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(_age, self.config.sso_session_lifetime))
+            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
+                    _age, self.config.sso_session_lifetime))
         return userdata
 
 

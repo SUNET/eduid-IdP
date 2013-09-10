@@ -8,6 +8,10 @@
 #          Roland Hedberg
 #
 
+"""
+Code handling Single Sign On logins.
+"""
+
 import uuid
 import time
 import pprint
@@ -19,15 +23,12 @@ import eduid_idp.mischttp
 
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
-from saml2.s_utils import rndstr, exception_trace
+from saml2.s_utils import exception_trace
 from saml2.sigver import verify_redirect_signature
 
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 
-"""
-Code handling Single Sign On logins.
-"""
 
 # -----------------------------------------------------------------------------
 # === Single log in ====
@@ -158,7 +159,10 @@ class SSO(Service):
         if self.req_info.message.force_authn:
             self.logger.info("Forcing authentication for user {!r}".format(self.user))
 
-        # re-insert in IDP.ticket cache
+        # Re-insert in IDP.ticket cache.
+        # XXX this should ideally be done in do_verify(), on actual authentication failures,
+        # since when it is done here it will show page reloads (Ctrl+R) as failed login
+        # attempts to the user.
         _ticket["FailCount"] = _fc + 1
         key = self._store_ticket(_ticket)
 
@@ -283,7 +287,7 @@ class SSO(Service):
         Authenticate user. Either, the user hasn't logged in yet,
         or the service provider forces re-authentication.
         """
-        redirect_uri = eduid_idp.mischttp.geturl(self.environ, query=False)
+        redirect_uri = eduid_idp.mischttp.geturl(query=False)
 
         self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
 

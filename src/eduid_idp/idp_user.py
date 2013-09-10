@@ -36,7 +36,6 @@ import pprint
 
 import vccs_client
 from eduid_am.celery import celery, get_attribute_manager
-import eduid_am.tasks
 
 USERS = {
     "roland": {
@@ -159,7 +158,7 @@ class IdPUserDb():
                 # response in this case. Maybe send bogus auth request to backends?
                 return None
             self.logger.debug("Found user {!r}".format(user))
-            self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user._data)))
+            self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
             # XXX for now, try the password sequentially against all the users password credentials
             for cred in user.passwords:
                 factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))

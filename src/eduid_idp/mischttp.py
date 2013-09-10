@@ -42,11 +42,11 @@ class Response(object):
         if 'content-type' not in headers_lc:
             self.headers.append(('Content-Type', _content_type))
 
-    def __call__(self, environ, start_response, **kwargs):
+    def __call__(self, environ, start_response):
         start_response(self.status, self.headers)
-        return self.response(self.message or geturl(environ), **kwargs)
+        return self.response(self.message or geturl())
 
-    def _response(self, message="", **argv):
+    def _response(self, message=""):
         if self.template:
             return [self.template % message]
         elif isinstance(message, basestring):
@@ -87,7 +87,7 @@ class ServiceError(Response):
 
 
 
-def geturl(environ, query=True, path=True):
+def geturl(query=True, path=True):
     """Rebuilds a request URL (from PEP 333).
 
     :param query: Is QUERY_STRING included in URI (default: True)
@@ -198,7 +198,7 @@ def _expiration(timeout, tformat="%a, %d-%b-%Y %H:%M:%S GMT"):
         return time_util.in_a_while(minutes=timeout, format=tformat)
 
 
-def delete_cookie(environ, name, logger):
+def delete_cookie(name, logger):
     kaka = cherrypy.request.cookie
     logger.debug("delete KAKA: %s" % kaka)
     if kaka:
