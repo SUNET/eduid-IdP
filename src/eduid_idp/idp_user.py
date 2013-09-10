@@ -95,7 +95,7 @@ class IdPUser():
         else:
             if not userdb:
                 raise NoSuchUser("Local user {!r} does not exist".format(username))
-            for field in ['email', 'eduPersonPrincipalName']:
+            for field in ['mail', 'eduPersonPrincipalName']:
                 self._data = userdb.get_user_by_field(field, username)
                 if self._data:
                     break
@@ -118,12 +118,12 @@ class IdPUser():
         return self._username
 
     @property
-    def credential_id(self):
-        return self._data['eduID,private,credential_id']
-
-    @property
-    def credential_salt(self):
-        return self._data['eduID,private,salt']
+    def passwords(self):
+        """
+        Return the password credentials for this user.
+        This is a list of dicts with "salt" and "id" keys.
+        """
+        return self._data['passwords']
 
 
 class IdPUserDb():
@@ -160,11 +160,13 @@ class IdPUserDb():
                 return None
             self.logger.debug("Found user {!r}".format(user))
             self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user._data)))
-            factor = vccs_client.VCCSPasswordFactor(password, user.credential_id,
-                                                    salt=user.credential_salt)
-            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
-                    username, user.credential_id, factor))
-            if self.vccs_client.authenticate(username, [factor]):
-                self.logger.debug("VCCS authenticated user {!r}".format(user))
-                return user
+            # XXX for now, try the password sequentially against all the users password credentials
+            for cred in user.passwords:
+                factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
+                self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
+                        username, cred['id'], factor))
+                if self.vccs_client.authenticate(username, [factor]):
+                    self.logger.debug("VCCS authenticated user {!r}".format(user))
+                    return user
+        self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         return None
