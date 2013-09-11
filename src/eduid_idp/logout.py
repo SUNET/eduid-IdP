@@ -14,6 +14,11 @@ Code handling Single Log Out requests.
 
 from eduid_idp.service import Service
 from eduid_idp.mischttp import Response, BadRequest, ServiceError, delete_cookie
+import eduid_idp.mischttp
+
+from saml2 import BINDING_HTTP_REDIRECT
+from saml2 import BINDING_HTTP_POST
+from saml2 import BINDING_SOAP
 
 # -----------------------------------------------------------------------------
 # === Single log out ===
