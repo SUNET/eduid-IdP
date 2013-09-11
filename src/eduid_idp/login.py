@@ -26,6 +26,7 @@ from saml2.s_utils import UnsupportedBinding
 from saml2.s_utils import exception_trace
 from saml2.sigver import verify_redirect_signature
 
+from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 
@@ -179,12 +180,29 @@ class SSO(Service):
             _info["SAMLRequest"], BINDING_HTTP_POST)
         _req = self.req_info.message
         if self.user and not _req.force_authn:
+            self.logger.debug("Continuing with posted Authn request {!r}".format(_info))
             return self.operation(_info, BINDING_HTTP_POST)
         # Request authentication, either because there was no self.user
         # or because it was requested using SAML2 ForceAuthn
         _info["req_info"] = self.req_info
         key = self._store_ticket(_info)
         return self._not_authn(key, _req.requested_authn_context)
+
+
+    def artifact(self):
+        # Can be either by HTTP_Redirect or HTTP_POST
+        _dict = self.unpack_either()
+        return self.artifact_operation(_dict)
+
+
+    def artifact_operation(self, _dict):
+        if not _dict:
+            resp = BadRequest("Missing query")
+            return resp(self.environ, self.start_response)
+        else:
+            # exchange artifact for request
+            request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
+            return self.do(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
 
 
     def _store_ticket(self, _ticket):

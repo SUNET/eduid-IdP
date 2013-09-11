@@ -19,9 +19,6 @@ import eduid_idp.mischttp
 from eduid_idp.mischttp import Response, BadRequest, Redirect
 
 from saml2 import BINDING_HTTP_ARTIFACT
-from saml2 import BINDING_SOAP
-from saml2 import BINDING_HTTP_REDIRECT
-from saml2 import BINDING_HTTP_POST
 
 class Service(object):
 
@@ -65,15 +62,6 @@ class Service(object):
         else:
             return self.do(_dict["SAMLRequest"], binding, _dict["RelayState"])
 
-    def artifact_operation(self, _dict):
-        if not _dict:
-            resp = BadRequest("Missing query")
-            return resp(self.environ, self.start_response)
-        else:
-            # exchange artifact for request
-            request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
-            return self.do(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
-
     def response(self, binding, http_args):
         if binding == BINDING_HTTP_ARTIFACT:
             resp = Redirect()
@@ -91,8 +79,3 @@ class Service(object):
     def post(self):
         """ Expects a HTTP-POST request """
         raise NotImplementedError('Subclass should implement function "post"')
-
-    def artifact(self):
-        # Can be either by HTTP_Redirect or HTTP_POST
-        _dict = self.unpack_either()
-        return self.artifact_operation(_dict)
