@@ -37,8 +37,7 @@ from saml2 import BINDING_HTTP_POST
 
 
 class SSO(Service):
-
-    def __init__(self, environ, start_response, idp_app, user=None):
+    def __init__(self, environ, start_response, idp_app, user = None):
         Service.__init__(self, environ, start_response, idp_app, user)
         self.binding = ""
         self.response_bindings = None
@@ -47,11 +46,13 @@ class SSO(Service):
         self.destination = None
         self.req_info = None
 
-
     def verify_request(self, query, binding):
         """
+        Verify that a login request looks OK to this IdP, and figure out
+        the outgoing binding and destination to use later.
+
         :param query: The SAML query, transport encoded
-        :param binding: Which binding the query came in over
+        :param binding: Which binding the query came in over as string
         """
         resp_args = {}
         if not query:
@@ -64,15 +65,15 @@ class SSO(Service):
             self.logger.info("SAML query parsed OK")
         else:
             self.logger.debug("verify_request acting on previously parsed self.req_info {!s}".format(
-                    self.req_info))
+                self.req_info))
 
         _authn_req = self.req_info.message
         self.logger.debug("AuthnRequest {!r} :\n{!s}".format(_authn_req, _authn_req))
 
         self.binding_out, self.destination = self.IDP.pick_binding(
             "assertion_consumer_service",
-            bindings=self.response_bindings,
-            entity_id=_authn_req.issuer.text)
+            bindings = self.response_bindings,
+            entity_id = _authn_req.issuer.text)
 
         self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
                                                             self.destination))
@@ -89,8 +90,14 @@ class SSO(Service):
 
         return resp_args, _resp
 
-
     def perform_login(self, _dict, binding_in, relay_state):
+        """
+
+        :param _dict: Login request as dict
+        :param binding_in:
+        :param relay_state:
+        :return:
+        """
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.do() ---")
 
@@ -118,8 +125,8 @@ class SSO(Service):
                 _authn = self.environ["idp.authn"]
                 self.logger.debug("User authenticated using Authn {!r}".format(_authn))
                 self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
-                _resp = self.IDP.create_authn_response(self.user.identity, userid=self.user.username,
-                                                       authn=_authn, sign_assertion=True, **resp_args)
+                _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
+                                                       authn = _authn, sign_assertion = True, **resp_args)
             except Exception, excp:
                 self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
                 resp = ServiceError("Exception: %s" % (excp,))
@@ -130,10 +137,9 @@ class SSO(Service):
         # with a SAMLResponse
         http_args = self.IDP.apply_binding(self.binding_out,
                                            "%s" % _resp, self.destination,
-                                           relay_state, response=True)
+                                           relay_state, response = True)
         #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
         return self.response(self.binding_out, http_args)
-
 
     def redirect(self):
         """ This is the HTTP-redirect endpoint """
@@ -175,7 +181,6 @@ class SSO(Service):
 
         return self._not_authn(key, self.req_info.message.requested_authn_context)
 
-
     def post(self):
         """
         The HTTP-Post endpoint
@@ -194,17 +199,15 @@ class SSO(Service):
         key = self._store_ticket(_info)
         return self._not_authn(key, _req.requested_authn_context)
 
-
     def artifact(self):
         # Can be either by HTTP_Redirect or HTTP_POST
         _dict = self.unpack_either()
         if not _dict:
             resp = BadRequest("Missing query")
             return resp(self.environ, self.start_response)
-        # exchange artifact for request
+            # exchange artifact for request
         request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
         return self.perform_login(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
-
 
     def _store_ticket(self, _ticket):
         """
@@ -226,7 +229,6 @@ class SSO(Service):
         self.IDP.ticket.add(key, _ticket)
         return key
 
-
     def _get_ticket(self, _info):
         """
         _info is redirect HTTP query parameters.
@@ -244,30 +246,28 @@ class SSO(Service):
         :returns: ResultBool, Ticket as dict
         """
         # Try ticket-cache lookup based on key, or key derived from SAMLRequest
-        _key = None
         if "key" in _info:
             _key = _info["key"]
         elif "SAMLRequest" in _info:
             _key = self.IDP.ticket.key(_info["SAMLRequest"])
         else:
             return False, BadRequest("Missing SAMLRequest, please re-initiate login")
-        # lookup
+            # lookup
         _data = self.IDP.ticket.get(_key)
 
         if _data is None:
             self.logger.debug("FREDRIK: Key {!r} not found in IDP.ticket :\n{!s}".format(
-                     _key, pprint.pformat(self.IDP.ticket.items())))
+                _key, pprint.pformat(self.IDP.ticket.items())))
             if "key" in _info:
                 return False, BadRequest("Missing IdP ticket, please re-initiate login")
-             # cache miss, parse SAMLRequest
+                # cache miss, parse SAMLRequest
             _data = _info
             _data["req_info"] = self._parse_SAMLRequest(_info)
         else:
             self.logger.debug("FREDRIK: Retreived IDP.ticket(key={!r}) :\n{!s}".format(
-                    _key, pprint.pformat(_data)))
+                _key, pprint.pformat(_data)))
 
         return True, _data
-
 
     def _parse_SAMLRequest(self, _info):
         """
@@ -283,7 +283,7 @@ class SSO(Service):
         _req_info = self.IDP.parse_authn_request(_info["SAMLRequest"], BINDING_HTTP_REDIRECT)
 
         self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
-                _req_info.message, _req_info.message))
+            _req_info.message, _req_info.message))
 
         if "SigAlg" in _info and "Signature" in _info:  # Signed request
             issuer = _req_info.message.issuer.text
@@ -300,13 +300,12 @@ class SSO(Service):
             self.logger.debug("No signature in SAMLRequest")
         return _req_info
 
-
     def _not_authn(self, key, requested_authn_context):
         """
         Authenticate user. Either, the user hasn't logged in yet,
         or the service provider forces re-authentication.
         """
-        redirect_uri = eduid_idp.mischttp.geturl(query=False)
+        redirect_uri = eduid_idp.mischttp.geturl(query = False)
 
         self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
 
@@ -321,7 +320,6 @@ class SSO(Service):
         else:
             resp = Unauthorized("No usable authentication method")
             return resp(self.environ, self.start_response)
-
 
 
 # -----------------------------------------------------------------------------
@@ -351,7 +349,7 @@ def username_password_authn(environ, start_response, reference, key,
     # if idp.FailCount is present, it is always an integer
     _fc = environ.get("idp.FailCount", 0)
     if _fc > 0:
-        argv["alert_msg"] = "Incorrect username or password (%i attempts)" % (_fc)
+        argv["alert_msg"] = "Incorrect username or password ({!s} attempts)".format(_fc)
 
     logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
@@ -361,7 +359,7 @@ def username_password_authn(environ, start_response, reference, key,
         res = eduid_idp.mischttp.static_file(environ, start_response, static_fn)
         if len(res) == 1:
             res = res[0]
-        # apply simplistic HTML formatting to template in 'res'
+            # apply simplistic HTML formatting to template in 'res'
         return res.format(**argv)
 
     return eduid_idp.mischttp.not_found(environ, start_response)
@@ -421,7 +419,7 @@ def do_verify(environ, start_response, idp_app, _user):
         _referer = cherrypy.request.headers.get('Referer')
         if _referer:
             lox = str(_referer)
-            resp = Redirect(lox, content="text/html")
+            resp = Redirect(lox, content = "text/html")
         else:
             resp = Unauthorized("Unknown user or wrong password")
     else:
@@ -431,7 +429,7 @@ def do_verify(environ, start_response, idp_app, _user):
         idp_app.IDP.cache.uid2user[uid] = {'user': user,
                                            'authn': _authn,
                                            'authn_timestamp': int(time.time()),
-                                           }
+        }
         idp_app.IDP.cache.user2uid[user] = uid
         idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, uid))
 
@@ -440,7 +438,7 @@ def do_verify(environ, start_response, idp_app, _user):
         lox = "%s?id=%s&key=%s" % (query["redirect_uri"], uid,
                                    query["key"])
         idp_app.logger.debug("Redirect => %s" % lox)
-        resp = Redirect(lox, headers=[kaka], content="text/html")
+        resp = Redirect(lox, headers = [kaka], content = "text/html")
 
     return resp(environ, start_response)
 

@@ -59,6 +59,15 @@ class SLO(Service):
             return None
 
     def perform_logout(self, _dict, binding):
+        """
+        Perform logout. Means remove SSO session from IdP list, and a best
+        effort to contact all SPs that have received assertions using this
+        SSO session and letting them know the user has been logged out.
+
+        :param _dict: Logout request as dict
+        :param binding: SAML2 binding as string
+        :return: Response as string
+        """
         self.logger.info("--- Single Log Out Service ---")
 
         self.logger.debug("_perform_logout:\n{!s}".format(pprint.pformat(_dict)))
