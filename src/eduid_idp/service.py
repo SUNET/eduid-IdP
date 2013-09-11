@@ -47,14 +47,6 @@ class Service(object):
         except Exception:
             return None
 
-    def unpack_soap(self):
-        try:
-            # XXX suspect this is broken - get_post() returns a dict() now
-            query = eduid_idp.mischttp.get_post(self.environ)
-            return {"SAMLRequest": query, "RelayState": ""}
-        except Exception:
-            return None
-
     def unpack_either(self):
         if self.environ["REQUEST_METHOD"] == "GET":
             _dict = self.unpack_redirect()
@@ -104,12 +96,3 @@ class Service(object):
         # Can be either by HTTP_Redirect or HTTP_POST
         _dict = self.unpack_either()
         return self.artifact_operation(_dict)
-
-    def soap(self):
-        """
-        Single log out using HTTP_SOAP binding
-        """
-        self.logger.debug("- SOAP -")
-        _dict = self.unpack_soap()
-        self.logger.debug("_dict: %s" % _dict)
-        return self.operation(_dict, BINDING_SOAP)

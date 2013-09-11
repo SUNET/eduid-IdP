@@ -35,6 +35,23 @@ class SLO(Service):
         _dict = self.unpack_post()
         return self.operation(_dict, BINDING_HTTP_POST)
 
+    def soap(self):
+        """
+        Single log out using HTTP_SOAP binding
+        """
+        self.logger.debug("- SOAP -")
+        _dict = self.unpack_soap()
+        self.logger.debug("_dict: %s" % _dict)
+        return self.operation(_dict, BINDING_SOAP)
+
+    def unpack_soap(self):
+        try:
+            # XXX suspect this is broken - get_post() returns a dict() now
+            query = eduid_idp.mischttp.get_post(self.environ)
+            return {"SAMLRequest": query, "RelayState": ""}
+        except Exception:
+            return None
+
     def do(self, request, binding, relay_state=""):
         self.logger.info("--- Single Log Out Service ---")
         try:
@@ -78,4 +95,3 @@ class SLO(Service):
         self.logger.info("Header: %s" % (hinfo["headers"],))
         resp = Response(hinfo["data"], headers=hinfo["headers"])
         return resp(self.environ, self.start_response)
-
