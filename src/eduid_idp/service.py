@@ -113,7 +113,3 @@ class Service(object):
         _dict = self.unpack_soap()
         self.logger.debug("_dict: %s" % _dict)
         return self.operation(_dict, BINDING_SOAP)
-
-    def uri(self):
-        _dict = self.unpack_either()
-        return self.operation(_dict, BINDING_SOAP)
