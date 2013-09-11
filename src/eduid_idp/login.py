@@ -90,11 +90,17 @@ class SSO(Service):
         return resp_args, _resp
 
 
-    def do(self, query, binding_in, relay_state=""):
+    def perform_login(self, _dict, binding_in, relay_state):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.do() ---")
+
+        self.logger.debug("perform_login :\n{!s}".format(pprint.pformat(_dict)))
+        if not _dict:
+            resp = BadRequest('Error parsing request or no request')
+            return resp(self.environ, self.start_response)
+
         try:
-            resp_args, _resp = self.verify_request(query, binding_in)
+            resp_args, _resp = self.verify_request(_dict, binding_in)
         except UnknownPrincipal, excp:
             self.logger.error("Could not verify request: UnknownPrincipal: %s" % (excp,))
             resp = ServiceError("UnknownPrincipal: %s" % (excp,))
@@ -153,7 +159,7 @@ class SSO(Service):
 
         if self.user and not self.req_info.message.force_authn:
             self.logger.debug("Continuing with Authn request {!r}".format(self.req_info))
-            return self.operation(_ticket, BINDING_HTTP_REDIRECT)
+            return self.perform_login(_ticket, BINDING_HTTP_REDIRECT)
 
         if not self.user:
             self.logger.info("Not authenticated")
@@ -181,7 +187,7 @@ class SSO(Service):
         _req = self.req_info.message
         if self.user and not _req.force_authn:
             self.logger.debug("Continuing with posted Authn request {!r}".format(_info))
-            return self.operation(_info, BINDING_HTTP_POST)
+            return self.perform_login(_info, BINDING_HTTP_POST)
         # Request authentication, either because there was no self.user
         # or because it was requested using SAML2 ForceAuthn
         _info["req_info"] = self.req_info
@@ -192,17 +198,12 @@ class SSO(Service):
     def artifact(self):
         # Can be either by HTTP_Redirect or HTTP_POST
         _dict = self.unpack_either()
-        return self.artifact_operation(_dict)
-
-
-    def artifact_operation(self, _dict):
         if not _dict:
             resp = BadRequest("Missing query")
             return resp(self.environ, self.start_response)
-        else:
-            # exchange artifact for request
-            request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
-            return self.do(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
+        # exchange artifact for request
+        request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
+        return self.perform_login(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
 
 
     def _store_ticket(self, _ticket):

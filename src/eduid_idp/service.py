@@ -54,23 +54,12 @@ class Service(object):
         self.logger.debug("_dict: %s" % _dict)
         return _dict
 
-    def operation(self, _dict, binding):
-        self.logger.debug("_operation:\n{!s}".format(pprint.pformat(_dict)))
-        if not _dict:
-            resp = BadRequest('Error parsing request or no request')
-            return resp(self.environ, self.start_response)
-        else:
-            return self.do(_dict["SAMLRequest"], binding, _dict["RelayState"])
-
     def response(self, binding, http_args):
         if binding == BINDING_HTTP_ARTIFACT:
             resp = Redirect()
         else:
             resp = Response(http_args["data"], headers=http_args["headers"])
         return resp(self.environ, self.start_response)
-
-    def do(self, query, binding, relay_state=""):
-        raise NotImplementedError('Subclass should implement function "do"')
 
     def redirect(self):
         """ Expects a HTTP-redirect request """

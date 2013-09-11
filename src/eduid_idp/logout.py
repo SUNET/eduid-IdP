@@ -11,6 +11,7 @@
 """
 Code handling Single Log Out requests.
 """
+import pprint
 
 from eduid_idp.service import Service
 from eduid_idp.mischttp import Response, BadRequest, ServiceError, delete_cookie
@@ -32,13 +33,13 @@ class SLO(Service):
         """ Expects a HTTP-redirect request """
 
         _dict = self.unpack_redirect()
-        return self.operation(_dict, BINDING_HTTP_REDIRECT)
+        return self.perform_logout(_dict, BINDING_HTTP_REDIRECT)
 
     def post(self):
         """ Expects a HTTP-POST request """
 
         _dict = self.unpack_post()
-        return self.operation(_dict, BINDING_HTTP_POST)
+        return self.perform_logout(_dict, BINDING_HTTP_POST)
 
     def soap(self):
         """
@@ -47,7 +48,7 @@ class SLO(Service):
         self.logger.debug("- SOAP -")
         _dict = self.unpack_soap()
         self.logger.debug("_dict: %s" % _dict)
-        return self.operation(_dict, BINDING_SOAP)
+        return self.perform_logout(_dict, BINDING_SOAP)
 
     def unpack_soap(self):
         try:
@@ -57,8 +58,17 @@ class SLO(Service):
         except Exception:
             return None
 
-    def do(self, request, binding, relay_state=""):
+    def perform_logout(self, _dict, binding):
         self.logger.info("--- Single Log Out Service ---")
+
+        self.logger.debug("_perform_logout:\n{!s}".format(pprint.pformat(_dict)))
+        if not _dict:
+            resp = BadRequest('Error parsing request or no request')
+            return resp(self.environ, self.start_response)
+
+        request = _dict["SAMLRequest"]
+        relay_state = _dict["RelayState"]
+
         try:
             _, body = request.split("\n")
             self.logger.debug("req: '%s'" % body)
