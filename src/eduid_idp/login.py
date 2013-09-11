@@ -46,60 +46,18 @@ class SSO(Service):
         self.destination = None
         self.req_info = None
 
-    def verify_request(self, query, binding):
+    def perform_login(self, _dict, binding_in, relay_state=""):
         """
-        Verify that a login request looks OK to this IdP, and figure out
-        the outgoing binding and destination to use later.
-
-        :param query: The SAML query, transport encoded
-        :param binding: Which binding the query came in over as string
-        """
-        resp_args = {}
-        if not query:
-            self.logger.info("Missing QUERY")
-            resp = Unauthorized('Unknown user')
-            return resp_args, resp(self.environ, self.start_response)
-
-        if not self.req_info:
-            self.req_info = self.IDP.parse_authn_request(query, binding)
-            self.logger.info("SAML query parsed OK")
-        else:
-            self.logger.debug("verify_request acting on previously parsed self.req_info {!s}".format(
-                self.req_info))
-
-        _authn_req = self.req_info.message
-        self.logger.debug("AuthnRequest {!r} :\n{!s}".format(_authn_req, _authn_req))
-
-        self.binding_out, self.destination = self.IDP.pick_binding(
-            "assertion_consumer_service",
-            bindings = self.response_bindings,
-            entity_id = _authn_req.issuer.text)
-
-        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
-                                                            self.destination))
-
-        try:
-            resp_args = self.IDP.response_args(_authn_req)
-            _resp = None
-        except UnknownPrincipal, excp:
-            _resp = self.IDP.create_error_response(_authn_req.id,
-                                                   self.destination, excp)
-        except UnsupportedBinding, excp:
-            _resp = self.IDP.create_error_response(_authn_req.id,
-                                                   self.destination, excp)
-
-        return resp_args, _resp
-
-    def perform_login(self, _dict, binding_in, relay_state):
-        """
+        Validate request, and then proceed with creating an AuthnResponse and
+        invoking the 'outgoing' SAML2 binding.
 
         :param _dict: Login request as dict
-        :param binding_in:
-        :param relay_state:
-        :return:
+        :param binding_in: SAML2 binding as string
+        :param relay_state: SAML2 relay state
+        :return: Response as string
         """
         self.logger.debug("\n\n---\n\n")
-        self.logger.debug("--- In SSO.do() ---")
+        self.logger.debug("--- In SSO.perform_login() ---")
 
         self.logger.debug("perform_login :\n{!s}".format(pprint.pformat(_dict)))
         if not _dict:
@@ -107,36 +65,41 @@ class SSO(Service):
             return resp(self.environ, self.start_response)
 
         try:
-            resp_args, _resp = self.verify_request(_dict, binding_in)
-        except UnknownPrincipal, excp:
-            self.logger.error("Could not verify request: UnknownPrincipal: %s" % (excp,))
-            resp = ServiceError("UnknownPrincipal: %s" % (excp,))
-            return resp(self.environ, self.start_response)
+            _ok, _resp = self._verify_request(_dict, binding_in)
+            if not _ok:
+                return _resp(self.environ, self.start_response)
+            resp_args = self.IDP.response_args(self.req_info.message)
+        except UnknownPrincipal as excp:
+            self.logger.error("Could not verify request: UnknownPrincipal: {!s}".format(excp))
+            _resp = self.IDP.create_error_response(self.req_info.message.id,
+                                                   self.destination, excp)
+            #_resp = ServiceError("UnknownPrincipal: %s" % (excp,))
+            return _resp(self.environ, self.start_response)
         except UnsupportedBinding, excp:
-            self.logger.error("Could not verify request: UnsupportedBinding: %s" % (excp,))
-            resp = ServiceError("UnsupportedBinding: %s" % (excp,))
+            self.logger.error("Could not verify request: UnsupportedBinding: {!s}".format(excp))
+            _resp = self.IDP.create_error_response(self.req_info.message.id,
+                                                   self.destination, excp)
+            #_resp = ServiceError("UnsupportedBinding: %s" % (excp,))
+            return _resp(self.environ, self.start_response)
+
+        self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
+
+        try:
+            #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
+            _authn = self.environ["idp.authn"]
+            self.logger.debug("User authenticated using Authn {!r}".format(_authn))
+            self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
+            _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
+                                                   authn = _authn, sign_assertion = True, **resp_args)
+        except Exception, excp:
+            self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
+            resp = ServiceError("Exception: %s" % (excp,))
             return resp(self.environ, self.start_response)
-
-        if not _resp:
-            self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
-
-            try:
-                #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
-                _authn = self.environ["idp.authn"]
-                self.logger.debug("User authenticated using Authn {!r}".format(_authn))
-                self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
-                _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
-                                                       authn = _authn, sign_assertion = True, **resp_args)
-            except Exception, excp:
-                self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
-                resp = ServiceError("Exception: %s" % (excp,))
-                return resp(self.environ, self.start_response)
 
         self.logger.info("AuthNResponse {!r} :\n{!s}".format(_resp, _resp))
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
-        http_args = self.IDP.apply_binding(self.binding_out,
-                                           "%s" % _resp, self.destination,
+        http_args = self.IDP.apply_binding(self.binding_out, str(_resp), self.destination,
                                            relay_state, response = True)
         #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
         return self.response(self.binding_out, http_args)
@@ -208,6 +171,40 @@ class SSO(Service):
             # exchange artifact for request
         request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
         return self.perform_login(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
+
+    def _verify_request(self, query, binding):
+        """
+        Verify that a login request looks OK to this IdP, and figure out
+        the outgoing binding and destination to use later.
+
+        :param query: The SAML query, transport encoded
+        :param binding: Which binding the query came in over as string
+        :return: Status, Response where Status is a bool()
+        Status is True if query is OK, and Response is either a Response() or None
+        if Status is True.
+        """
+        if not query:
+            self.logger.info("Missing QUERY")
+            resp = Unauthorized('Unknown user')
+            return False, resp(self.environ, self.start_response)
+
+        if not self.req_info:
+            self.req_info = self.IDP.parse_authn_request(query, binding)
+            self.logger.info("SAML query parsed OK")
+        else:
+            self.logger.debug("verify_request acting on previously parsed self.req_info {!s}".format(
+                self.req_info))
+
+        self.logger.debug("AuthnRequest {!r}".format(self.req_info.message))
+
+        self.binding_out, self.destination = self.IDP.pick_binding(
+            "assertion_consumer_service",
+            bindings = self.response_bindings,
+            entity_id = self.req_info.message.issuer.text)
+
+        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
+                                                            self.destination))
+        return True, None
 
     def _store_ticket(self, _ticket):
         """
@@ -429,7 +426,7 @@ def do_verify(environ, start_response, idp_app, _user):
         idp_app.IDP.cache.uid2user[uid] = {'user': user,
                                            'authn': _authn,
                                            'authn_timestamp': int(time.time()),
-        }
+                                           }
         idp_app.IDP.cache.user2uid[user] = uid
         idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, uid))
 
