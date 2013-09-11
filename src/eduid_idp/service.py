@@ -94,15 +94,11 @@ class Service(object):
 
     def redirect(self):
         """ Expects a HTTP-redirect request """
-
-        _dict = self.unpack_redirect()
-        return self.operation(_dict, BINDING_HTTP_REDIRECT)
+        raise NotImplementedError('Subclass should implement function "redirect"')
 
     def post(self):
         """ Expects a HTTP-POST request """
-
-        _dict = self.unpack_post()
-        return self.operation(_dict, BINDING_HTTP_POST)
+        raise NotImplementedError('Subclass should implement function "post"')
 
     def artifact(self):
         # Can be either by HTTP_Redirect or HTTP_POST

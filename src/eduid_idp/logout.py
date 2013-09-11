@@ -23,6 +23,18 @@ from eduid_idp.mischttp import Response, BadRequest, ServiceError, delete_cookie
 
 class SLO(Service):
 
+    def redirect(self):
+        """ Expects a HTTP-redirect request """
+
+        _dict = self.unpack_redirect()
+        return self.operation(_dict, BINDING_HTTP_REDIRECT)
+
+    def post(self):
+        """ Expects a HTTP-POST request """
+
+        _dict = self.unpack_post()
+        return self.operation(_dict, BINDING_HTTP_POST)
+
     def do(self, request, binding, relay_state=""):
         self.logger.info("--- Single Log Out Service ---")
         try:
