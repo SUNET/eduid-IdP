@@ -137,8 +137,8 @@ class IdPUserDb():
                 'MONGO_URI': config.userdb_mongo_uri,
                 }
             celery.conf.update(settings)
-            am = get_attribute_manager(celery)
-            self.userdb = am #am.conn.get_database(config.userdb_mongo_database)
+        am = get_attribute_manager(celery)
+        self.userdb = am #am.conn.get_database(config.userdb_mongo_database)
 
     def verify_username_and_password(self, username, password):
         # verify username and password
