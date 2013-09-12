@@ -381,7 +381,7 @@ def verify_username_and_password(dic, idp_app):
     return False, ""
 
 
-def do_verify(environ, start_response, idp_app, _user):
+def do_verify(environ, start_response, idp_app):
     query = eduid_idp.mischttp.get_post()
 
     _loggable = query.copy()

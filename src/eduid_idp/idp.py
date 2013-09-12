@@ -72,7 +72,6 @@ General user<->IdP interaction flow :
 """
 
 import os
-import re
 import sys
 import time
 import pprint
@@ -163,34 +162,6 @@ class TicketCache():
 # -----------------------------------------------------------------------------
 
 
-
-# map urls to functions
-AUTHN_URLS = [
-    # sso
-    (r'sso/post$', (SSO, "post")),
-    (r'sso/post/(.*)$', (SSO, "post")),
-    (r'sso/redirect$', (SSO, "redirect")),
-    (r'sso/redirect/(.*)$', (SSO, "redirect")),
-    (r'sso/art$', (SSO, "artifact")),		# seldomly used, but part of standard
-    (r'sso/art/(.*)$', (SSO, "artifact")),	# seldomly used, but part of standard
-    # slo
-    (r'slo/redirect$', (SLO, "redirect")),
-    (r'slo/redirect/(.*)$', (SLO, "redirect")),
-    (r'slo/post$', (SLO, "post")),
-    (r'slo/post/(.*)$', (SLO, "post")),
-    (r'slo/soap$', (SLO, "soap")),		# SOAP is commonly used for SLO
-    (r'slo/soap/(.*)$', (SLO, "soap")),		# SOAP is commonly used for SLO
-]
-
-NON_AUTHN_URLS = [
-    (r'verify?(.*)$', do_verify),
-    #(r'sso/ecp$', (SSO, "ecp")),   # ECP is for eduID > 1
-]
-
-# ----------------------------------------------------------------------------
-
-
-
 class IdPApplication(object):
 
     def __init__(self, logger, config):
@@ -223,54 +194,55 @@ class IdPApplication(object):
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
     @cherrypy.expose
-    def default(self, *_args, **_kwargs):
-        cherrypy.response.idp_response_status = None
+    def sso(self, *_args, **_kwargs):
+        self.logger.debug("--- SSO ---")
+        path = cherrypy.request.path_info.lstrip('/').split('/')
+        self.logger.debug("\n\n-----\n\n")
+        self.logger.info("<application> PATH: %s" % path)
 
-        res = self.application(self.my_start_response)
-        res2 = res
-        if isinstance(res, list):
-            res2 = ''.join(res)
-        if isinstance(res2, basestring):
-            if len(res2) < 200:
-                self.logger.debug("FREDRIK: APP RESPONSE {!r} :\n{!r}".format(
-                        cherrypy.response.idp_response_status, res2))
-            else:
-                self.logger.debug("FREDRIK: APP RESPONSE {!r} : {!r} bytes ({!r})".format(
-                        cherrypy.response.idp_response_status, len(res2), res2[:20]))
-            res = res2
-        else:
-            self.logger.debug("FREDRIK: NON-LIST APP RESPONSE {!r} : {!r}".format(
-                    cherrypy.response.idp_response_status, res))
-        # Return the HTTP response code stored in my_start_response()
-        cherrypy.response.status = cherrypy.response.idp_response_status
-        if cherrypy.response.idp_response_headers:
-            for (k, v) in cherrypy.response.idp_response_headers:
-                cherrypy.response.headers[k] = v
-        return res
+        environ = self._request_environment()
+        user = environ['idp.user']
 
-    def my_start_response(self, status, headers):
-        """
-        The IdP used to be a WSGI application, and this function is a remaining trace of that.
-        """
-        self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
-        if cherrypy.response.idp_response_status:
-            self.logger.warning("start_response called twice (now {!r} / {!r}, previous {!r} / {!r})".format(
-                    status, headers, cherrypy.response.idp_response_status, cherrypy.response.idp_response_headers))
-        cherrypy.response.idp_response_status = status
-        cherrypy.response.idp_response_headers = headers
+        if path[1] == 'post':
+            return SSO(environ, self._my_start_response, self, user).post()
+        if path[1] == 'redirect':
+            return SSO(environ, self._my_start_response, self, user).redirect()
+        if path[1] == 'art':
+            # seldomly used, but part of standard
+            return SSO(environ, self._my_start_response, self, user).artifact()
 
-    def application(self, start_response):
-        """
-        What used to be the main WSGI application. Dispatch the current
-        request to the functions from above (AUTHN_URLS and NOT_AUTHN_URLS).
+        return eduid_idp.mischttp.not_found(environ, self._my_start_response)
 
-        If nothing matches call the `not_found` function.
+    @cherrypy.expose
+    def slo(self, *_args, **_kwargs):
+        self.logger.debug("--- SLO ---")
+        path = cherrypy.request.path_info.lstrip('/').split('/')
+        self.logger.debug("\n\n-----\n\n")
+        self.logger.info("<application> PATH: %s" % path)
 
-        :param start_response: The function to run when the handling of the
-        request is done
-        :return: The response as a list of lines
-        """
+        environ = self._request_environment()
+        user = environ['idp.user']
 
+        if path[1] == 'post':
+            return SLO(environ, self._my_start_response, self, user).post()
+        if path[1] == 'redirect':
+            return SLO(environ, self._my_start_response, self, user).redirect()
+        if path[1] == 'soap':
+            # SOAP is commonly used for SLO
+            return SLO(environ, self._my_start_response, self, user).soap()
+
+        return eduid_idp.mischttp.not_found(environ, self._my_start_response)
+
+    @cherrypy.expose
+    def verify(self, *_args, **_kwargs):
+        environ = {}
+        self.logger.debug("--- Verify ---")
+        assert not (self._lookup_userdata())  # just to verify when refactoring
+        return do_verify(environ, self._my_start_response, self)
+
+    @cherrypy.expose
+    def static(self, *_args, **_kwargs):
+        self.logger.debug("--- Static file ---")
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
@@ -280,36 +252,36 @@ class IdPApplication(object):
         static_fn = eduid_idp.mischttp.static_filename(self.config, path)
         if static_fn:
             self.logger.debug("Serving static file {!r}".format(static_fn))
-            return eduid_idp.mischttp.static_file(environ, start_response, static_fn)
-        if path.startswith("static/") or path == "favicon.ico":
-            return eduid_idp.mischttp.not_found(environ, start_response)
+            return eduid_idp.mischttp.static_file(environ, self._my_start_response, static_fn)
+        return eduid_idp.mischttp.not_found(environ, self._my_start_response)
 
-        user = None
+    def _my_start_response(self, status, headers):
+        """
+        The IdP used to be a WSGI application, and this function is a remaining trace of that.
+        """
+        self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
+        if hasattr(cherrypy.response, 'idp_response_status') and cherrypy.response.idp_response_status:
+            self.logger.warning("start_response called twice (now {!r}, previous {!r})".format(
+                    status, cherrypy.response.idp_response_status))
+        cherrypy.response.idp_response_status = status
+        cherrypy.response.status = status
+        for (k, v) in headers:
+            cherrypy.response.headers[k] = v
+
+    def _request_environment(self):
+        """
+        Initialize well-known environment for this request.
+
+        :returns: environ dict()
+        """
+        environ = {'idp.user': None,
+                   }
         userdata = self._lookup_userdata()
         if userdata:
-            user = userdata['user']
-            environ["idp.authn"] = userdata['authn']
-
-        url_patterns = AUTHN_URLS
-        if not user:
-            self.logger.info("-- No USER --")
-            # insert NON_AUTHN_URLS first in case there is no user
-            url_patterns = NON_AUTHN_URLS + url_patterns
-        else:
-            self.logger.info("SSO session for user {!r} found in IdP cache".format(user.username))
-
-        for regex, callback in url_patterns:
-            match = re.search(regex, path)
-            self.logger.debug("URL routing: match path {!r} to re {!r} -> {!r}".format(path, regex, match))
-            if match is not None:
-                self.logger.debug("URL callback found: %s" % (callback,))
-                if isinstance(callback, tuple):
-                    cls = callback[0](environ, start_response, self, user)
-                    func = getattr(cls, callback[1])
-                    return func()
-                return callback(environ, start_response, self, user)
-
-        return eduid_idp.mischttp.not_found(environ, start_response)
+            environ['idp.user'] = userdata['user']
+            environ['idp.authn'] = userdata['authn']
+            self.logger.info("SSO session for user {!r} found in IdP cache".format(userdata['user'].username))
+        return environ
 
     def _lookup_userdata(self):
         kaka = cherrypy.request.cookie
@@ -341,10 +313,7 @@ class IdPApplication(object):
                     _age, self.config.sso_session_lifetime))
         return userdata
 
-
 # ----------------------------------------------------------------------------
-
-
 
 def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     """
