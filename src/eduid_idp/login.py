@@ -46,7 +46,7 @@ class SSO(Service):
         self.destination = None
         self.req_info = None
 
-    def perform_login(self, _dict, binding_in, relay_state=""):
+    def perform_login(self, _dict, binding_in, relay_state=None):
         """
         Validate request, and then proceed with creating an AuthnResponse and
         invoking the 'outgoing' SAML2 binding.
@@ -88,7 +88,7 @@ class SSO(Service):
             #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
             _authn = self.environ["idp.authn"]
             self.logger.debug("User authenticated using Authn {!r}".format(_authn))
-            self.logger.debug("Creating an AuthnResponse, user {!r}".format(self.user))
+            self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
             _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
                                                    authn = _authn, sign_assertion = True, **resp_args)
         except Exception, excp:
@@ -96,9 +96,13 @@ class SSO(Service):
             resp = ServiceError("Exception: %s" % (excp,))
             return resp(self.environ, self.start_response)
 
-        self.logger.info("AuthNResponse {!r} :\n{!s}".format(_resp, _resp))
+        self.logger.info("AuthNResponse {!r}".format(_resp))
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
+        if relay_state is None:
+            relay_state = _dict["RelayState"]
+        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
+            self.binding_out, self.destination, relay_state))
         http_args = self.IDP.apply_binding(self.binding_out, str(_resp), self.destination,
                                            relay_state, response = True)
         #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
