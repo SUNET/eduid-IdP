@@ -37,8 +37,8 @@ from saml2 import BINDING_HTTP_POST
 
 
 class SSO(Service):
-    def __init__(self, environ, start_response, idp_app, user = None):
-        Service.__init__(self, environ, start_response, idp_app, user)
+    def __init__(self, environ, start_response, idp_app):
+        Service.__init__(self, environ, start_response, idp_app)
         self.binding = ""
         self.response_bindings = None
         self.resp_args = {}

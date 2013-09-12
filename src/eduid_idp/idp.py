@@ -195,60 +195,58 @@ class IdPApplication(object):
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
+        self.logger.debug("\n\n")
         self.logger.debug("--- SSO ---")
         path = cherrypy.request.path_info.lstrip('/').split('/')
-        self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
         environ = self._request_environment()
-        user = environ['idp.user']
 
         if path[1] == 'post':
-            return SSO(environ, self._my_start_response, self, user).post()
+            return SSO(environ, self._my_start_response, self).post()
         if path[1] == 'redirect':
-            return SSO(environ, self._my_start_response, self, user).redirect()
+            return SSO(environ, self._my_start_response, self).redirect()
         if path[1] == 'art':
             # seldomly used, but part of standard
-            return SSO(environ, self._my_start_response, self, user).artifact()
+            return SSO(environ, self._my_start_response, self).artifact()
 
         return eduid_idp.mischttp.not_found(environ, self._my_start_response)
 
     @cherrypy.expose
     def slo(self, *_args, **_kwargs):
+        self.logger.debug("\n\n")
         self.logger.debug("--- SLO ---")
         path = cherrypy.request.path_info.lstrip('/').split('/')
-        self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
         environ = self._request_environment()
-        user = environ['idp.user']
 
         if path[1] == 'post':
-            return SLO(environ, self._my_start_response, self, user).post()
+            return SLO(environ, self._my_start_response, self).post()
         if path[1] == 'redirect':
-            return SLO(environ, self._my_start_response, self, user).redirect()
+            return SLO(environ, self._my_start_response, self).redirect()
         if path[1] == 'soap':
             # SOAP is commonly used for SLO
-            return SLO(environ, self._my_start_response, self, user).soap()
+            return SLO(environ, self._my_start_response, self).soap()
 
         return eduid_idp.mischttp.not_found(environ, self._my_start_response)
 
     @cherrypy.expose
     def verify(self, *_args, **_kwargs):
-        environ = {}
+        self.logger.debug("\n\n")
         self.logger.debug("--- Verify ---")
         assert not (self._lookup_userdata())  # just to verify when refactoring
+        environ = {}
         return do_verify(environ, self._my_start_response, self)
 
     @cherrypy.expose
     def static(self, *_args, **_kwargs):
+        self.logger.debug("\n\n")
         self.logger.debug("--- Static file ---")
         path = cherrypy.request.path_info.lstrip('/')
-        self.logger.debug("\n\n-----\n\n")
         self.logger.info("<application> PATH: %s" % path)
 
         environ = {}
-
         static_fn = eduid_idp.mischttp.static_filename(self.config, path)
         if static_fn:
             self.logger.debug("Serving static file {!r}".format(static_fn))
@@ -259,7 +257,7 @@ class IdPApplication(object):
         """
         The IdP used to be a WSGI application, and this function is a remaining trace of that.
         """
-        self.logger.debug("FREDRIK: START RESPONSE {!r}, HEADERs {!r}".format(status, headers))
+        self.logger.debug("Initiating HTTP response {!r}, headers {!s}".format(status, pprint.pformat(headers)))
         if hasattr(cherrypy.response, 'idp_response_status') and cherrypy.response.idp_response_status:
             self.logger.warning("start_response called twice (now {!r}, previous {!r})".format(
                     status, cherrypy.response.idp_response_status))

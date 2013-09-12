@@ -22,7 +22,7 @@ from saml2 import BINDING_HTTP_ARTIFACT
 
 class Service(object):
 
-    def __init__(self, environ, start_response, idp_app, user=None):
+    def __init__(self, environ, start_response, idp_app):
         self.environ = environ
         idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
         self.start_response = start_response
@@ -30,7 +30,7 @@ class Service(object):
         self.IDP = idp_app.IDP
         self.AUTHN_BROKER = idp_app.AUTHN_BROKER
         self.config = idp_app.config
-        self.user = user
+        self.user = environ['idp.user']
 
     def unpack_redirect(self):
         return eduid_idp.mischttp.parse_query_string()
