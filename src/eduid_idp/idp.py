@@ -77,13 +77,14 @@ import time
 import pprint
 import logging
 import argparse
-from hashlib import sha1
+import threading
 
 import cherrypy
 
 import eduid_idp
 from eduid_idp.login import SSO, do_verify
 from eduid_idp.logout import SLO
+from eduid_idp.cache import ExpiringCache
 
 from saml2 import server
 
@@ -131,32 +132,6 @@ class Cache(object):
         self.user2uid = {}
         self.uid2user = {}
 
-class TicketCache():
-
-    # XXX something needs to clean out old entries from TicketCache!
-
-    def __init__(self, logger):
-        self.logger = logger
-        self._data = {}
-
-    def key(self, SAMLRequest):
-        return sha1(SAMLRequest).hexdigest()
-
-    def add(self, key, info):
-        assert("SAMLRequest" in info)
-        self._data[key] = info
-
-    def get(self, key):
-        return self._data.get(key)
-
-    def items(self):
-        return self._data
-
-    def delete(self, key):
-        if key in self._data:
-            del self._data[key]
-        else:
-            self.logger.debug("Failed deleting {!r} from TicketCache (entry did not exist)".format(key))
 
 
 # -----------------------------------------------------------------------------
@@ -180,7 +155,9 @@ class IdPApplication(object):
         self.IDP = server.Server(cfgfile, cache=Cache())
         # restore path
         sys.path = old_path
-        self.IDP.ticket = TicketCache(logger)
+        self._ticket_lock = threading.Lock()
+        self.IDP.ticket = ExpiringCache(logger, self.config.sso_session_lifetime * 60,
+                                        'TicketCache', self._ticket_lock)
 
         authn_authority = self.IDP.config.entityid
 

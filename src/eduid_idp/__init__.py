@@ -43,3 +43,4 @@ import eduid_idp.service
 import eduid_idp.login
 import eduid_idp.logout
 import eduid_idp.mischttp
+import eduid_idp.cache
