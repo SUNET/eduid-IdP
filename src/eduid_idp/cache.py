@@ -22,7 +22,7 @@ class NoOpLock():
     def __init__(self):
         pass
 
-    def acquire(self, _block=True):
+    def acquire(self, _block = True):
         return True
 
     def release(self):
@@ -38,13 +38,16 @@ class ExpiringCache():
     site with e.g. load balancers causing uneven traffic patterns, this might not
     work that well and the use of an external cache such as memcache is recommended.
     """
+
     def __init__(self, logger, ttl, name, lock = None):
         self.logger = logger
         self._data = {}
         self._ages = deque()
         self._ttl = ttl
         self._name = name
-        self.lock = lock or NoOpLock()
+        self.lock = lock
+        if self.lock is None:
+            self.lock = NoOpLock()
 
     def key(self, something):
         return sha1(something).hexdigest()

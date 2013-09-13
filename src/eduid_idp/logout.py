@@ -53,7 +53,7 @@ class SLO(Service):
     def unpack_soap(self):
         try:
             # XXX suspect this is broken - get_post() returns a dict() now
-            query = eduid_idp.mischttp.get_post(self.environ)
+            query = eduid_idp.mischttp.get_post()
             return {"SAMLRequest": query, "RelayState": ""}
         except Exception:
             return None

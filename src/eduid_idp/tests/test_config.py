@@ -40,7 +40,6 @@ Test config parsing.
 import os
 import unittest
 import pkg_resources
-from pprint import pprint, pformat
 
 import eduid_idp
 

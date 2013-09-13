@@ -15,10 +15,10 @@ Code handling Single Sign On logins.
 
 import pprint
 
-import eduid_idp.mischttp
-from eduid_idp.mischttp import Response, BadRequest, Redirect
-
 from saml2 import BINDING_HTTP_ARTIFACT
+
+import eduid_idp.mischttp
+from eduid_idp.mischttp import Response, Redirect
 
 class Service(object):
 

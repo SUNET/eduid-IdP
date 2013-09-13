@@ -106,16 +106,16 @@ def parse_args():
                                      formatter_class = argparse.ArgumentDefaultsHelpFormatter,
                                      )
     parser.add_argument('-c', '--config-file',
-                        dest='config_file',
-                        default=default_config_file,
-                        help='Config file',
-                        metavar='PATH',
+                        dest = 'config_file',
+                        default = default_config_file,
+                        help = 'Config file',
+                        metavar = 'PATH',
                         )
 
     parser.add_argument('--debug',
-                        dest='debug',
-                        action='store_true', default=default_debug,
-                        help='Enable debug operation',
+                        dest = 'debug',
+                        action = 'store_true', default = default_debug,
+                        help = 'Enable debug operation',
                         )
 
     return parser.parse_args()
@@ -138,7 +138,6 @@ class Cache(object):
 
 
 class IdPApplication(object):
-
     def __init__(self, logger, config):
         self.logger = logger
         self.config = config
@@ -155,9 +154,7 @@ class IdPApplication(object):
         self.IDP = server.Server(cfgfile, cache=Cache())
         # restore path
         sys.path = old_path
-        self._ticket_lock = threading.Lock()
-        self.IDP.ticket = ExpiringCache(logger, self.config.sso_session_lifetime * 60,
-                                        'TicketCache', self._ticket_lock)
+        self.IDP.ticket = ExpiringCache(logger, 5 * 60, 'TicketCache', threading.Lock())
 
         authn_authority = self.IDP.config.entityid
 
@@ -165,7 +162,8 @@ class IdPApplication(object):
         # but for displaying proper login forms it seems.
         self.AUTHN_BROKER = AuthnBroker()
         #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
-        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), eduid_idp.login.username_password_authn, 10, authn_authority)
+        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), eduid_idp.login.username_password_authn, 10,
+                              authn_authority)
         self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
 
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
@@ -237,7 +235,7 @@ class IdPApplication(object):
         self.logger.debug("Initiating HTTP response {!r}, headers {!s}".format(status, pprint.pformat(headers)))
         if hasattr(cherrypy.response, 'idp_response_status') and cherrypy.response.idp_response_status:
             self.logger.warning("start_response called twice (now {!r}, previous {!r})".format(
-                    status, cherrypy.response.idp_response_status))
+                status, cherrypy.response.idp_response_status))
         cherrypy.response.idp_response_status = status
         cherrypy.response.status = status
         for (k, v) in headers:
@@ -250,7 +248,7 @@ class IdPApplication(object):
         :returns: environ dict()
         """
         environ = {'idp.user': None,
-                   }
+        }
         userdata = self._lookup_userdata()
         if userdata:
             environ['idp.user'] = userdata['user']
@@ -264,7 +262,7 @@ class IdPApplication(object):
         if kaka:
             userdata = eduid_idp.mischttp.info_from_cookie(kaka, self.IDP, self.logger)
             self.logger.debug("Looked up SSO session using idpauthn cookie : {!s}".format(
-                    pprint.pformat(userdata)))
+                pprint.pformat(userdata)))
         else:
             query = eduid_idp.mischttp.parse_query_string()
             if query:
@@ -272,7 +270,7 @@ class IdPApplication(object):
                 try:
                     userdata = self.IDP.cache.uid2user[query['id']]
                     self.logger.debug("Looked up SSO session using query 'id' parameter : {!s}".format(
-                            pprint.pformat(userdata)))
+                        pprint.pformat(userdata)))
                 except KeyError:
                     # no 'id', or not found in cache
                     pass
@@ -280,10 +278,10 @@ class IdPApplication(object):
             _age = (int(time.time()) - userdata['authn_timestamp']) / 60
             if _age > self.config.sso_session_lifetime:
                 self.logger.info("SSO session expired (age {!r} minutes > {!r})".format(
-                        _age, self.config.sso_session_lifetime))
+                    _age, self.config.sso_session_lifetime))
                 return None
             self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-                    _age, self.config.sso_session_lifetime))
+                _age, self.config.sso_session_lifetime))
         else:
             self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
         return userdata
@@ -320,18 +318,18 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         logger.addHandler(syslog_h)
 
     cherry_conf = {'server.thread_pool': config.num_threads,
-        	   'server.socket_host': config.listen_addr,
+                   'server.socket_host': config.listen_addr,
                    'server.socket_port': config.listen_port,
                    # enables X-Forwarded-For, since BCP is to run this server
                    # behind a webserver that handles SSL
                    'tools.proxy.on': True,
-                   }
+    }
     if config.server_cert and config.server_key:
         _ssl_opts = {'server.ssl_module': config.ssl_adapter,
                      'server.ssl_certificate': config.server_cert,
                      'server.ssl_private_key': config.server_key,
                      #'server.ssl_certificate_chain':
-                         }
+        }
         cherry_conf.update(_ssl_opts)
 
     if config.logdir:

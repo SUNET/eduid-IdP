@@ -257,15 +257,14 @@ class SSO(Service):
         _data = self.IDP.ticket.get(_key)
 
         if _data is None:
-            self.logger.debug("FREDRIK: Key {!r} not found in IDP.ticket :\n{!s}".format(
-                _key, pprint.pformat(self.IDP.ticket.items())))
+            self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
             if "key" in _info:
                 return False, BadRequest("Missing IdP ticket, please re-initiate login")
                 # cache miss, parse SAMLRequest
             _data = _info
             _data["req_info"] = self._parse_SAMLRequest(_info)
         else:
-            self.logger.debug("FREDRIK: Retreived IDP.ticket(key={!r}) :\n{!s}".format(
+            self.logger.debug("Retreived IDP.ticket(key={!r}) :\n{!s}".format(
                 _key, pprint.pformat(_data)))
 
         return True, _data

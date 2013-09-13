@@ -96,16 +96,16 @@ def geturl(query=True, path=True):
     # For some reason, cherrypy.request.base always have host 127.0.0.1 -
     # work around that with much more elaborate code, based on pysaml2.
     #return cherrypy.request.base + cherrypy.request.path_info
-    url = [cherrypy.request.scheme + '://']
-    url.append(cherrypy.request.headers['Host'])
-    url.append(':' + str(cherrypy.request.local.port))
+    url = [cherrypy.request.scheme, '://',
+           cherrypy.request.headers['Host'], ':',
+           str(cherrypy.request.local.port), '/']
     if path:
-        url.append('/' + cherrypy.request.path_info.lstrip('/'))
-        if query:
-            url.append('?' + cherrypy.request.query_string)
+        url.append(cherrypy.request.path_info.lstrip('/'))
+    if query:
+        url.append('?' + cherrypy.request.query_string)
     return ''.join(url)
 
-def get_post(_environ = None):
+def get_post():
     # When the method is POST the query string will be sent
     # in the HTTP request body
     return cherrypy.request.body_params
@@ -170,7 +170,7 @@ def info_from_cookie(kaka, IDP, logger):
     if _authn:
         try:
             key = base64.b64decode(_authn.value)
-            logger.debug("idpauthn key={!r}".format(key))
+            logger.debug("idpauthn cookie value={!r}".format(key))
             return IDP.cache.uid2user[key]
         except KeyError:
             return None
