@@ -286,17 +286,15 @@ class IdPApplication(object):
         userdata = None
         if kaka:
             userdata = eduid_idp.mischttp.info_from_cookie(kaka, self.IDP, self.logger)
-            self.logger.debug("Looked up userdata using idpauthn cookie : {!s}".format(
+            self.logger.debug("Looked up SSO session using idpauthn cookie : {!s}".format(
                     pprint.pformat(userdata)))
         else:
-            self.logger.debug("No cookie, looking for 'id' parameter in query string :\n{!s}".format(
-                    cherrypy.request.query_string))
             query = eduid_idp.mischttp.parse_query_string()
-            self.logger.debug("FREDRIK: QUERY:\n{!s}".format(pprint.pformat(query)))
             if query:
+                self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
-                    userdata = self.IDP.cache.uid2user[query["id"]]
-                    self.logger.debug("Looked up userdata using request id parameter : {!s}".format(
+                    userdata = self.IDP.cache.uid2user[query['id']]
+                    self.logger.debug("Looked up SSO session using query 'id' parameter : {!s}".format(
                             pprint.pformat(userdata)))
                 except KeyError:
                     # no 'id', or not found in cache
@@ -309,6 +307,8 @@ class IdPApplication(object):
                 return None
             self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
                     _age, self.config.sso_session_lifetime))
+        else:
+            self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
         return userdata
 
 # ----------------------------------------------------------------------------
