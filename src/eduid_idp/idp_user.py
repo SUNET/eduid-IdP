@@ -167,5 +167,5 @@ class IdPUserDb():
                 if self.vccs_client.authenticate(username, [factor]):
                     self.logger.debug("VCCS authenticated user {!r}".format(user))
                     return user
-        self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
+            self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         return None
