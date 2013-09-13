@@ -169,9 +169,9 @@ def info_from_cookie(kaka, IDP, logger):
     _authn = kaka.get("idpauthn")
     if _authn:
         try:
-            key = base64.b64decode(_authn.value)
-            logger.debug("idpauthn cookie value={!r}".format(key))
-            return IDP.cache.uid2user[key]
+            uid = base64.b64decode(_authn.value)
+            logger.debug("idpauthn cookie value={!r}".format(uid))
+            return IDP.cache.get_using_uid(uid)
         except KeyError:
             return None
     else:

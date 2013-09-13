@@ -39,7 +39,7 @@ class ExpiringCache():
     work that well and the use of an external cache such as memcache is recommended.
     """
 
-    def __init__(self, logger, ttl, name, lock = None):
+    def __init__(self, name, logger, ttl, lock = None):
         self.logger = logger
         self._data = {}
         self._ages = deque()
@@ -109,3 +109,62 @@ class ExpiringCache():
         except KeyError:
             self.logger.debug("Failed deleting {!r} from {!s} cache (entry did not exist)".format(
                 self._name, key))
+
+
+class SSOSessionCache(object):
+    """
+    This cache holds all SSO sessions, meaning information about what users
+    have a valid session with the IdP in order to not be authenticated again
+    (until the SSO session expires).
+    """
+
+    def __init__(self, logger, ttl, lock = None):
+        self.logger = logger
+        self._ttl = ttl
+        self._lock = lock
+        if self._lock is None:
+            self._lock = NoOpLock()
+        self.user2uid = ExpiringCache('SSOSession.user2uid', self.logger, self._ttl, lock = self._lock)
+        self.uid2user = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
+
+    def remove_using_local_id(self, _lid):
+        """
+        Remove entrys when SLO is executed.
+
+        :param _lid: Local identifier as string (username?)
+        :return: None
+        """
+        _uid = self.user2uid.get(_lid)
+        self.logger.debug("Purging SSO session, uid : {!s}".format(self.uid2user.get(_uid)))
+        self.logger.debug("Purging SSO session, lid : {!s}".format(self.user2uid.get(_lid)))
+        self.uid2user.delete(_uid)
+        self.user2uid.delete(_lid)
+
+    def add_session(self, uid, user, data):
+        """
+        Add a new SSO session to the cache.
+
+        The mapping of uid -> user (and data) is used when a user visits another SP before
+        the SSO session expires, and the mapping of user -> uid is used if the user requests
+        logout (SLO).
+
+        :param uid: Unique id as string (uniqueness is security critical!)
+        :param user: Username (or 'local id') as string
+        :param data: opaque, should be dict
+        :return:
+        """
+        self.uid2user.add(uid, data)
+        self.user2uid.add(user, uid)
+
+    def get_using_uid(self, uid):
+        """
+        Lookup an SSO session using the uid (same uid previously used with add_session).
+
+        :param uid: Unique id as string
+        :return: opaque, should be dict
+        """
+        try:
+            return self.uid2user.get(uid)
+        except KeyError:
+            self.logger.debug('Failed looking up SSO session with uid={!r}'.format(uid))
+            raise

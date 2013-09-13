@@ -426,11 +426,11 @@ def do_verify(environ, start_response, idp_app):
         idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
         # NOTE: It is important than noone can guess one of these uids, as that would allow impersonation.
         uid = str(uuid.uuid4())
-        idp_app.IDP.cache.uid2user[uid] = {'user': user,
-                                           'authn': _authn,
-                                           'authn_timestamp': int(time.time()),
-                                           }
-        idp_app.IDP.cache.user2uid[user] = uid
+        _session = {'user': user,
+                    'authn': _authn,
+                    'authn_timestamp': int(time.time()),
+                    }
+        idp_app.IDP.cache.add_session(uid, user, _session)
         idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, uid))
 
         kaka = eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime,

@@ -121,19 +121,6 @@ def parse_args():
     return parser.parse_args()
 
 
-class Cache(object):
-    """
-    This cache holds all SSO sessions, meaning information about what users
-    have a valid session with the IdP in order to not be authenticated again
-    (until the SSO session expires).
-    """
-
-    def __init__(self):
-        self.user2uid = {}
-        self.uid2user = {}
-
-
-
 # -----------------------------------------------------------------------------
 
 
@@ -151,10 +138,12 @@ class IdPApplication(object):
             # add directory part to sys.path, since pysaml2 'import's it's config
             sys.path = [cfgdir] + sys.path
             cfgfile = os.path.basename(config.pysaml2_config)
-        self.IDP = server.Server(cfgfile, cache=Cache())
+        _SSOSessions = eduid_idp.cache.SSOSessionCache(logger, (self.config.sso_session_lifetime + 1) * 60,
+                                                       threading.Lock())
+        self.IDP = server.Server(cfgfile, cache = _SSOSessions)
         # restore path
         sys.path = old_path
-        self.IDP.ticket = ExpiringCache(logger, 5 * 60, 'TicketCache', threading.Lock())
+        self.IDP.ticket = ExpiringCache('TicketCache', logger, 5 * 60, threading.Lock())
 
         authn_authority = self.IDP.config.entityid
 
@@ -261,15 +250,15 @@ class IdPApplication(object):
         userdata = None
         if kaka:
             userdata = eduid_idp.mischttp.info_from_cookie(kaka, self.IDP, self.logger)
-            self.logger.debug("Looked up SSO session using idpauthn cookie : {!s}".format(
+            self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(
                 pprint.pformat(userdata)))
         else:
             query = eduid_idp.mischttp.parse_query_string()
             if query:
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
-                    userdata = self.IDP.cache.uid2user[query['id']]
-                    self.logger.debug("Looked up SSO session using query 'id' parameter : {!s}".format(
+                    userdata = self.IDP.cache.get_using_uid(query['id'])
+                    self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
                         pprint.pformat(userdata)))
                 except KeyError:
                     # no 'id', or not found in cache

@@ -90,12 +90,8 @@ class SLO(Service):
         msg = req_info.message
         if msg.name_id:
             _lid = self.IDP.ident.find_local_id(msg.name_id)
-            _uid = self.IDP.cache.user2uid[_lid]
-            self.logger.info("local identifier: {!s}".format(_lid))
-            self.logger.debug("Purging from cache, uid : {!s}".format(self.IDP.cache.uid2user[_uid]))
-            self.logger.debug("Purging from cache, lid : {!s}".format(self.IDP.cache.user2uid[_lid]))
-            del self.IDP.cache.uid2user[_uid]
-            del self.IDP.cache.user2uid[_lid]
+            self.logger.info("Logging out session with local identifier: {!s}".format(_lid))
+            self.IDP.cache.remove_using_local_id(_lid)
             # remove the authentication
             try:
                 self.IDP.session_db.remove_authn_statements(msg.name_id)
