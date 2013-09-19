@@ -96,7 +96,8 @@ class SSO(Service):
             resp = ServiceError("Exception: %s" % (excp,))
             return resp(self.environ, self.start_response)
 
-        self.logger.info("AuthNResponse {!r}".format(_resp))
+        self.logger.info("AuthNResponse\n\n{!r}\n\n".format(_resp))
+
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
         if relay_state is None:
