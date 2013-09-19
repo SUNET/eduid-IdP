@@ -430,7 +430,7 @@ def do_verify(environ, start_response, idp_app):
                     'authn': _authn,
                     'authn_timestamp': int(time.time()),
                     }
-        idp_app.IDP.cache.add_session(uid, user, _session)
+        idp_app.IDP.cache.add_session(uid, user.username, _session)
         idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, uid))
 
         kaka = eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime,
