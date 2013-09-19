@@ -106,9 +106,10 @@ class ExpiringCache():
     def delete(self, key):
         try:
             del self._data[key]
+            return True
         except KeyError:
-            self.logger.debug("Failed deleting {!r} from {!s} cache (entry did not exist)".format(
-                self._name, key))
+            self.logger.debug("Failed deleting key {!r} from {!s} cache (entry did not exist)".format(
+                key, self._name))
 
 
 class SSOSessionCache(object):
@@ -132,13 +133,13 @@ class SSOSessionCache(object):
         Remove entrys when SLO is executed.
 
         :param _lid: Local identifier as string (username?)
-        :return: None
+        :return: True on success
         """
         _uid = self.user2uid.get(_lid)
         self.logger.debug("Purging SSO session, uid : {!s}".format(self.uid2user.get(_uid)))
         self.logger.debug("Purging SSO session, lid : {!s}".format(self.user2uid.get(_lid)))
-        self.uid2user.delete(_uid)
-        self.user2uid.delete(_lid)
+        if self.uid2user.delete(_uid) and self.user2uid.delete(_lid):
+            return True
 
     def add_session(self, uid, user, data):
         """
