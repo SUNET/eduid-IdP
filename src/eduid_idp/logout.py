@@ -14,12 +14,14 @@ Code handling Single Log Out requests.
 import pprint
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Response, BadRequest, ServiceError, delete_cookie
+from eduid_idp.mischttp import Response, Redirect, BadRequest, ServiceError, delete_cookie
 import eduid_idp.mischttp
 
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_SOAP
+from saml2.s_utils import exception_trace, error_status_factory
+import saml2.samlp
 
 # -----------------------------------------------------------------------------
 # === Single log out ===
@@ -28,7 +30,6 @@ from saml2 import BINDING_SOAP
 
 
 class SLO(Service):
-
     def redirect(self):
         """ Expects a HTTP-redirect request """
 
@@ -53,6 +54,7 @@ class SLO(Service):
     def unpack_soap(self):
         try:
             # XXX suspect this is broken - get_post() returns a dict() now
+            # and it looks like the old get_post returned the body as string
             query = eduid_idp.mischttp.get_post()
             return {"SAMLRequest": query, "RelayState": ""}
         except Exception:
@@ -64,54 +66,113 @@ class SLO(Service):
         effort to contact all SPs that have received assertions using this
         SSO session and letting them know the user has been logged out.
 
-        :param _dict: Logout request as dict
+        :param _dict: Dict with SAMLRequest and possibly RelayState
         :param binding: SAML2 binding as string
         :return: Response as string
         """
         self.logger.info("--- Single Log Out Service ---")
 
-        self.logger.debug("_perform_logout:\n{!s}".format(pprint.pformat(_dict)))
+        self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(_dict)))
         if not _dict:
             resp = BadRequest('Error parsing request or no request')
             return resp(self.environ, self.start_response)
 
         request = _dict["SAMLRequest"]
-        relay_state = _dict["RelayState"]
 
         try:
-            _, body = request.split("\n")
-            self.logger.debug("req: '%s'" % body)
-            req_info = self.IDP.parse_logout_request(body, binding)
-        except Exception, exc:
-            self.logger.error("Bad request: %s" % exc)
-            resp = BadRequest("%s" % exc)
+            req_info = self.IDP.parse_logout_request(request, binding)
+            self.logger.debug("Parsed Logout request: {!s}".format(req_info.message))
+        except Exception as exc:
+            self.logger.error("Bad request parsing logout request : {!r}".format(exc))
+            self.logger.debug("Exception parsing logout request :\n{!s}".format(exception_trace(exc)))
+            resp = BadRequest("Failed parsing logout request")
             return resp(self.environ, self.start_response)
 
-        msg = req_info.message
-        if msg.name_id:
-            _lid = self.IDP.ident.find_local_id(msg.name_id)
-            self.logger.info("Logging out session with local identifier: {!s}".format(_lid))
-            self.IDP.cache.remove_using_local_id(_lid)
-            # remove the authentication
-            try:
-                self.IDP.session_db.remove_authn_statements(msg.name_id)
-            except KeyError, exc:
-                self.logger.error("ServiceError: %s" % exc)
-                resp = ServiceError("%s" % exc)
-                return resp(self.environ, self.start_response)
+        req_info.binding = binding
+        if 'RelayState' in _dict:
+            req_info.relay_state = _dict['RelayState']
 
-        resp = self.IDP.create_logout_response(msg, [binding])
-
+        # look for the subject
+        subject = req_info.subject_id()
+        self.logger.debug("Logout subject: {!s}".format(subject.text.strip()))
         try:
-            hinfo = self.IDP.apply_binding(binding, "%s" % resp, "", relay_state)
-        except Exception, exc:
-            self.logger.error("ServiceError: %s" % exc)
+            # XXX should verify issuer somehow perhaps
+            self.logger.debug("Logout request issuer : {!s}".format(req_info.issuer()))
+        except AttributeError:
+            pass
+        self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
+
+        status_code = self._logout_using_name_id(req_info.message.name_id)
+        self.logger.debug("Name-id logout result : {!r}".format(status_code))
+        if isinstance(status_code, basestring):
+            resp = self._logout_response(req_info, status_code)
+        else:
+            resp = status_code
+        return resp(self.environ, self.start_response)
+
+
+    def _logout_using_name_id(self, name_id):
+        """
+
+        :param name_id:
+        :return: SAML StatusCode (string) or ServiceError() on error
+        """
+        if not name_id:
+            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
+        self.logger.debug("Logout message name_id: {!r}/{!s}".format(name_id, name_id))
+        _lid = self.IDP.ident.find_local_id(name_id)
+        if not _lid:
+            self.logger.error("Could not find local identifier (SSO session key) using provided name-id")
+            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
+        self.logger.info("Logging out session with local identifier: {!s}".format(_lid))
+        if not self.IDP.cache.remove_using_local_id(_lid):
+            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
+        try:
+            # remove the authentication
+            # XXX would be useful if remove_authn_statements() returned how many statements it actually removed
+            res = self.IDP.session_db.remove_authn_statements(name_id)
+        except KeyError as exc:
+            self.logger.error("ServiceError removing authn : %s" % exc)
             resp = ServiceError("%s" % exc)
             return resp(self.environ, self.start_response)
+        return saml2.samlp.STATUS_SUCCESS
 
+    def _logout_response(self, req_info, status_code, sign_response=True):
+        self.logger.info("LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(), req_info.sender(),
+                                                                           status_code))
+        if req_info.binding != BINDING_SOAP:
+            bindings = [BINDING_HTTP_REDIRECT, BINDING_HTTP_POST]
+            binding, destination = self.IDP.pick_binding("single_logout_service", bindings,
+                                                         entity_id = req_info.sender())
+            bindings = [binding]
+        else:
+            bindings = [BINDING_SOAP]
+            destination = ""
+
+        status = None  # None == success in create_logout_response()
+        if status_code != saml2.samlp.STATUS_SUCCESS:
+            status = error_status_factory((status_code, "Logout failed"))
+            self.logger.debug("Created 'logout failed' status based on {!r} : {!r}".format(status_code, status))
+
+        issuer = self.IDP._issuer(self.IDP.config.entityid)
+        response = self.IDP.create_logout_response(req_info.message, bindings, status, sign = sign_response,
+                                                   issuer = issuer)
+        self.logger.debug("Logout SAMLResponse :\n{!s}".format(response))
+
+        ht_args = self.IDP.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
+                                         response = True)
+
+        self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
+
+        # Delete the SSO session cookie in the browser
         delco = delete_cookie("idpauthn", self.logger)
         if delco:
-            hinfo["headers"].append(delco)
-        self.logger.info("Header: %s" % (hinfo["headers"],))
-        resp = Response(hinfo["data"], headers=hinfo["headers"])
-        return resp(self.environ, self.start_response)
+            ht_args["headers"].append(delco)
+
+        if req_info.binding == BINDING_HTTP_REDIRECT:
+            _loc = [v for (k, v) in ht_args['headers'] if k == 'Location']
+            # avoid redundant Location header added by Redirect()
+            _new_h = [(k, v) for (k, v) in ht_args['headers'] if k != 'Location']
+            ht_args['headers'] = _new_h
+            return Redirect(_loc[0], headers=_new_h)
+        return Response(ht_args['data'], **ht_args)
