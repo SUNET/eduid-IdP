@@ -29,7 +29,7 @@ class Response(object):
     _status = '200 OK'
     _content_type = 'text/html'
 
-    def __init__(self, message=None, **kwargs):
+    def __init__(self, message = None, **kwargs):
         self.status = kwargs.get('status', self._status)
         self.response = kwargs.get('response', self._response)
         self.template = kwargs.get('template', self._template)
@@ -46,7 +46,7 @@ class Response(object):
         start_response(self.status, self.headers)
         return self.response(self.message or geturl())
 
-    def _response(self, message=""):
+    def _response(self, message = ""):
         if self.template:
             return [self.template % message]
         elif isinstance(message, basestring):
@@ -61,13 +61,13 @@ class NotFound(Response):
 
 class Redirect(Response):
     _template = '<html>\n<head><title>Redirecting to %s</title></head>\n' \
-        '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
-        '</body>\n</html>'
+                '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
+                '</body>\n</html>'
     _status = '302 Found'
 
-    def __call__(self, environ, start_response, **kwargs):
+    def __call__(self, environ, start_response):
         location = self.message
-        self.headers.append(('location', location))
+        self.headers.append(('Location', location))
         start_response(self.status, self.headers)
         return self.response((location, location, location))
 
@@ -86,8 +86,7 @@ class ServiceError(Response):
     _status = '500 Internal Service Error'
 
 
-
-def geturl(query=True, path=True):
+def geturl(query = True, path = True):
     """Rebuilds a request URL (from PEP 333).
 
     :param query: Is QUERY_STRING included in URI (default: True)
@@ -105,10 +104,12 @@ def geturl(query=True, path=True):
         url.append('?' + cherrypy.request.query_string)
     return ''.join(url)
 
+
 def get_post():
     # When the method is POST the query string will be sent
     # in the HTTP request body
     return cherrypy.request.body_params
+
 
 def static_filename(config, path):
     if not isinstance(path, basestring):
@@ -122,6 +123,7 @@ def static_filename(config, path):
     except OSError:
         return None
 
+
 def static_file(environ, start_response, filename):
     types = {'ico': 'image/x-icon',
              'png': 'image/png',
@@ -130,7 +132,7 @@ def static_file(environ, start_response, filename):
              'js': 'application/javascript',
              'txt': 'text/plain',
              'xml': 'text/xml',
-             }
+    }
     ext = filename.rsplit('.', 1)[-1]
 
     if not ext in types:
@@ -151,7 +153,6 @@ def not_found(environ, start_response):
     """Called if no URL matches."""
     resp = NotFound()
     return resp(environ, start_response)
-
 
 
 # ----------------------------------------------------------------------------
@@ -182,7 +183,7 @@ def info_from_cookie(kaka, IDP, logger):
 # XXX cherrypy offers some significantly simpler ways to set cookies using
 # cherrypy.response.cookie - any reason to not use those? /Fredrik 2013-08
 
-def _expiration(timeout, tformat="%a, %d-%b-%Y %H:%M:%S GMT"):
+def _expiration(timeout, tformat = "%a, %d-%b-%Y %H:%M:%S GMT"):
     """
 
     :param timeout:
@@ -195,7 +196,7 @@ def _expiration(timeout, tformat="%a, %d-%b-%Y %H:%M:%S GMT"):
         return time.strftime(tformat, time.gmtime(0))
     else:
         # validity time should match lifetime of assertions
-        return time_util.in_a_while(minutes=timeout, format=tformat)
+        return time_util.in_a_while(minutes = timeout, format = tformat)
 
 
 def delete_cookie(name, logger):
