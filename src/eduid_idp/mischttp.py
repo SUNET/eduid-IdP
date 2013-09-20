@@ -172,7 +172,7 @@ def info_from_cookie(kaka, IDP, logger):
         try:
             uid = base64.b64decode(_authn.value)
             logger.debug("idpauthn cookie value={!r}".format(uid))
-            return IDP.cache.get_using_uid(uid)
+            return IDP.cache.get_using_local_id(uid)
         except KeyError:
             return None
     else:

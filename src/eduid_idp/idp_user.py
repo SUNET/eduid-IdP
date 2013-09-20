@@ -150,9 +150,8 @@ class IdPUserDb():
                     self.logger.debug("  user.identity :\n{!s}".format(pprint.pformat(res.identity)))
                 return res
         else:
-            try:
-                user = IdPUser(username, userdb=self.userdb)
-            except NoSuchUser:
+            user = self.lookup_user(username)
+            if not user:
                 self.logger.info("Unknown user : {!r}".format(username))
                 # XXX we effectively disclose there was no such user by the quick
                 # response in this case. Maybe send bogus auth request to backends?
@@ -169,3 +168,15 @@ class IdPUserDb():
                     return user
             self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         return None
+
+    def lookup_user(self, username):
+        """
+        Load IdPUser from userdb.
+
+        :param username: string
+        :return: IdPUser or None
+        """
+        try:
+            return IdPUser(username, userdb=self.userdb)
+        except NoSuchUser:
+            return None

@@ -12,6 +12,9 @@
 import time
 from collections import deque
 from hashlib import sha1
+import datetime
+
+import pymongo
 
 
 class NoOpLock():
@@ -22,6 +25,7 @@ class NoOpLock():
     def __init__(self):
         pass
 
+    # noinspection PyUnusedLocal
     def acquire(self, _block = True):
         return True
 
@@ -141,7 +145,7 @@ class SSOSessionCache(object):
         if self.uid2user.delete(_uid) and self.user2uid.delete(_lid):
             return True
 
-    def add_session(self, uid, user, data):
+    def add_session(self, lid, username, data):
         """
         Add a new SSO session to the cache.
 
@@ -149,23 +153,111 @@ class SSOSessionCache(object):
         the SSO session expires, and the mapping of user -> uid is used if the user requests
         logout (SLO).
 
-        :param uid: Unique id as string (uniqueness is security critical!)
-        :param user: Username (or 'local id') as string
+        :param lid: local unique id as string (uniqueness and unability to guess is security critical!)
+        :param username: Username as string
         :param data: opaque, should be dict
         :return:
         """
-        self.uid2user.add(uid, data)
-        self.user2uid.add(user, uid)
+        self.uid2user.add(lid, data)
+        self.user2uid.add(username, lid)
 
-    def get_using_uid(self, uid):
+    def get_using_local_id(self, lid):
         """
-        Lookup an SSO session using the uid (same uid previously used with add_session).
+        Lookup an SSO session using the local id (same lid previously used with add_session).
 
-        :param uid: Unique id as string
+        :param lid: Unique id as string
         :return: opaque, should be dict
         """
         try:
-            return self.uid2user.get(uid)
+            return self.uid2user.get(lid)
         except KeyError:
-            self.logger.debug('Failed looking up SSO session with uid={!r}'.format(uid))
+            self.logger.debug('Failed looking up SSO session with local_id={!r}'.format(lid))
+            raise
+
+
+class SSOSessionCacheMDB(object):
+    """
+    This is a MongoDB version of SSOSessionCache().
+
+    Expiration is done using simple non-blocking delete-querys on an indexed date-field.
+    A simple timestamp is used to not invoke expiration more often than once every
+    `expiration_freq' seconds.
+    """
+
+    def __init__(self, uri, logger, ttl, lock = None, expiration_freq = 60, conn = None, db_name = "eduid_idp",
+                 **kwargs):
+        self.logger = logger
+        self._ttl = ttl
+        self._lock = lock
+        if self._lock is None:
+            self._lock = NoOpLock()
+        self._expiration_freq = expiration_freq
+
+        if conn is not None:
+            self.connection = conn
+        else:
+            if "replicaSet=" in uri:
+                self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
+            else:
+                self.connection = pymongo.MongoClient(uri, **kwargs)
+        self.db = self.connection[db_name]
+        self.sso_sessions = self.db.sso_sessions
+        for this in xrange(2):
+            try:
+                self.sso_sessions.ensure_index('expire_at', name = 'expire_at_idx', unique = False)
+                self.sso_sessions.ensure_index('local_id', name = 'local_id_idx', unique = True)
+                break
+            except pymongo.errors.AutoReconnect, e:
+                if this == 1:
+                    raise
+                self.logger.error("Failed ensuring mongodb index, retrying ({!r})".format(e))
+
+    def remove_using_local_id(self, _lid):
+        """
+        Remove entrys when SLO is executed.
+
+        :param _lid: Local identifier as string (username?)
+        :return: True on success
+        """
+        return self.sso_sessions.remove({'local_id': _lid}, w = 1, getLastError = True)
+
+    def add_session(self, lid, username, data):
+        """
+        Add a new SSO session to the cache.
+
+        The mapping of uid -> user (and data) is used when a user visits another SP before
+        the SSO session expires, and the mapping of user -> uid is used if the user requests
+        logout (SLO).
+
+        :param lid: Unique local id as string (uniqueness and unability to guess is security critical!)
+        :param username: Username as string
+        :param data: opaque, should be dict
+        :return: True on success
+        """
+        _ts = time.time()
+        isodate = datetime.datetime.fromtimestamp(_ts, None)
+        _doc = {'local_id': lid,
+                'username': username,
+                'data': data,
+                'created_ts': isodate,
+                }
+        import pprint
+
+        self.logger.debug("INSERTING DOCUMENT {!s}".format(pprint.pformat(_doc)))
+        self.sso_sessions.insert(_doc)
+        return True
+
+    def get_using_local_id(self, lid):
+        """
+            Lookup an SSO session using the local id (same lid previously used with add_session).
+
+            :param lid: Unique id as string
+            :return: opaque, should be dict
+            """
+        try:
+            res = self.sso_sessions.find_one({'local_id': lid})
+            self.logger.debug("FOUND SESSION {!s}".format(res))
+            return res['data']
+        except KeyError:
+            self.logger.debug('Failed looking up SSO session with local id={!r}'.format(lid))
             raise

@@ -138,8 +138,12 @@ class IdPApplication(object):
             # add directory part to sys.path, since pysaml2 'import's it's config
             sys.path = [cfgdir] + sys.path
             cfgfile = os.path.basename(config.pysaml2_config)
-        _SSOSessions = eduid_idp.cache.SSOSessionCache(logger, (self.config.sso_session_lifetime + 1) * 60,
-                                                       threading.Lock())
+        _session_ttl = (self.config.sso_session_lifetime + 1) * 60
+        if self.config.sso_session_mongo_uri:
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+                                                              logger, _session_ttl)
+        else:
+            _SSOSessions = eduid_idp.cache.SSOSessionCache(logger, _session_ttl, threading.Lock())
         self.IDP = server.Server(cfgfile, cache = _SSOSessions)
         # restore path
         sys.path = old_path
@@ -237,12 +241,12 @@ class IdPApplication(object):
         :returns: environ dict()
         """
         environ = {'idp.user': None,
-        }
+                   }
         userdata = self._lookup_userdata()
         if userdata:
-            environ['idp.user'] = userdata['user']
-            environ['idp.authn'] = userdata['authn']
-            self.logger.info("SSO session for user {!r} found in IdP cache".format(userdata['user'].username))
+            environ['idp.user'] = self.userdb.lookup_user(userdata['username'])
+            environ['idp.authn'] = self.get_authn_by_ref(userdata['authn_ref'], userdata.get('authn_class_ref'))
+            self.logger.info("SSO session for user {!r} found in IdP cache".format(userdata['username']))
         return environ
 
     def _lookup_userdata(self):
@@ -257,7 +261,7 @@ class IdPApplication(object):
             if query:
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
-                    userdata = self.IDP.cache.get_using_uid(query['id'])
+                    userdata = self.IDP.cache.get_using_local_id(query['id'])
                     self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
                         pprint.pformat(userdata)))
                 except KeyError:
@@ -275,7 +279,26 @@ class IdPApplication(object):
             self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
         return userdata
 
+    def get_authn_by_ref(self, ref, class_ref=None):
+        """
+        Look up an authentication context by reference.
+        :param ref: object
+        :return: authn context or None
+        """
+        self.logger.debug("LOOKUP AUTHN BY REF {!r} CLASS {!r}".format(ref, class_ref))
+        try:
+            _authn = self.AUTHN_BROKER[ref]
+            if class_ref is not None:
+                if _authn['class_ref'] != class_ref:
+                    self.logger.warning("AuthN context returned for ref {!r} class_ref mismatch".format(ref))
+                    self.logger.debug("Got AuthN context class_ref {!r}, expected {!r}".format(
+                        _authn['class_ref'], class_ref))
+            return _authn
+        except KeyError:
+            pass
+
 # ----------------------------------------------------------------------------
+
 
 def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     """

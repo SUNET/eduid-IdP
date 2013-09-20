@@ -54,6 +54,7 @@ _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'userdb_mongo_uri': None,
                     'userdb_mongo_database': None,
                     'sso_session_lifetime': '15', # Lifetime of SSO session in minutes
+                    'sso_session_mongo_uri': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -199,3 +200,12 @@ class IdPConfig():
         this value, plus the pysaml2 lifetime of the assertion.
         """
         return self.config.getint(self.section, 'sso_session_lifetime')
+
+    @property
+    def sso_session_mongo_uri(self):
+        """
+        SSO session MongoDB connection URI (string). See MongoDB documentation for details.
+
+        If not set, an in-memory SSO session cache will be used.
+        """
+        return self.config.get(self.section, 'sso_session_mongo_uri')
