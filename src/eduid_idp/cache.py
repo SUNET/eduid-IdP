@@ -192,6 +192,7 @@ class SSOSessionCacheMDB(object):
         if self._lock is None:
             self._lock = NoOpLock()
         self._expiration_freq = expiration_freq
+        self._last_expire_at = None
 
         if conn is not None:
             self.connection = conn
@@ -241,10 +242,8 @@ class SSOSessionCacheMDB(object):
                 'data': data,
                 'created_ts': isodate,
                 }
-        import pprint
-
-        self.logger.debug("INSERTING DOCUMENT {!s}".format(pprint.pformat(_doc)))
         self.sso_sessions.insert(_doc)
+        self.expire_old_sessions()
         return True
 
     def get_using_local_id(self, lid):
@@ -256,8 +255,27 @@ class SSOSessionCacheMDB(object):
             """
         try:
             res = self.sso_sessions.find_one({'local_id': lid})
-            self.logger.debug("FOUND SESSION {!s}".format(res))
-            return res['data']
+            if res:
+                return res['data']
         except KeyError:
             self.logger.debug('Failed looking up SSO session with local id={!r}'.format(lid))
             raise
+
+    def expire_old_sessions(self, force=False):
+        """
+        Remove expired sessions from the MongoDB database.
+
+        Unless force=True, this will be a no-op if less than `expiration_freq' seconds
+        has passed since the last time this operation was invoked.
+
+        :param force: Boolean, force run even if not enough time has passed
+        :return: True if expiration was performed, False otherwise
+        """
+        _ts = time.time() - self._ttl
+        if not force:
+            if self._last_expire_at > _ts - self._expiration_freq:
+                return False
+        self._last_expire_at = _ts
+        isodate = datetime.datetime.fromtimestamp(_ts, None)
+        self.sso_sessions.remove({'created_ts': {'$lt': isodate}})
+        return True
