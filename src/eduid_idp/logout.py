@@ -102,8 +102,15 @@ class SLO(Service):
             pass
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
-        status_code = self._logout_using_name_id(req_info.message.name_id)
-        self.logger.debug("Name-id logout result : {!r}".format(status_code))
+        _name_id = req_info.message.name_id
+        _lid = eduid_idp.mischttp.read_cookie(self.logger)
+        if not _lid:
+            _lid = self.IDP.ident.find_local_id(_name_id)
+            self.logger.debug("Logout message name_id: {!r} found local-id {!r}".format(
+                _name_id, _lid))
+
+        status_code = self._logout_using_name_id(_lid, _name_id)
+        self.logger.debug("Logout of local-id {!r} result : {!r}".format(_lid, status_code))
         if isinstance(status_code, basestring):
             resp = self._logout_response(req_info, status_code)
         else:
@@ -111,21 +118,17 @@ class SLO(Service):
         return resp(self.environ, self.start_response)
 
 
-    def _logout_using_name_id(self, name_id):
+    def _logout_using_name_id(self, local_id, name_id):
         """
-
-        :param name_id:
+        :param local_id: Local ID (db key in SSO session database)
+        :param name_id: NameID from LogoutRequest
         :return: SAML StatusCode (string) or ServiceError() on error
         """
-        if not name_id:
-            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
-        self.logger.debug("Logout message name_id: {!r}/{!s}".format(name_id, name_id))
-        _lid = self.IDP.ident.find_local_id(name_id)
-        if not _lid:
+        if not local_id or not name_id:
             self.logger.error("Could not find local identifier (SSO session key) using provided name-id")
             return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
-        self.logger.info("Logging out session with local identifier: {!s}".format(_lid))
-        if not self.IDP.cache.remove_using_local_id(_lid):
+        self.logger.info("Logging out session with local identifier: {!s}".format(local_id))
+        if not self.IDP.cache.remove_using_local_id(local_id):
             return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
         try:
             # remove the authentication

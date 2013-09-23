@@ -250,10 +250,10 @@ class IdPApplication(object):
         return environ
 
     def _lookup_userdata(self):
-        kaka = cherrypy.request.cookie
         userdata = None
-        if kaka:
-            userdata = eduid_idp.mischttp.info_from_cookie(kaka, self.IDP, self.logger)
+        _lid = eduid_idp.mischttp.read_cookie(self.logger)
+        if _lid:
+            userdata = self.IDP.cache.get_using_local_id(_lid)
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(
                 pprint.pformat(userdata)))
         else:

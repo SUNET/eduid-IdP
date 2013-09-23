@@ -158,21 +158,24 @@ def not_found(environ, start_response):
 # ----------------------------------------------------------------------------
 # Cookie handling
 # ----------------------------------------------------------------------------
-def info_from_cookie(kaka, IDP, logger):
+def read_cookie(logger):
     """
     Decode information stored in a browser cookie.
 
     The idpauthn cookie holds a value used to lookup `userdata' in IDP.cache.
 
-    :returns: User data
+    :returns: string with cookie content, or None
     """
+    kaka = cherrypy.request.cookie
     logger.debug("Parsing cookie(s): %s" % kaka)
+    if not kaka:
+        return None
     _authn = kaka.get("idpauthn")
     if _authn:
         try:
-            uid = base64.b64decode(_authn.value)
-            logger.debug("idpauthn cookie value={!r}".format(uid))
-            return IDP.cache.get_using_local_id(uid)
+            cookie_val = base64.b64decode(_authn.value)
+            logger.debug("idpauthn cookie value={!r}".format(cookie_val))
+            return cookie_val
         except KeyError:
             return None
     else:
