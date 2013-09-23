@@ -396,8 +396,8 @@ def do_verify(environ, start_response, idp_app):
     # parameter (authn_reference) so it can't be trusted. XXX is this a problem? Not sure.
 
     _authn = None
-    if 'authn_reference' in query:
-        authn_ref = query["authn_reference"]
+    authn_ref = query.get('authn_reference')
+    if authn_ref:
         _authn = idp_app.get_authn_by_ref(authn_ref)
     if not _authn:
         resp = Unauthorized("Bad authentication reference")
