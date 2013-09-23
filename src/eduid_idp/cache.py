@@ -132,17 +132,17 @@ class SSOSessionCache(object):
         self.user2uid = ExpiringCache('SSOSession.user2uid', self.logger, self._ttl, lock = self._lock)
         self.uid2user = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
 
-    def remove_using_local_id(self, _lid):
+    def remove_using_local_id(self, lid):
         """
         Remove entrys when SLO is executed.
 
-        :param _lid: Local identifier as string (username?)
+        :param lid: Local identifier as string (username?)
         :return: True on success
         """
-        _uid = self.user2uid.get(_lid)
+        _uid = self.user2uid.get(lid)
         self.logger.debug("Purging SSO session, uid : {!s}".format(self.uid2user.get(_uid)))
-        self.logger.debug("Purging SSO session, lid : {!s}".format(self.user2uid.get(_lid)))
-        if self.uid2user.delete(_uid) and self.user2uid.delete(_lid):
+        self.logger.debug("Purging SSO session, lid : {!s}".format(self.user2uid.get(lid)))
+        if self.uid2user.delete(_uid) and self.user2uid.delete(lid):
             return True
 
     def add_session(self, lid, username, data):
@@ -215,14 +215,14 @@ class SSOSessionCacheMDB(object):
                     raise
                 self.logger.error("Failed ensuring mongodb index, retrying ({!r})".format(e))
 
-    def remove_using_local_id(self, _lid):
+    def remove_using_local_id(self, lid):
         """
         Remove entrys when SLO is executed.
 
-        :param _lid: Local identifier as string (username?)
+        :param lid: Local identifier as string (username?)
         :return: True on success
         """
-        return self.sso_sessions.remove({'local_id': _lid}, w = 1, getLastError = True)
+        return self.sso_sessions.remove({'local_id': lid}, w = 1, getLastError = True)
 
     def add_session(self, lid, username, data):
         """

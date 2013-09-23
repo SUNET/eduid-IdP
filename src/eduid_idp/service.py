@@ -20,8 +20,8 @@ from saml2 import BINDING_HTTP_ARTIFACT
 import eduid_idp.mischttp
 from eduid_idp.mischttp import Response, Redirect
 
-class Service(object):
 
+class Service(object):
     def __init__(self, environ, start_response, idp_app):
         self.environ = environ
         idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
@@ -36,11 +36,11 @@ class Service(object):
         return eduid_idp.mischttp.parse_query_string()
 
     def unpack_post(self):
-        #_dict = parse_qs(get_post(self.environ))
-        _dict = eduid_idp.mischttp.get_post()
-        self.logger.debug("unpack_post:: %s" % _dict)
+        #info = parse_qs(get_post(self.environ))
+        info = eduid_idp.mischttp.get_post()
+        self.logger.debug("unpack_post:: %s" % info)
         try:
-            return dict([(k, v) for k, v in _dict.items()])
+            return dict([(k, v) for k, v in info.items()])
         except Exception:
             return None
 
@@ -58,7 +58,7 @@ class Service(object):
         if binding == BINDING_HTTP_ARTIFACT:
             resp = Redirect()
         else:
-            resp = Response(http_args["data"], headers=http_args["headers"])
+            resp = Response(http_args["data"], headers = http_args["headers"])
         return resp(self.environ, self.start_response)
 
     def redirect(self):

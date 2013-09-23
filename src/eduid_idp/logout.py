@@ -28,7 +28,6 @@ import saml2.samlp
 # -----------------------------------------------------------------------------
 
 
-
 class SLO(Service):
     def redirect(self):
         """ Expects a HTTP-redirect request """
@@ -60,24 +59,24 @@ class SLO(Service):
         except Exception:
             return None
 
-    def perform_logout(self, _dict, binding):
+    def perform_logout(self, info, binding):
         """
         Perform logout. Means remove SSO session from IdP list, and a best
         effort to contact all SPs that have received assertions using this
         SSO session and letting them know the user has been logged out.
 
-        :param _dict: Dict with SAMLRequest and possibly RelayState
+        :param info: Dict with SAMLRequest and possibly RelayState
         :param binding: SAML2 binding as string
         :return: Response as string
         """
         self.logger.info("--- Single Log Out Service ---")
 
-        self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(_dict)))
-        if not _dict:
+        self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(info)))
+        if not info:
             resp = BadRequest('Error parsing request or no request')
             return resp(self.environ, self.start_response)
 
-        request = _dict["SAMLRequest"]
+        request = info["SAMLRequest"]
 
         try:
             req_info = self.IDP.parse_logout_request(request, binding)
@@ -89,8 +88,8 @@ class SLO(Service):
             return resp(self.environ, self.start_response)
 
         req_info.binding = binding
-        if 'RelayState' in _dict:
-            req_info.relay_state = _dict['RelayState']
+        if 'RelayState' in info:
+            req_info.relay_state = info['RelayState']
 
         # look for the subject
         subject = req_info.subject_id()
@@ -116,7 +115,6 @@ class SLO(Service):
         else:
             resp = status_code
         return resp(self.environ, self.start_response)
-
 
     def _logout_using_name_id(self, local_id, name_id):
         """

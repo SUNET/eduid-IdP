@@ -46,12 +46,12 @@ class SSO(Service):
         self.destination = None
         self.req_info = None
 
-    def perform_login(self, _dict, binding_in, relay_state=None):
+    def perform_login(self, info, binding_in, relay_state=None):
         """
         Validate request, and then proceed with creating an AuthnResponse and
         invoking the 'outgoing' SAML2 binding.
 
-        :param _dict: Login request as dict
+        :param info: Login request as dict
         :param binding_in: SAML2 binding as string
         :param relay_state: SAML2 relay state
         :return: Response as string
@@ -59,13 +59,13 @@ class SSO(Service):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        self.logger.debug("perform_login :\n{!s}".format(pprint.pformat(_dict)))
-        if not _dict:
+        self.logger.debug("perform_login :\n{!s}".format(pprint.pformat(info)))
+        if not info:
             resp = BadRequest('Error parsing request or no request')
             return resp(self.environ, self.start_response)
 
         try:
-            _ok, _resp = self._verify_request(_dict, binding_in)
+            _ok, _resp = self._verify_request(info, binding_in)
             if not _ok:
                 return _resp(self.environ, self.start_response)
             resp_args = self.IDP.response_args(self.req_info.message)
@@ -101,7 +101,7 @@ class SSO(Service):
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
         if relay_state is None:
-            relay_state = _dict["RelayState"]
+            relay_state = info["RelayState"]
         self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
             self.binding_out, self.destination, relay_state))
         http_args = self.IDP.apply_binding(self.binding_out, str(_resp), self.destination,
@@ -154,28 +154,28 @@ class SSO(Service):
         The HTTP-Post endpoint
         """
         self.logger.info("--- In SSO POST ---")
-        _info = self.unpack_either()
+        info = self.unpack_either()
         self.req_info = self.IDP.parse_authn_request(
-            _info["SAMLRequest"], BINDING_HTTP_POST)
+            info["SAMLRequest"], BINDING_HTTP_POST)
         _req = self.req_info.message
         if self.user and not _req.force_authn:
-            self.logger.debug("Continuing with posted Authn request {!r}".format(_info))
-            return self.perform_login(_info, BINDING_HTTP_POST)
+            self.logger.debug("Continuing with posted Authn request {!r}".format(info))
+            return self.perform_login(info, BINDING_HTTP_POST)
         # Request authentication, either because there was no self.user
         # or because it was requested using SAML2 ForceAuthn
-        _info["req_info"] = self.req_info
-        key = self._store_ticket(_info)
+        info["req_info"] = self.req_info
+        key = self._store_ticket(info)
         return self._not_authn(key, _req.requested_authn_context)
 
     def artifact(self):
         # Can be either by HTTP_Redirect or HTTP_POST
-        _dict = self.unpack_either()
-        if not _dict:
+        info = self.unpack_either()
+        if not info:
             resp = BadRequest("Missing query")
             return resp(self.environ, self.start_response)
             # exchange artifact for request
-        request = self.IDP.artifact2message(_dict["SAMLart"], "spsso")
-        return self.perform_login(request, BINDING_HTTP_ARTIFACT, _dict["RelayState"])
+        request = self.IDP.artifact2message(info["SAMLart"], "spsso")
+        return self.perform_login(request, BINDING_HTTP_ARTIFACT, info["RelayState"])
 
     def _verify_request(self, query, binding):
         """
@@ -211,7 +211,7 @@ class SSO(Service):
                                                             self.destination))
         return True, None
 
-    def _store_ticket(self, _ticket):
+    def _store_ticket(self, ticket):
         """
         Add an entry to the IDP.ticket cache.
 
@@ -225,13 +225,13 @@ class SSO(Service):
 
         :returns: Key as string
         """
-        key = self.IDP.ticket.key(_ticket["SAMLRequest"])
-        self.logger.debug("_store_ticket in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(_ticket)))
+        key = self.IDP.ticket.key(ticket["SAMLRequest"])
+        self.logger.debug("_store_ticket in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(ticket)))
         # store the AuthnRequest
-        self.IDP.ticket.add(key, _ticket)
+        self.IDP.ticket.add(key, ticket)
         return key
 
-    def _get_ticket(self, _info):
+    def _get_ticket(self, info):
         """
         _info is redirect HTTP query parameters.
 
@@ -248,10 +248,10 @@ class SSO(Service):
         :returns: ResultBool, Ticket as dict
         """
         # Try ticket-cache lookup based on key, or key derived from SAMLRequest
-        if "key" in _info:
-            _key = _info["key"]
-        elif "SAMLRequest" in _info:
-            _key = self.IDP.ticket.key(_info["SAMLRequest"])
+        if "key" in info:
+            _key = info["key"]
+        elif "SAMLRequest" in info:
+            _key = self.IDP.ticket.key(info["SAMLRequest"])
         else:
             return False, BadRequest("Missing SAMLRequest, please re-initiate login")
             # lookup
@@ -259,18 +259,18 @@ class SSO(Service):
 
         if _data is None:
             self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
-            if "key" in _info:
+            if "key" in info:
                 return False, BadRequest("Missing IdP ticket, please re-initiate login")
                 # cache miss, parse SAMLRequest
-            _data = _info
-            _data["req_info"] = self._parse_SAMLRequest(_info)
+            _data = info
+            _data["req_info"] = self._parse_SAMLRequest(info)
         else:
             self.logger.debug("Retreived IDP.ticket(key={!r}) :\n{!s}".format(
                 _key, pprint.pformat(_data)))
 
         return True, _data
 
-    def _parse_SAMLRequest(self, _info):
+    def _parse_SAMLRequest(self, info):
         """
         Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
         instance.
@@ -280,18 +280,18 @@ class SSO(Service):
 
         :returns: AuthnRequest or BadRequest() instance
         """
-        self.logger.debug("SAML request : {!r}".format(_info["SAMLRequest"]))
-        _req_info = self.IDP.parse_authn_request(_info["SAMLRequest"], BINDING_HTTP_REDIRECT)
+        self.logger.debug("SAML request : {!r}".format(info["SAMLRequest"]))
+        _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], BINDING_HTTP_REDIRECT)
 
         self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
             _req_info.message, _req_info.message))
 
-        if "SigAlg" in _info and "Signature" in _info:  # Signed request
+        if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
             _certs = self.IDP.metadata.certs(issuer, "any", "signing")
             verified_ok = False
             for cert in _certs:
-                if verify_redirect_signature(_info, cert):
+                if verify_redirect_signature(info, cert):
                     verified_ok = True
                     break
             if not verified_ok:
