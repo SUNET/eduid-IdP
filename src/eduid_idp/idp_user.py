@@ -37,69 +37,21 @@ import pprint
 import vccs_client
 from eduid_am.celery import celery, get_attribute_manager
 
-USERS = {
-    "roland": {
-        "sn": "Hedberg",
-        "givenName": "Roland",
-        "eduPersonScopedAffiliation": "staff@example.com",
-        "eduPersonPrincipalName": "rohe@example.com",
-        "uid": "rohe",
-        "eduPersonTargetedID": "one!for!all",
-        "c": "SE",
-        "o": "Example Co.",
-        "ou": "IT",
-        "initials": "P",
-        "schacHomeOrganization": "example.com",
-        "email": "roland@example.com",
-        "displayName": "P. Roland Hedberg",
-        "labeledURL": "http://www.example.com/rohe My homepage",
-        "norEduPersonNIN": "SE197001012222"
-    },
-    "babs": {
-        "surname": "Babs",
-        "givenName": "Ozzie",
-        "eduPersonAffiliation": "affiliate"
-    },
-    "upper": {
-        "surname": "Jeter",
-        "givenName": "Derek",
-        "eduPersonAffiliation": "affiliate",
-        "eduPersonTargetedID": "youknowme",
-    },
-}
-
-EXTRA = {
-    "roland": {
-        "eduPersonEntitlement": "urn:mace:swamid.se:foo:bar",
-        "schacGender": "male",
-        "schacUserPresenceID": "skype:pepe.perez"
-    }
-}
-
-
-PASSWD = {"roland": "dianakra",
-          "babs": "howes",
-          "upper": "crust",
-          }
 
 class NoSuchUser(Exception):
     pass
+
 
 class IdPUser():
 
     def __init__(self, username, userdb=None):
         self._username = username
-        if username in USERS:
-            self._data = USERS[username]
-        else:
-            if not userdb:
-                raise NoSuchUser("Local user {!r} does not exist".format(username))
-            for field in ['mail', 'eduPersonPrincipalName']:
-                self._data = userdb.get_user_by_field(field, username)
-                if self._data:
-                    break
-            if not self._data:
-                raise NoSuchUser("User {!r} not found".format(username))
+        for field in ['mail', 'eduPersonPrincipalName']:
+            self._data = userdb.get_user_by_field(field, username)
+            if self._data:
+                break
+        if not self._data:
+            raise NoSuchUser("User {!r} not found".format(username))
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -133,40 +85,30 @@ class IdPUserDb():
         self.vccs_client = vccs_client.VCCSClient()
         self.userdb = None
         if config.userdb_mongo_uri and config.userdb_mongo_database:
-            settings = {
-                'MONGO_URI': config.userdb_mongo_uri,
-                }
+            settings = {'MONGO_URI': config.userdb_mongo_uri,
+                        }
             celery.conf.update(settings)
-        am = get_attribute_manager(celery)
-        self.userdb = am #am.conn.get_database(config.userdb_mongo_database)
+        self.userdb = get_attribute_manager(celery)
 
     def verify_username_and_password(self, username, password):
         # verify username and password
-        if username in PASSWD:
-            if PASSWD[username] == password:
-                res = IdPUser(username, userdb=self.userdb)
-                self.logger.debug("verify_username_and_password returning user {!r}".format(res))
-                if res is not None:
-                    self.logger.debug("  user.identity :\n{!s}".format(pprint.pformat(res.identity)))
-                return res
-        else:
-            user = self.lookup_user(username)
-            if not user:
-                self.logger.info("Unknown user : {!r}".format(username))
-                # XXX we effectively disclose there was no such user by the quick
-                # response in this case. Maybe send bogus auth request to backends?
-                return None
-            self.logger.debug("Found user {!r}".format(user))
-            self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
-            # XXX for now, try the password sequentially against all the users password credentials
-            for cred in user.passwords:
-                factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
-                self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
-                        username, cred['id'], factor))
-                if self.vccs_client.authenticate(username, [factor]):
-                    self.logger.debug("VCCS authenticated user {!r}".format(user))
-                    return user
-            self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
+        user = self.lookup_user(username)
+        if not user:
+            self.logger.info("Unknown user : {!r}".format(username))
+            # XXX we effectively disclose there was no such user by the quick
+            # response in this case. Maybe send bogus auth request to backends?
+            return None
+        self.logger.debug("Found user {!r}".format(user))
+        self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
+        # XXX for now, try the password sequentially against all the users password credentials
+        for cred in user.passwords:
+            factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
+            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
+                    username, cred['id'], factor))
+            if self.vccs_client.authenticate(username, [factor]):
+                self.logger.debug("VCCS authenticated user {!r}".format(user))
+                return user
+        self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         return None
 
     def lookup_user(self, username):
