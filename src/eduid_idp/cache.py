@@ -159,6 +159,8 @@ class SSOSessionCache(object):
         :return:
         """
         self.uid2user.add(lid, data)
+        # XXX overwrites any existing session for a user. A user should be able to have more
+        # than one SSO session at a time (from different devices for example).
         self.user2uid.add(username, lid)
 
     def get_using_local_id(self, lid):
