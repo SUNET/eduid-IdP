@@ -129,8 +129,7 @@ class SSOSessionCache(object):
         self._lock = lock
         if self._lock is None:
             self._lock = NoOpLock()
-        self.user2uid = ExpiringCache('SSOSession.user2uid', self.logger, self._ttl, lock = self._lock)
-        self.uid2user = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
+        self.lid2data = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
 
     def remove_using_local_id(self, lid):
         """
@@ -139,11 +138,9 @@ class SSOSessionCache(object):
         :param lid: Local identifier as string (username?)
         :return: True on success
         """
-        _uid = self.user2uid.get(lid)
-        self.logger.debug("Purging SSO session, uid : {!s}".format(self.uid2user.get(_uid)))
-        self.logger.debug("Purging SSO session, lid : {!s}".format(self.user2uid.get(lid)))
-        if self.uid2user.delete(_uid) and self.user2uid.delete(lid):
-            return True
+        self.logger.debug("Purging SSO session, data : {!s}".format(self.lid2data.get(lid)))
+
+        return self.lid2data.delete(lid)
 
     def add_session(self, lid, username, data):
         """
@@ -158,20 +155,21 @@ class SSOSessionCache(object):
         :param data: opaque, should be dict
         :return:
         """
-        self.uid2user.add(lid, data)
-        # XXX overwrites any existing session for a user. A user should be able to have more
-        # than one SSO session at a time (from different devices for example).
-        self.user2uid.add(username, lid)
+        self.lid2data.add(lid, {'username': username,
+                                'data': data,
+                                })
 
     def get_using_local_id(self, lid):
         """
-        Lookup an SSO session using the local id (same lid previously used with add_session).
+        Lookup an SSO session using the local id (same `lid' previously used with add_session).
 
         :param lid: Unique id as string
         :return: opaque, should be dict
         """
         try:
-            return self.uid2user.get(lid)
+            this = self.lid2data.get(lid)
+            if this:
+                return this['data']
         except KeyError:
             self.logger.debug('Failed looking up SSO session with local_id={!r}'.format(lid))
             raise
@@ -219,7 +217,7 @@ class SSOSessionCacheMDB(object):
         """
         Remove entrys when SLO is executed.
 
-        :param lid: Local identifier as string (username?)
+        :param lid: Local identifier as string
         :return: True on success
         """
         return self.sso_sessions.remove({'local_id': lid}, w = 1, getLastError = True)
