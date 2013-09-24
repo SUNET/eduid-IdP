@@ -12,7 +12,6 @@
 Code handling Single Sign On logins.
 """
 
-import uuid
 import time
 import pprint
 import cherrypy
@@ -427,18 +426,18 @@ def do_verify(environ, start_response, idp_app):
     else:
         idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
         # NOTE: It is important than noone can guess one of these uids, as that would allow impersonation.
-        _lid = str(uuid.uuid4())
+
         _data = {'username': user.username,
                  'authn_ref': authn_ref,
                  'authn_class_ref': _authn['class_ref'],
                  'authn_timestamp': int(time.time()),
                  }
-        idp_app.IDP.cache.add_session(_lid, user.username, _data)
-        idp_app.logger.debug("Registered %s under '%s' in IdP SSO sessions" % (user, _lid))
+        _session_id = idp_app.IDP.cache.add_session(user.username, _data)
+        idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(user, _session_id))
 
         kaka = eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime,
-                                             "/", idp_app.logger, _lid)
-        lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _lid,
+                                             "/", idp_app.logger, _session_id)
+        lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id,
                                    query["key"])
         idp_app.logger.debug("Redirect => %s" % lox)
         resp = Redirect(lox, headers = [kaka], content = "text/html")

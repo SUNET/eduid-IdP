@@ -253,9 +253,9 @@ class IdPApplication(object):
 
     def _lookup_userdata(self):
         userdata = None
-        _lid = eduid_idp.mischttp.read_cookie(self.logger)
-        if _lid:
-            userdata = self.IDP.cache.get_using_local_id(_lid)
+        _session_id = eduid_idp.mischttp.read_cookie(self.logger)
+        if _session_id:
+            userdata = self.IDP.cache.get_session(_session_id)
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(
                 pprint.pformat(userdata)))
         else:
@@ -263,7 +263,7 @@ class IdPApplication(object):
             if query:
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
-                    userdata = self.IDP.cache.get_using_local_id(query['id'])
+                    userdata = self.IDP.cache.get_session(query['id'])
                     self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
                         pprint.pformat(userdata)))
                 except KeyError:

@@ -126,7 +126,7 @@ class SLO(Service):
             self.logger.error("Could not find local identifier (SSO session key) using provided name-id")
             return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
         self.logger.info("Logging out session with local identifier: {!s}".format(local_id))
-        if not self.IDP.cache.remove_using_local_id(local_id):
+        if not self.IDP.cache.remove_session(local_id):
             return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
         try:
             # remove the authentication

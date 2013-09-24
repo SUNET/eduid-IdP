@@ -10,6 +10,7 @@
 #
 
 import time
+import uuid
 from collections import deque
 from hashlib import sha1
 import datetime
@@ -95,7 +96,7 @@ class ExpiringCache():
                     # entry not expired - reinsert in queue and end purging
                     self._ages.appendleft((_exp_ts, _exp_key))
                     break
-                self.logger.debug("Purged {!s} cache entry {!s} seconds over limit : {!s}".format(
+                self.logger.debug('Purged {!s} cache entry {!s} seconds over limit : {!s}'.format(
                     self._name, timestamp - _exp_ts, _exp_key))
                 self.delete(_exp_key)
         finally:
@@ -112,7 +113,7 @@ class ExpiringCache():
             del self._data[key]
             return True
         except KeyError:
-            self.logger.debug("Failed deleting key {!r} from {!s} cache (entry did not exist)".format(
+            self.logger.debug('Failed deleting key {!r} from {!s} cache (entry did not exist)'.format(
                 key, self._name))
 
 
@@ -130,16 +131,16 @@ class SSOSessionCache(object):
         if self._lock is None:
             self._lock = NoOpLock()
 
-    def remove_using_local_id(self, lid):
+    def remove_session(self, sid):
         """
         Remove entrys when SLO is executed.
 
-        :param lid: Local identifier as string
+        :param sid: Session identifier as string
         :return: True on success
         """
         raise NotImplementedError()
 
-    def add_session(self, lid, username, data):
+    def add_session(self, username, data):
         """
         Add a new SSO session to the cache.
 
@@ -147,30 +148,29 @@ class SSOSessionCache(object):
         the SSO session expires, and the mapping of user -> uid is used if the user requests
         logout (SLO).
 
-        :param lid: local unique id as string (uniqueness and unability to guess is security critical!)
         :param username: Username as string
         :param data: opaque, should be dict
-        :return:
+        :return: Unique session identifier as string
         """
         raise NotImplementedError()
 
-    def get_using_local_id(self, lid):
+    def get_session(self, sid):
         """
-        Lookup an SSO session using the local id (same `lid' previously used with add_session).
+        Lookup an SSO session using the session id (same `sid' previously used with add_session).
 
-        :param lid: Unique id as string
+        :param sid: Unique session identifier as string
         :return: opaque, should be dict
         """
         raise NotImplementedError()
 
-    def get_using_local_id(self, lid):
+    def _create_session_id(self):
         """
-        Lookup an SSO session using the local id (same `lid' previously used with add_session).
+        Create a unique value suitable for use as session identifier.
 
-        :param lid: Unique id as string
-        :return: opaque, should be dict
+        The uniqueness and unability to guess is security critical!
+        :return: session_id as string()
         """
-        raise NotImplementedError()
+        return str(uuid.uuid4())
 
 
 class SSOSessionCacheMem(SSOSessionCache):
@@ -184,22 +184,24 @@ class SSOSessionCacheMem(SSOSessionCache):
         SSOSessionCache.__init__(self, logger, ttl, lock)
         self.lid2data = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
 
-    def remove_using_local_id(self, lid):
-        self.logger.debug("Purging SSO session, data : {!s}".format(self.lid2data.get(lid)))
-        return self.lid2data.delete(lid)
+    def remove_session(self, sid):
+        self.logger.debug('Purging SSO session, data : {!s}'.format(self.lid2data.get(sid)))
+        return self.lid2data.delete(sid)
 
-    def add_session(self, lid, username, data):
-        self.lid2data.add(lid, {'username': username,
-                                'data': data,
-                                })
+    def add_session(self, username, data):
+        _sid = self._create_session_id()
+        self.lid2data.add(_sid, {'username': username,
+                                 'data': data,
+                                 })
+        return _sid
 
-    def get_using_local_id(self, lid):
+    def get_session(self, sid):
         try:
-            this = self.lid2data.get(lid)
+            this = self.lid2data.get(sid)
             if this:
                 return this['data']
         except KeyError:
-            self.logger.debug('Failed looking up SSO session with local_id={!r}'.format(lid))
+            self.logger.debug('Failed looking up SSO session with session id={!r}'.format(sid))
             raise
 
 
@@ -212,7 +214,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
     `expiration_freq' seconds.
     """
 
-    def __init__(self, uri, logger, ttl, lock = None, expiration_freq = 60, conn = None, db_name = "eduid_idp",
+    def __init__(self, uri, logger, ttl, lock = None, expiration_freq = 60, conn = None, db_name = 'eduid_idp',
                  **kwargs):
         SSOSessionCache.__init__(self, logger, ttl, lock)
         self._expiration_freq = expiration_freq
@@ -221,7 +223,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
         if conn is not None:
             self.connection = conn
         else:
-            if "replicaSet=" in uri:
+            if 'replicaSet=' in uri:
                 self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
             else:
                 self.connection = pymongo.MongoClient(uri, **kwargs)
@@ -230,35 +232,36 @@ class SSOSessionCacheMDB(SSOSessionCache):
         for this in xrange(2):
             try:
                 self.sso_sessions.ensure_index('expire_at', name = 'expire_at_idx', unique = False)
-                self.sso_sessions.ensure_index('local_id', name = 'local_id_idx', unique = True)
+                self.sso_sessions.ensure_index('session_id', name = 'session_id_idx', unique = True)
                 break
             except pymongo.errors.AutoReconnect, e:
                 if this == 1:
                     raise
-                self.logger.error("Failed ensuring mongodb index, retrying ({!r})".format(e))
+                self.logger.error('Failed ensuring mongodb index, retrying ({!r})'.format(e))
 
-    def remove_using_local_id(self, lid):
-        return self.sso_sessions.remove({'local_id': lid}, w = 1, getLastError = True)
+    def remove_session(self, lid):
+        return self.sso_sessions.remove({'session_id': lid}, w = 1, getLastError = True)
 
-    def add_session(self, lid, username, data):
+    def add_session(self, username, data):
         _ts = time.time()
         isodate = datetime.datetime.fromtimestamp(_ts, None)
-        _doc = {'local_id': lid,
+        _sid = self._create_session_id()
+        _doc = {'session_id': _sid,
                 'username': username,
                 'data': data,
                 'created_ts': isodate,
                 }
         self.sso_sessions.insert(_doc)
         self.expire_old_sessions()
-        return True
+        return _sid
 
-    def get_using_local_id(self, lid):
+    def get_session(self, sid):
         try:
-            res = self.sso_sessions.find_one({'local_id': lid})
+            res = self.sso_sessions.find_one({'session_id': sid})
             if res:
                 return res['data']
         except KeyError:
-            self.logger.debug('Failed looking up SSO session with local id={!r}'.format(lid))
+            self.logger.debug('Failed looking up SSO session with id={!r}'.format(sid))
             raise
 
     def expire_old_sessions(self, force=False):
