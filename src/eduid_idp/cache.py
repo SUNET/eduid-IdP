@@ -129,18 +129,15 @@ class SSOSessionCache(object):
         self._lock = lock
         if self._lock is None:
             self._lock = NoOpLock()
-        self.lid2data = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
 
     def remove_using_local_id(self, lid):
         """
         Remove entrys when SLO is executed.
 
-        :param lid: Local identifier as string (username?)
+        :param lid: Local identifier as string
         :return: True on success
         """
-        self.logger.debug("Purging SSO session, data : {!s}".format(self.lid2data.get(lid)))
-
-        return self.lid2data.delete(lid)
+        raise NotImplementedError()
 
     def add_session(self, lid, username, data):
         """
@@ -155,9 +152,7 @@ class SSOSessionCache(object):
         :param data: opaque, should be dict
         :return:
         """
-        self.lid2data.add(lid, {'username': username,
-                                'data': data,
-                                })
+        raise NotImplementedError()
 
     def get_using_local_id(self, lid):
         """
@@ -166,6 +161,39 @@ class SSOSessionCache(object):
         :param lid: Unique id as string
         :return: opaque, should be dict
         """
+        raise NotImplementedError()
+
+    def get_using_local_id(self, lid):
+        """
+        Lookup an SSO session using the local id (same `lid' previously used with add_session).
+
+        :param lid: Unique id as string
+        :return: opaque, should be dict
+        """
+        raise NotImplementedError()
+
+
+class SSOSessionCacheMem(SSOSessionCache):
+    """
+    This cache holds all SSO sessions, meaning information about what users
+    have a valid session with the IdP in order to not be authenticated again
+    (until the SSO session expires).
+    """
+
+    def __init__(self, logger, ttl, lock = None):
+        SSOSessionCache.__init__(self, logger, ttl, lock)
+        self.lid2data = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
+
+    def remove_using_local_id(self, lid):
+        self.logger.debug("Purging SSO session, data : {!s}".format(self.lid2data.get(lid)))
+        return self.lid2data.delete(lid)
+
+    def add_session(self, lid, username, data):
+        self.lid2data.add(lid, {'username': username,
+                                'data': data,
+                                })
+
+    def get_using_local_id(self, lid):
         try:
             this = self.lid2data.get(lid)
             if this:
@@ -175,7 +203,7 @@ class SSOSessionCache(object):
             raise
 
 
-class SSOSessionCacheMDB(object):
+class SSOSessionCacheMDB(SSOSessionCache):
     """
     This is a MongoDB version of SSOSessionCache().
 
@@ -186,11 +214,7 @@ class SSOSessionCacheMDB(object):
 
     def __init__(self, uri, logger, ttl, lock = None, expiration_freq = 60, conn = None, db_name = "eduid_idp",
                  **kwargs):
-        self.logger = logger
-        self._ttl = ttl
-        self._lock = lock
-        if self._lock is None:
-            self._lock = NoOpLock()
+        SSOSessionCache.__init__(self, logger, ttl, lock)
         self._expiration_freq = expiration_freq
         self._last_expire_at = None
 
@@ -214,27 +238,9 @@ class SSOSessionCacheMDB(object):
                 self.logger.error("Failed ensuring mongodb index, retrying ({!r})".format(e))
 
     def remove_using_local_id(self, lid):
-        """
-        Remove entrys when SLO is executed.
-
-        :param lid: Local identifier as string
-        :return: True on success
-        """
         return self.sso_sessions.remove({'local_id': lid}, w = 1, getLastError = True)
 
     def add_session(self, lid, username, data):
-        """
-        Add a new SSO session to the cache.
-
-        The mapping of uid -> user (and data) is used when a user visits another SP before
-        the SSO session expires, and the mapping of user -> uid is used if the user requests
-        logout (SLO).
-
-        :param lid: Unique local id as string (uniqueness and unability to guess is security critical!)
-        :param username: Username as string
-        :param data: opaque, should be dict
-        :return: True on success
-        """
         _ts = time.time()
         isodate = datetime.datetime.fromtimestamp(_ts, None)
         _doc = {'local_id': lid,
@@ -247,12 +253,6 @@ class SSOSessionCacheMDB(object):
         return True
 
     def get_using_local_id(self, lid):
-        """
-            Lookup an SSO session using the local id (same lid previously used with add_session).
-
-            :param lid: Unique id as string
-            :return: opaque, should be dict
-            """
         try:
             res = self.sso_sessions.find_one({'local_id': lid})
             if res:

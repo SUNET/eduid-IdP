@@ -143,7 +143,7 @@ class IdPApplication(object):
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               logger, _session_ttl)
         else:
-            _SSOSessions = eduid_idp.cache.SSOSessionCache(logger, _session_ttl, threading.Lock())
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(logger, _session_ttl, threading.Lock())
         self.IDP = server.Server(cfgfile, cache = _SSOSessions)
         # restore path
         sys.path = old_path
