@@ -82,7 +82,7 @@ import threading
 import cherrypy
 
 import eduid_idp
-from eduid_idp.login import SSO, do_verify
+from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 from eduid_idp.cache import ExpiringCache
 
@@ -153,6 +153,8 @@ class IdPApplication(object):
 
         # NOTE: The function pointers supplied to the AUTHN_BROKER is not for authentication,
         # but for displaying proper login forms it seems.
+        # NOTE: All IdP:s in a cluster *must* have the same exact setup of AUTHN_BROKER, since
+        # references to these contexts are passed as indexes essentially.
         self.AUTHN_BROKER = AuthnBroker()
         #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
         self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), eduid_idp.login.username_password_authn, 10,
@@ -205,7 +207,7 @@ class IdPApplication(object):
         self.logger.debug("--- Verify ---")
         assert not (self._lookup_userdata())  # just to verify when refactoring
         environ = {}
-        return do_verify(environ, self._my_start_response, self)
+        return eduid_idp.login.do_verify(environ, self._my_start_response, self)
 
     @cherrypy.expose
     def static(self, *_args, **_kwargs):
@@ -285,7 +287,6 @@ class IdPApplication(object):
         :param ref: object
         :return: authn context or None
         """
-        self.logger.debug("LOOKUP AUTHN BY REF {!r} CLASS {!r}".format(ref, class_ref))
         try:
             _authn = self.AUTHN_BROKER[ref]
             if class_ref is not None:
