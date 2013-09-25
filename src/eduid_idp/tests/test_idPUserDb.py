@@ -37,7 +37,8 @@ import logging
 
 from unittest import TestCase
 from vccs_client import VCCSPasswordFactor
-from idp_user import IdPUserDb
+
+import eduid_idp
 
 logger = logging.getLogger()
 
@@ -98,7 +99,8 @@ class FakeAuthClient():
 class TestIdPUserDb(TestCase):
     def setUp(self):
         config = None
-        self.idp_userdb = IdPUserDb(logger, config, userdb = FakeUserDb(), auth_client = FakeAuthClient())
+        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, userdb = FakeUserDb(),
+                                                       auth_client = FakeAuthClient())
 
     def test_lookup_user(self):
         _this = self.idp_userdb.lookup_user('test@example.com')
