@@ -79,19 +79,31 @@ class IdPUser():
 
 class IdPUserDb():
 
-    def __init__(self, logger, config):
+    def __init__(self, logger, config, userdb = None, auth_client = None):
         self.logger = logger
         self.config = config
-        self.vccs_client = vccs_client.VCCSClient()
-        self.userdb = None
-        if config.userdb_mongo_uri and config.userdb_mongo_database:
-            settings = {'MONGO_URI': config.userdb_mongo_uri,
-                        }
-            celery.conf.update(settings)
-        self.userdb = get_attribute_manager(celery)
+        self.auth_client = auth_client
+        if auth_client is None:
+            self.auth_client = vccs_client.VCCSClient()
+        self.userdb = userdb
+        if userdb is None:
+            if config.userdb_mongo_uri and config.userdb_mongo_database:
+                settings = {'MONGO_URI': config.userdb_mongo_uri,
+                            }
+                celery.conf.update(settings)
+            self.userdb = get_attribute_manager(celery)
 
     def verify_username_and_password(self, username, password):
-        # verify username and password
+        """
+        Attempt to verify that a password is valid for a specific user.
+
+        Currently, the naive approach of looping through all the users password credentials
+        is taken. This is bad because the more passwords a user has, the more likely an
+        online attacker is to guess any one of them.
+        :param username: string
+        :param password: string
+        :return: IdPUser on successful authentication
+        """
         user = self.lookup_user(username)
         if not user:
             self.logger.info("Unknown user : {!r}".format(username))
@@ -105,7 +117,7 @@ class IdPUserDb():
             factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
             self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
                     username, cred['id'], factor))
-            if self.vccs_client.authenticate(username, [factor]):
+            if self.auth_client.authenticate(username, [factor]):
                 self.logger.debug("VCCS authenticated user {!r}".format(user))
                 return user
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
