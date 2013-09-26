@@ -231,7 +231,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
         self.sso_sessions = self.db.sso_sessions
         for this in xrange(2):
             try:
-                self.sso_sessions.ensure_index('expire_at', name = 'expire_at_idx', unique = False)
+                self.sso_sessions.ensure_index('created_ts', name = 'created_ts_idx', unique = False)
                 self.sso_sessions.ensure_index('session_id', name = 'session_id_idx', unique = True)
                 break
             except pymongo.errors.AutoReconnect, e:
