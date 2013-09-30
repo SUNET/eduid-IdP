@@ -315,54 +315,58 @@ class SSO(Service):
             method, reference = auth_info[0]
             self.logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
             # `method' is, for example, the function username_password_authn
-            return method(self.environ, self.start_response, reference, key,
-                          redirect_uri, self.logger, self.config)
+            return self.show_login_page(self.environ, self.start_response, reference, key, redirect_uri)
         else:
             resp = Unauthorized("No usable authentication method")
             return resp(self.environ, self.start_response)
+
+    def show_login_page(self, environ, start_response, reference, key, redirect_uri):
+        """
+        Display the login form for all authentication methods.
+
+        SSO._not_authn() chooses what authentication method to use based on
+        requested AuthnContext and local configuration, and then calls this method
+        to render the login page for this method.
+
+        :param environ: dict() with various request state
+        :param start_response: WSGI-like callback for HTTP response
+        :param reference: AuthnBroker() reference to invoked authn context
+        :param key: string with key to data about this request in the IDP.ticket state dict
+        :param redirect_uri: string with URL to proceed to after authentication
+        :returns: HTTP response data as string
+        """
+        argv = {
+            "action": "/verify",
+            "username": "",
+            "password": "",
+            "key": key,
+            "authn_reference": reference,
+            "redirect_uri": redirect_uri,
+            "alert_msg": "",
+        }
+
+        # if idp.FailCount is present, it is always an integer
+        _fc = environ.get("idp.FailCount", 0)
+        if _fc > 0:
+            argv["alert_msg"] = "Incorrect username or password ({!s} attempts)".format(_fc)
+
+        self.logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
+
+        static_fn = eduid_idp.mischttp.static_filename(self.config, 'login.html')
+
+        if static_fn:
+            res = eduid_idp.mischttp.static_file(environ, start_response, static_fn)
+            if len(res) == 1:
+                res = res[0]
+                # apply simplistic HTML formatting to template in 'res'
+            return res.format(**argv)
+
+        return eduid_idp.mischttp.not_found(environ, start_response)
 
 
 # -----------------------------------------------------------------------------
 # === Authentication ====
 # -----------------------------------------------------------------------------
-
-
-def username_password_authn(environ, start_response, reference, key,
-                            redirect_uri, logger, config):
-    """
-    Display the login form for standard username-password authentication.
-
-    SSO._not_authn() chooses what authentication method to use based on
-    requested AuthnContext and local configuration, and then calls this method
-    to render the login page for this method.
-    """
-    argv = {
-        "action": "/verify",
-        "username": "",
-        "password": "",
-        "key": key,
-        "authn_reference": reference,
-        "redirect_uri": redirect_uri,
-        "alert_msg": "",
-    }
-
-    # if idp.FailCount is present, it is always an integer
-    _fc = environ.get("idp.FailCount", 0)
-    if _fc > 0:
-        argv["alert_msg"] = "Incorrect username or password ({!s} attempts)".format(_fc)
-
-    logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
-
-    static_fn = eduid_idp.mischttp.static_filename(config, 'login.html')
-
-    if static_fn:
-        res = eduid_idp.mischttp.static_file(environ, start_response, static_fn)
-        if len(res) == 1:
-            res = res[0]
-            # apply simplistic HTML formatting to template in 'res'
-        return res.format(**argv)
-
-    return eduid_idp.mischttp.not_found(environ, start_response)
 
 
 def verify_username_and_password(dic, idp_app):

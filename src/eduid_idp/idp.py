@@ -149,17 +149,13 @@ class IdPApplication(object):
         sys.path = old_path
         self.IDP.ticket = ExpiringCache('TicketCache', logger, 5 * 60, threading.Lock())
 
-        authn_authority = self.IDP.config.entityid
+        _my_id = self.IDP.config.entityid
 
         # NOTE: The function pointers supplied to the AUTHN_BROKER is not for authentication,
         # but for displaying proper login forms it seems.
-        # NOTE: All IdP:s in a cluster *must* have the same exact setup of AUTHN_BROKER, since
-        # references to these contexts are passed as indexes essentially.
         self.AUTHN_BROKER = AuthnBroker()
-        #self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), two_factor_authn, 20, authn_authority)
-        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), eduid_idp.login.username_password_authn, 10,
-                              authn_authority)
-        self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, authn_authority)
+        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), 1, 10, _my_id, reference="AL1,AL2-Password")
+        self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, _my_id, reference="AL0")
 
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
