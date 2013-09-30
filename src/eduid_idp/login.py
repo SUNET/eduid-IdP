@@ -343,12 +343,18 @@ class SSO(Service):
             "authn_reference": reference,
             "redirect_uri": redirect_uri,
             "alert_msg": "",
+            "sp_entity_id": "",
         }
 
         # if idp.FailCount is present, it is always an integer
         _fc = environ.get("idp.FailCount", 0)
         if _fc > 0:
             argv["alert_msg"] = "Incorrect username or password ({!s} attempts)".format(_fc)
+
+        try:
+            argv["sp_entity_id"] = self.req_info.message.issuer.text
+        except KeyError:
+            pass
 
         self.logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
