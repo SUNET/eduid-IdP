@@ -147,7 +147,7 @@ class IdPApplication(object):
         self.IDP = server.Server(cfgfile, cache = _SSOSessions)
         # restore path
         sys.path = old_path
-        self.IDP.ticket = ExpiringCache('TicketCache', logger, 5 * 60, threading.Lock())
+        self.IDP.ticket = eduid_idp.login.SSOLoginData(self.IDP, 'TicketCache', logger, 5 * 60, threading.Lock())
 
         _my_id = self.IDP.config.entityid
 

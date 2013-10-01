@@ -30,6 +30,115 @@ from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 
 
+class SSOLoginData(eduid_idp.cache.ExpiringCache):
+
+    def __init__(self, idp_app, name, logger, ttl, lock = None):
+        """
+        Login data is state kept between rendering the login screen, to when the user is
+        completely logged in and redirected from the IdP to the original resource the
+        user is accessing.
+
+        :param idp_app: saml2.server.Server() instance
+        :param name: string describing this cache
+        :param logger: logging logger
+        :param ttl: expire time of data in seconds
+        :param lock: threading.Lock() instance
+        """
+        self.IDP = idp_app
+        eduid_idp.cache.ExpiringCache.__init__(self, name, logger, ttl, lock)
+
+    def store_ticket(self, ticket):
+        """
+        Add an entry to the IDP.ticket cache.
+
+        Ticket must contain SAMLRequest and is typically
+
+        {'RelayState': '/path',
+         'SAMLRequest': 'nVLB...==',
+         'req_info': <saml2.request.AuthnRequest object>,
+         ...
+        }
+
+        :returns: Key as string
+        """
+        key = self.key(ticket["SAMLRequest"])
+        self.logger.debug("_store_ticket in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(ticket)))
+        # store the AuthnRequest
+        self.add(key, ticket)
+        return key
+
+    def get_ticket(self, info):
+        """
+        _info is redirect HTTP query parameters.
+
+        Will include a 'key' parameter, or a 'SAMLRequest'.
+
+        Ticket is typically
+
+        {'RelayState': '/path',
+         'SAMLRequest': 'nVLB...==',
+         'req_info': <saml2.request.AuthnRequest object>,
+         ...
+        }
+
+        :returns: ResultBool, Ticket as dict
+        """
+        # Try ticket-cache lookup based on key, or key derived from SAMLRequest
+        if "key" in info:
+            _key = info["key"]
+        elif "SAMLRequest" in info:
+            _key = self.key(info["SAMLRequest"])
+        else:
+            return False, BadRequest("Missing SAMLRequest, please re-initiate login")
+            # lookup
+        _data = self.get(_key)
+
+        if _data is None:
+            self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
+            if "key" in info:
+                return False, BadRequest("Missing IdP ticket, please re-initiate login")
+                # cache miss, parse SAMLRequest
+            _data = info
+            _data["req_info"] = self._parse_SAMLRequest(info)
+        else:
+            self.logger.debug("Retreived IDP.ticket(key={!r}) :\n{!s}".format(
+                _key, pprint.pformat(_data)))
+
+        return True, _data
+
+    def _parse_SAMLRequest(self, info):
+        """
+        Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
+        instance.
+
+        If the SAMLRequest is signed, the signature is validated and a BadRequest()
+        returned on failure.
+
+        :returns: AuthnRequest or BadRequest() instance
+        """
+        self.logger.debug("SAML request : {!r}".format(info["SAMLRequest"]))
+        _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], BINDING_HTTP_REDIRECT)
+
+        self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
+            _req_info.message, _req_info.message))
+
+        if "SigAlg" in info and "Signature" in info:  # Signed request
+            issuer = _req_info.message.issuer.text
+            _certs = self.IDP.metadata.certs(issuer, "any", "signing")
+            verified_ok = False
+            for cert in _certs:
+                if verify_redirect_signature(info, cert):
+                    verified_ok = True
+                    break
+            if not verified_ok:
+                self.logger.info("Message signature verification failure")
+                raise eduid_idp.error.BadRequest("Message signature verification failure",
+                                                 logger = self.logger)
+        else:
+            self.logger.debug("No signature in SAMLRequest")
+        return _req_info
+
+
 # -----------------------------------------------------------------------------
 # === Single log in ====
 # -----------------------------------------------------------------------------
@@ -114,7 +223,7 @@ class SSO(Service):
         _info = self.unpack_redirect()
         self.logger.debug("FREDRIK: Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        _res, _ticket = self._get_ticket(_info)
+        _res, _ticket = self.IDP.ticket.get_ticket(_info)
         if not _res or isinstance(_ticket, Response):
             # result is False and/or _ticket is an instance of Response (or BadRequest etc.)
             return _ticket(self.environ, self.start_response)
@@ -144,7 +253,7 @@ class SSO(Service):
         # since when it is done here it will show page reloads (Ctrl+R) as failed login
         # attempts to the user.
         _ticket["FailCount"] = _fc + 1
-        key = self._store_ticket(_ticket)
+        key = self.IDP.ticket.store_ticket(_ticket)
 
         return self._not_authn(key, self.req_info.message.requested_authn_context)
 
@@ -163,7 +272,7 @@ class SSO(Service):
         # Request authentication, either because there was no self.user
         # or because it was requested using SAML2 ForceAuthn
         info["req_info"] = self.req_info
-        key = self._store_ticket(info)
+        key = self.IDP.ticket.store_ticket(info)
         return self._not_authn(key, _req.requested_authn_context)
 
     def artifact(self):
@@ -209,96 +318,6 @@ class SSO(Service):
         self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
                                                             self.destination))
         return True, None
-
-    def _store_ticket(self, ticket):
-        """
-        Add an entry to the IDP.ticket cache.
-
-        Ticket must contain SAMLRequest and is typically
-
-        {'RelayState': '/path',
-         'SAMLRequest': 'nVLB...==',
-         'req_info': <saml2.request.AuthnRequest object>,
-         ...
-        }
-
-        :returns: Key as string
-        """
-        key = self.IDP.ticket.key(ticket["SAMLRequest"])
-        self.logger.debug("_store_ticket in IDP.ticket (key {!r}):\n{!s}".format(key, pprint.pformat(ticket)))
-        # store the AuthnRequest
-        self.IDP.ticket.add(key, ticket)
-        return key
-
-    def _get_ticket(self, info):
-        """
-        _info is redirect HTTP query parameters.
-
-        Will include a 'key' parameter, or a 'SAMLRequest'.
-
-        Ticket is typically
-
-        {'RelayState': '/path',
-         'SAMLRequest': 'nVLB...==',
-         'req_info': <saml2.request.AuthnRequest object>,
-         ...
-        }
-
-        :returns: ResultBool, Ticket as dict
-        """
-        # Try ticket-cache lookup based on key, or key derived from SAMLRequest
-        if "key" in info:
-            _key = info["key"]
-        elif "SAMLRequest" in info:
-            _key = self.IDP.ticket.key(info["SAMLRequest"])
-        else:
-            return False, BadRequest("Missing SAMLRequest, please re-initiate login")
-            # lookup
-        _data = self.IDP.ticket.get(_key)
-
-        if _data is None:
-            self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
-            if "key" in info:
-                return False, BadRequest("Missing IdP ticket, please re-initiate login")
-                # cache miss, parse SAMLRequest
-            _data = info
-            _data["req_info"] = self._parse_SAMLRequest(info)
-        else:
-            self.logger.debug("Retreived IDP.ticket(key={!r}) :\n{!s}".format(
-                _key, pprint.pformat(_data)))
-
-        return True, _data
-
-    def _parse_SAMLRequest(self, info):
-        """
-        Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
-        instance.
-
-        If the SAMLRequest is signed, the signature is validated and a BadRequest()
-        returned on failure.
-
-        :returns: AuthnRequest or BadRequest() instance
-        """
-        self.logger.debug("SAML request : {!r}".format(info["SAMLRequest"]))
-        _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], BINDING_HTTP_REDIRECT)
-
-        self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
-            _req_info.message, _req_info.message))
-
-        if "SigAlg" in info and "Signature" in info:  # Signed request
-            issuer = _req_info.message.issuer.text
-            _certs = self.IDP.metadata.certs(issuer, "any", "signing")
-            verified_ok = False
-            for cert in _certs:
-                if verify_redirect_signature(info, cert):
-                    verified_ok = True
-                    break
-            if not verified_ok:
-                resp = BadRequest("Message signature verification failure")
-                return resp(self.environ, self.start_response)
-        else:
-            self.logger.debug("No signature in SAMLRequest")
-        return _req_info
 
     def _not_authn(self, key, requested_authn_context):
         """
