@@ -332,13 +332,14 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
                    # enables X-Forwarded-For, since BCP is to run this server
                    # behind a webserver that handles SSL
                    'tools.proxy.on': True,
-    }
+                   'request.show_tracebacks': config.debug,
+                   }
     if config.server_cert and config.server_key:
         _ssl_opts = {'server.ssl_module': config.ssl_adapter,
                      'server.ssl_certificate': config.server_cert,
                      'server.ssl_private_key': config.server_key,
                      #'server.ssl_certificate_chain':
-        }
+                     }
         cherry_conf.update(_ssl_opts)
 
     if config.logdir:
