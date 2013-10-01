@@ -375,7 +375,7 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def verify_username_and_password(dic, idp_app):
+def verify_username_and_password(dic, idp_app, min_length=0):
     """
     :params dic: dict() with POST parameters
     :params idp_app: IdPApplication instance
@@ -386,7 +386,8 @@ def verify_username_and_password(dic, idp_app):
 
     res = idp_app.userdb.verify_username_and_password(username, password)
     if res:
-        return True, res
+        if len(password) >= min_length:
+            return True, res
     return False, ""
 
 
@@ -417,6 +418,8 @@ def do_verify(environ, start_response, idp_app):
     try:
         if _authn['class_ref'] == 'urn:oasis:names:tc:SAML:2.0:ac:classes:Password':
             _ok, user = verify_username_and_password(query, idp_app)
+        elif _authn['class_ref'] == 'http://www.swamid.se/assurance/al2':
+            _ok, user = verify_username_and_password(query, idp_app, min_length=20)
         else:
             idp_app.logger.info("Authentication for class {!r} not implemented".format(_authn['class_ref']))
             raise NotImplementedError()
