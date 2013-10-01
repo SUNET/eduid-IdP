@@ -23,6 +23,8 @@ from saml2 import time_util
 from urlparse import parse_qs
 from Cookie import SimpleCookie
 
+import eduid_idp
+
 
 class Response(object):
     _template = None
@@ -54,11 +56,6 @@ class Response(object):
         return message
 
 
-class NotFound(Response):
-    _status = '404 NOT FOUND'
-    _template = "<html>The requested resource %s was not found on this server</html>"
-
-
 class Redirect(Response):
     _template = '<html>\n<head><title>Redirecting to %s</title></head>\n' \
                 '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
@@ -70,20 +67,6 @@ class Redirect(Response):
         self.headers.append(('Location', location))
         start_response(self.status, self.headers)
         return self.response((location, location, location))
-
-
-class Unauthorized(Response):
-    _status = "401 Unauthorized"
-    _template = "<html>%s</html>"
-
-
-class BadRequest(Response):
-    _status = "400 Bad Request"
-    _template = "<html>%s</html>"
-
-
-class ServiceError(Response):
-    _status = '500 Internal Service Error'
 
 
 def geturl(query = True, path = True):
@@ -136,23 +119,15 @@ def static_file(environ, start_response, filename):
     ext = filename.rsplit('.', 1)[-1]
 
     if not ext in types:
-        resp = NotFound()
-        return resp(environ, start_response)
+        raise eduid_idp.error.NotFound()
 
     try:
         text = open(filename).read()
     except IOError:
-        resp = NotFound()
-        return resp(environ, start_response)
+        raise eduid_idp.error.NotFound()
 
     start_response('200 Ok', [('Content-Type', types[ext])])
     return [text]
-
-
-def not_found(environ, start_response):
-    """Called if no URL matches."""
-    resp = NotFound()
-    return resp(environ, start_response)
 
 
 # ----------------------------------------------------------------------------

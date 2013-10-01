@@ -17,7 +17,7 @@ import pprint
 import cherrypy
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Response, BadRequest, Unauthorized, ServiceError, Redirect
+from eduid_idp.mischttp import Redirect
 import eduid_idp.mischttp
 
 from saml2.s_utils import UnknownPrincipal
@@ -81,7 +81,7 @@ class SSOLoginData(eduid_idp.cache.ExpiringCache):
          ...
         }
 
-        :returns: ResultBool, Ticket as dict
+        :returns: Ticket as dict
         """
         # Try ticket-cache lookup based on key, or key derived from SAMLRequest
         if "key" in info:
@@ -89,22 +89,23 @@ class SSOLoginData(eduid_idp.cache.ExpiringCache):
         elif "SAMLRequest" in info:
             _key = self.key(info["SAMLRequest"])
         else:
-            return False, BadRequest("Missing SAMLRequest, please re-initiate login")
-            # lookup
+            raise eduid_idp.error.BadRequest("Missing SAMLRequest, please re-initiate login", logger = self.logger)
+
+        # lookup
         _data = self.get(_key)
 
         if _data is None:
             self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
             if "key" in info:
-                return False, BadRequest("Missing IdP ticket, please re-initiate login")
-                # cache miss, parse SAMLRequest
+                raise eduid_idp.error.BadRequest("Missing IdP ticket, please re-initiate login", logger = self.logger)
+
+            # cache miss, parse SAMLRequest
             _data = info
             _data["req_info"] = self._parse_SAMLRequest(info)
         else:
-            self.logger.debug("Retreived IDP.ticket(key={!r}) :\n{!s}".format(
-                _key, pprint.pformat(_data)))
+            self.logger.debug("Retreived IDP.ticket(key={!r}) :\n{!s}".format(_key, pprint.pformat(_data)))
 
-        return True, _data
+        return _data
 
     def _parse_SAMLRequest(self, info):
         """
@@ -132,8 +133,7 @@ class SSOLoginData(eduid_idp.cache.ExpiringCache):
                     break
             if not verified_ok:
                 self.logger.info("Message signature verification failure")
-                raise eduid_idp.error.BadRequest("Message signature verification failure",
-                                                 logger = self.logger)
+                raise eduid_idp.error.BadRequest("Message signature verification failure", logger = self.logger)
         else:
             self.logger.debug("No signature in SAMLRequest")
         return _req_info
@@ -169,13 +169,10 @@ class SSO(Service):
 
         self.logger.debug("perform_login :\n{!s}".format(pprint.pformat(info)))
         if not info:
-            resp = BadRequest('Error parsing request or no request')
-            return resp(self.environ, self.start_response)
-
+            raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
         try:
-            _ok, _resp = self._verify_request(info, binding_in)
-            if not _ok:
-                return _resp(self.environ, self.start_response)
+            if not self._verify_request(info, binding_in):
+                raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(self.req_info.message)
         except UnknownPrincipal as excp:
             self.logger.error("Could not verify request: UnknownPrincipal: {!s}".format(excp))
@@ -192,17 +189,12 @@ class SSO(Service):
 
         self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
 
-        try:
-            #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
-            _authn = self.environ["idp.authn"]
-            self.logger.debug("User authenticated using Authn {!r}".format(_authn))
-            self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
-            _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
-                                                   authn = _authn, sign_assertion = True, **resp_args)
-        except Exception, excp:
-            self.logger.error("Failed creating AuthnResponse:\n {!s}".format(exception_trace(excp)))
-            resp = ServiceError("Exception: %s" % (excp,))
-            return resp(self.environ, self.start_response)
+        #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
+        _authn = self.environ["idp.authn"]
+        self.logger.debug("User authenticated using Authn {!r}".format(_authn))
+        self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
+        _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
+                                               authn = _authn, sign_assertion = True, **resp_args)
 
         self.logger.info("AuthNResponse\n\n{!r}\n\n".format(_resp))
 
@@ -221,13 +213,9 @@ class SSO(Service):
         """ This is the HTTP-redirect endpoint """
         self.logger.info("--- In SSO Redirect ---")
         _info = self.unpack_redirect()
-        self.logger.debug("FREDRIK: Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
+        self.logger.debug("Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        _res, _ticket = self.IDP.ticket.get_ticket(_info)
-        if not _res or isinstance(_ticket, Response):
-            # result is False and/or _ticket is an instance of Response (or BadRequest etc.)
-            return _ticket(self.environ, self.start_response)
-
+        _ticket = self.IDP.ticket.get_ticket(_info)
         self.req_info = _ticket['req_info']
 
         _fc = _ticket.get("FailCount", 0)
@@ -263,8 +251,7 @@ class SSO(Service):
         """
         self.logger.info("--- In SSO POST ---")
         info = self.unpack_either()
-        self.req_info = self.IDP.parse_authn_request(
-            info["SAMLRequest"], BINDING_HTTP_POST)
+        self.req_info = self.IDP.parse_authn_request(info["SAMLRequest"], BINDING_HTTP_POST)
         _req = self.req_info.message
         if self.user and not _req.force_authn:
             self.logger.debug("Continuing with posted Authn request {!r}".format(info))
@@ -279,9 +266,8 @@ class SSO(Service):
         # Can be either by HTTP_Redirect or HTTP_POST
         info = self.unpack_either()
         if not info:
-            resp = BadRequest("Missing query")
-            return resp(self.environ, self.start_response)
-            # exchange artifact for request
+            raise eduid_idp.error.BadRequest('Missing query', logger = self.logger)
+        # exchange artifact for request
         request = self.IDP.artifact2message(info["SAMLart"], "spsso")
         return self.perform_login(request, BINDING_HTTP_ARTIFACT, info["RelayState"])
 
@@ -292,21 +278,19 @@ class SSO(Service):
 
         :param query: The SAML query, transport encoded
         :param binding: Which binding the query came in over as string
-        :return: Status, Response where Status is a bool()
+        :return: True on success
         Status is True if query is OK, and Response is either a Response() or None
         if Status is True.
         """
         if not query:
             self.logger.info("Missing QUERY")
-            resp = Unauthorized('Unknown user')
-            return False, resp(self.environ, self.start_response)
+            raise eduid_idp.error.Unauthorized("Unknown user", logger = self.logger)
 
         if not self.req_info:
             self.req_info = self.IDP.parse_authn_request(query, binding)
             self.logger.info("SAML query parsed OK")
         else:
-            self.logger.debug("verify_request acting on previously parsed self.req_info {!s}".format(
-                self.req_info))
+            self.logger.debug("verify_request acting on previously parsed self.req_info {!s}".format(self.req_info))
 
         self.logger.debug("AuthnRequest {!r}".format(self.req_info.message))
 
@@ -315,9 +299,8 @@ class SSO(Service):
             bindings = self.response_bindings,
             entity_id = self.req_info.message.issuer.text)
 
-        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out,
-                                                            self.destination))
-        return True, None
+        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
+        return True
 
     def _not_authn(self, key, requested_authn_context):
         """
@@ -335,9 +318,8 @@ class SSO(Service):
             self.logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
             # `method' is, for example, the function username_password_authn
             return self.show_login_page(self.environ, self.start_response, reference, key, redirect_uri)
-        else:
-            resp = Unauthorized("No usable authentication method")
-            return resp(self.environ, self.start_response)
+
+        raise eduid_idp.error.Unauthorized("No usable authentication method", logger = self.logger)
 
     def show_login_page(self, environ, start_response, reference, key, redirect_uri):
         """
@@ -429,8 +411,7 @@ def do_verify(environ, start_response, idp_app):
     if authn_ref:
         _authn = idp_app.get_authn_by_ref(authn_ref)
     if not _authn:
-        resp = Unauthorized("Bad authentication reference")
-        return resp(environ, start_response)
+        raise eduid_idp.error.Unauthorized("Bad authentication reference", logger = idp_app.logger)
 
     idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(_authn['class_ref'], authn_ref))
 
@@ -441,7 +422,7 @@ def do_verify(environ, start_response, idp_app):
             _ok, user = verify_username_and_password(query, idp_app, min_length=20)
         else:
             idp_app.logger.info("Authentication for class {!r} not implemented".format(_authn['class_ref']))
-            raise NotImplementedError()
+            raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented", logger=idp_app.logger)
     except Exception as excp:
         idp_app.logger.error("Failed authenticating user:\n {!s}".format(exception_trace(excp)))
         _ok = False
@@ -454,7 +435,7 @@ def do_verify(environ, start_response, idp_app):
             lox = str(_referer)
             resp = Redirect(lox, content = "text/html")
         else:
-            resp = Unauthorized("Unknown user or wrong password")
+            raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
     else:
         idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
         # NOTE: It is important than noone can guess one of these uids, as that would allow impersonation.

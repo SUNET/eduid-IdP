@@ -40,7 +40,8 @@ __authors__ = ['Fredrik Thulin']
 from . import config
 from . import idp_user
 from . import service
+from . import cache
 from . import login
 from . import logout
 from . import mischttp
-from . import cache
+from . import error

@@ -84,7 +84,6 @@ import cherrypy
 import eduid_idp
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
-from eduid_idp.cache import ExpiringCache
 
 from saml2 import server
 
@@ -176,7 +175,7 @@ class IdPApplication(object):
             # seldomly used, but part of standard
             return SSO(environ, self._my_start_response, self).artifact()
 
-        return eduid_idp.mischttp.not_found(environ, self._my_start_response)
+        raise eduid_idp.error.NotFound(logger = self.logger)
 
     @cherrypy.expose
     def slo(self, *_args, **_kwargs):
@@ -195,7 +194,7 @@ class IdPApplication(object):
             # SOAP is commonly used for SLO
             return SLO(environ, self._my_start_response, self).soap()
 
-        return eduid_idp.mischttp.not_found(environ, self._my_start_response)
+        raise eduid_idp.error.NotFound(logger = self.logger)
 
     @cherrypy.expose
     def verify(self, *_args, **_kwargs):
@@ -217,7 +216,8 @@ class IdPApplication(object):
         if static_fn:
             self.logger.debug("Serving static file {!r}".format(static_fn))
             return eduid_idp.mischttp.static_file(environ, self._my_start_response, static_fn)
-        return eduid_idp.mischttp.not_found(environ, self._my_start_response)
+
+        raise eduid_idp.error.NotFound(logger = self.logger)
 
     def _my_start_response(self, status, headers):
         """
