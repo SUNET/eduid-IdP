@@ -340,10 +340,8 @@ class SSO(Service):
 
         self.logger.debug("AuthnRequest {!r}".format(ticket.req_info.message))
 
-        self.binding_out, self.destination = self.IDP.pick_binding(
-            "assertion_consumer_service",
-            bindings = self.response_bindings,
-            entity_id = ticket.req_info.message.issuer.text)
+        self.binding_out, self.destination = self.IDP.pick_binding("assertion_consumer_service",
+                                                                   entity_id = ticket.req_info.message.issuer.text)
 
         self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
         return True
