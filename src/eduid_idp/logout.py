@@ -14,7 +14,7 @@ Code handling Single Log Out requests.
 import pprint
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Response, Redirect, BadRequest, ServiceError, delete_cookie
+from eduid_idp.mischttp import Response, Redirect, delete_cookie
 import eduid_idp.mischttp
 
 from saml2 import BINDING_HTTP_REDIRECT
@@ -84,8 +84,7 @@ class SLO(Service):
         except Exception as exc:
             self.logger.error("Bad request parsing logout request : {!r}".format(exc))
             self.logger.debug("Exception parsing logout request :\n{!s}".format(exception_trace(exc)))
-            resp = BadRequest("Failed parsing logout request")
-            return resp(self.environ, self.start_response)
+            raise eduid_idp.error.BadRequest("Failed parsing logout request", logger = self.logger)
 
         req_info.binding = binding
         if 'RelayState' in info:
@@ -110,17 +109,14 @@ class SLO(Service):
 
         status_code = self._logout_using_name_id(_lid, _name_id)
         self.logger.debug("Logout of local-id {!r} result : {!r}".format(_lid, status_code))
-        if isinstance(status_code, basestring):
-            resp = self._logout_response(req_info, status_code)
-        else:
-            resp = status_code
+        resp = self._logout_response(req_info, status_code)
         return resp(self.environ, self.start_response)
 
     def _logout_using_name_id(self, local_id, name_id):
         """
         :param local_id: Local ID (db key in SSO session database)
         :param name_id: NameID from LogoutRequest
-        :return: SAML StatusCode (string) or ServiceError() on error
+        :return: SAML StatusCode (string)
         """
         if not local_id or not name_id:
             self.logger.error("Could not find local identifier (SSO session key) using provided name-id")
@@ -134,8 +130,7 @@ class SLO(Service):
             res = self.IDP.session_db.remove_authn_statements(name_id)
         except KeyError as exc:
             self.logger.error("ServiceError removing authn : %s" % exc)
-            resp = ServiceError("%s" % exc)
-            return resp(self.environ, self.start_response)
+            raise eduid_idp.error.ServiceError(logger = self.logger)
         return saml2.samlp.STATUS_SUCCESS
 
     def _logout_response(self, req_info, status_code, sign_response=True):
