@@ -14,14 +14,10 @@ Miscellaneous HTTP related functions.
 """
 
 import os
-import time
 import base64
 import cherrypy
 
-from saml2 import time_util
-
 from urlparse import parse_qs
-from Cookie import SimpleCookie
 
 import eduid_idp
 
@@ -56,17 +52,11 @@ class Response(object):
         return message
 
 
-class Redirect(Response):
-    _template = '<html>\n<head><title>Redirecting to %s</title></head>\n' \
-                '<body>\nYou are being redirected to <a href="%s">%s</a>\n' \
-                '</body>\n</html>'
-    _status = '302 Found'
-
-    def __call__(self, environ, start_response):
-        location = self.message
-        self.headers.append(('Location', location))
-        start_response(self.status, self.headers)
-        return self.response((location, location, location))
+class Redirect(cherrypy.HTTPRedirect):
+    """
+    Class 'copy' just to avoid having references to CherryPy in other modules.
+    """
+    pass
 
 
 def geturl(query = True, path = True):
@@ -141,16 +131,14 @@ def read_cookie(logger):
 
     :returns: string with cookie content, or None
     """
-    kaka = cherrypy.request.cookie
-    logger.debug("Parsing cookie(s): %s" % kaka)
-    if not kaka:
-        return None
-    _authn = kaka.get("idpauthn")
+    cookie = cherrypy.request.cookie
+    logger.debug("Parsing cookie(s): {!s}".format(cookie))
+    _authn = cookie.get("idpauthn")
     if _authn:
         try:
             cookie_val = base64.b64decode(_authn.value)
             logger.debug("idpauthn cookie value={!r}".format(cookie_val))
-            return cookie_val
+            return cookie_val  # XXX should maybe split on ':' to be consistent with set_cookie
         except KeyError:
             return None
     else:
@@ -158,58 +146,38 @@ def read_cookie(logger):
     return None
 
 
-# XXX cherrypy offers some significantly simpler ways to set cookies using
-# cherrypy.response.cookie - any reason to not use those? /Fredrik 2013-08
-
-def _expiration(timeout, tformat = "%a, %d-%b-%Y %H:%M:%S GMT"):
-    """
-
-    :param timeout:
-    :param tformat:
-    :return:
-    """
-    if timeout == "now":
-        return time_util.instant(tformat)
-    elif timeout == "dawn":
-        return time.strftime(tformat, time.gmtime(0))
-    else:
-        # validity time should match lifetime of assertions
-        return time_util.in_a_while(minutes = timeout, format = tformat)
-
-
 def delete_cookie(name, logger):
-    kaka = cherrypy.request.cookie
-    logger.debug("delete KAKA: %s" % kaka)
-    if kaka:
-        cookie_obj = SimpleCookie(kaka)
-        morsel = cookie_obj.get(name, None)
-        cookie = SimpleCookie()
-        cookie[name] = ""
-        cookie[name]['path'] = "/"
-        logger.debug("Expire: %s" % morsel)
-        cookie[name]["expires"] = _expiration("dawn")
-        return tuple(cookie.output().split(": ", 1))
-    return None
+    """
+    Ask browser to delete a cookie.
+
+    :param name: cookie name as string
+    :param logger: logging logger
+    :return: True on success
+    """
+    logger.debug("Delete cookie: {!s}".format(name))
+    return set_cookie(name, 0, '/', logger)
 
 
 def set_cookie(name, expire, path, logger, *args):
     """
-    Create Cookies
+    Ask browser to store a cookie.
+
+    Since eduID.se is HTTPS only, the cookie parameter `Secure' is set.
 
     :param name: Cookie identifier (string)
     :param expire: Number of minutes before this cookie goes stale
     :param path: The path specification for the cookie
     :param logger: logging instance
-    :return: A tuple to be added to headers
+    :return: True on success
     """
-    cookie = SimpleCookie()
+    cookie = cherrypy.response.cookie
     cookie[name] = base64.b64encode(":".join(args))
-    if path:
-        cookie[name]["path"] = path
-    cookie[name]["expires"] = _expiration(expire)
-    logger.debug("Cookie expires ({!r} minutes) : {!s}".format(expire, cookie[name]["expires"]))
-    logger.debug("set KAKA: %s" % cookie)
-    return tuple(cookie.output().split(": ", 1))
+    cookie[name]['path'] = path
+    cookie[name]['max-age'] = expire * 60
+    cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
+
+    logger.debug("Set cookie (expires {!r} minutes) : {!s}".format(expire, cookie))
+    return True
 
 
 def parse_query_string():

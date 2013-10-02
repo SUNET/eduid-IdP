@@ -161,14 +161,9 @@ class SLO(Service):
         self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 
         # Delete the SSO session cookie in the browser
-        delco = delete_cookie("idpauthn", self.logger)
-        if delco:
-            ht_args["headers"].append(delco)
+        delete_cookie("idpauthn", self.logger)
 
         if req_info.binding == BINDING_HTTP_REDIRECT:
             _loc = [v for (k, v) in ht_args['headers'] if k == 'Location']
-            # avoid redundant Location header added by Redirect()
-            _new_h = [(k, v) for (k, v) in ht_args['headers'] if k != 'Location']
-            ht_args['headers'] = _new_h
-            return Redirect(_loc[0], headers=_new_h)
+            raise eduid_idp.mischttp.Redirect(_loc)
         return Response(ht_args['data'], **ht_args)

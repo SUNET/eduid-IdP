@@ -221,11 +221,8 @@ class SSO(Service):
     def __init__(self, environ, start_response, idp_app):
         Service.__init__(self, environ, start_response, idp_app)
         self.binding = ""
-        self.response_bindings = None
-        self.resp_args = {}
         self.binding_out = None
         self.destination = None
-        self.Xreq_info = None
 
     def perform_login(self, ticket):
         """
@@ -487,10 +484,8 @@ def do_verify(environ, start_response, idp_app):
         idp_app.logger.info("Unknown user or wrong password")
         _referer = cherrypy.request.headers.get('Referer')
         if _referer:
-            lox = str(_referer)
-            resp = Redirect(lox, content = "text/html")
-        else:
-            raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
+            raise eduid_idp.mischttp.Redirect(str(_referer))
+        raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
     else:
         idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
         _data = {'username': user.username,
@@ -503,15 +498,11 @@ def do_verify(environ, start_response, idp_app):
         # period of time, by storing the session-id in a browser cookie.
         _session_id = idp_app.IDP.cache.add_session(user.username, _data)
         idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(user, _session_id))
+        eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
 
-        kaka = eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime,
-                                             "/", idp_app.logger, _session_id)
-        lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id,
-                                   query["key"])
+        lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id, query["key"])
         idp_app.logger.debug("Redirect => %s" % lox)
-        resp = Redirect(lox, headers = [kaka], content = "text/html")
-
-    return resp(environ, start_response)
+        raise eduid_idp.mischttp.Redirect(lox)
 
 
 # ----------------------------------------------------------------------------
