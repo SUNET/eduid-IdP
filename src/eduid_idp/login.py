@@ -17,7 +17,6 @@ import pprint
 import cherrypy
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Redirect
 import eduid_idp.mischttp
 
 from saml2.s_utils import UnknownPrincipal
@@ -244,16 +243,11 @@ class SSO(Service):
             resp_args = self.IDP.response_args(ticket.req_info.message)
         except UnknownPrincipal as excp:
             self.logger.error("Could not verify request: UnknownPrincipal: {!s}".format(excp))
-            _resp = self.IDP.create_error_response(ticket.req_info.message.id,
-                                                   self.destination, excp)
-            #_resp = ServiceError("UnknownPrincipal: %s" % (excp,))
-            return _resp(self.environ, self.start_response)
-        except UnsupportedBinding, excp:
+            raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
+        except UnsupportedBinding as excp:
             self.logger.error("Could not verify request: UnsupportedBinding: {!s}".format(excp))
-            _resp = self.IDP.create_error_response(ticket.req_info.message.id,
-                                                   self.destination, excp)
-            #_resp = ServiceError("UnsupportedBinding: %s" % (excp,))
-            return _resp(self.environ, self.start_response)
+            raise eduid_idp.error.BadRequest("Don't know how to reply to the SP that referred you here",
+                                             logger = self.logger)
 
         self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
 
