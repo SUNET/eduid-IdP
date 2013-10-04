@@ -87,11 +87,6 @@ from eduid_idp.logout import SLO
 
 from saml2 import server
 
-from saml2.authn_context import AuthnBroker
-from saml2.authn_context import PASSWORD
-from saml2.authn_context import UNSPECIFIED
-from saml2.authn_context import authn_context_class_ref
-
 default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
 
@@ -149,13 +144,7 @@ class IdPApplication(object):
         self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, 5 * 60, threading.Lock())
 
         _my_id = self.IDP.config.entityid
-
-        # NOTE: The function pointers supplied to the AUTHN_BROKER is not for authentication,
-        # but for displaying proper login forms it seems.
-        self.AUTHN_BROKER = AuthnBroker()
-        self.AUTHN_BROKER.add(authn_context_class_ref(PASSWORD), 1, 10, _my_id, reference="AL1,AL2-Password")
-        self.AUTHN_BROKER.add(authn_context_class_ref(UNSPECIFIED), "", 0, _my_id, reference="AL0")
-
+        self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
     @cherrypy.expose
@@ -245,6 +234,11 @@ class IdPApplication(object):
             environ['idp.user'] = self.userdb.lookup_user(userdata['username'])
             environ['idp.authn'] = self.get_authn_by_ref(userdata['authn_ref'], userdata.get('authn_class_ref'))
             self.logger.info("SSO session for user {!r} found in IdP cache".format(userdata['username']))
+            if environ['idp.authn'] is None:
+                # This could happen with SSO sessions refering to old authns during
+                # reconfiguration of authns in the AUTHN_BROKER.
+                # XXX remove SSO session?
+                raise eduid_idp.error.ServiceError(logger=self.logger)
         return environ
 
     def _lookup_userdata(self):
@@ -292,6 +286,7 @@ class IdPApplication(object):
                         _authn['class_ref'], class_ref))
             return _authn
         except KeyError:
+            self.logger.warning("No AuthN context found using ref {!r}".format(ref))
             pass
 
 # ----------------------------------------------------------------------------

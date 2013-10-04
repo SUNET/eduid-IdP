@@ -45,3 +45,4 @@ from . import login
 from . import logout
 from . import mischttp
 from . import error
+from . import assurance

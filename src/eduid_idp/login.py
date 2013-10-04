@@ -60,6 +60,7 @@ class SSOLoginData(object):
     def SAMLRequest(self):
         """
         The SAML request in transport encoding (base 64).
+        :rtype : basestring
         """
         return self._data['SAMLRequest']
 
@@ -89,6 +90,10 @@ class SSOLoginData(object):
 
     @FailCount.setter
     def FailCount(self, value):
+        """
+        Set the FailCount.
+        :param value: new value as integer
+        """
         assert isinstance(value, int)
         self._FailCount = value
 
@@ -134,6 +139,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
 
         :param data: dict containing at least `SAMLRequest'.
         :param binding: SAML2 binding as string (typically a URN)
+        :param key: unique key to use. If not specified, one will be computed.
         :returns: SSOLoginData instance
         """
         if not binding:
@@ -236,7 +242,7 @@ class SSO(Service):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        self.logger.debug("perform_login :\n{!s}".format(pprint.pformat(ticket)))
+        self.logger.debug("perform_login :\n{!s}".format(str(ticket)))
         try:
             if not self._verify_request(ticket):
                 raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
@@ -254,9 +260,28 @@ class SSO(Service):
         #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
         _authn = self.environ["idp.authn"]
         self.logger.debug("User authenticated using Authn {!r}".format(_authn))
+
+        # Decide what AuthnContext to assert based on the one requested in the request
+        # and the authentication performed
+        req_authn_context = ticket.req_info.message.requested_authn_context
+
+        authn_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_context, self.logger)
+        auth_info = self.AUTHN_BROKER.pick(authn_ctx)
+
+        auth_levels = []
+        if authn_ctx and len(auth_info):
+            # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
+            # filter out the `reference' values (canonical class_ref strings)
+            auth_levels = [reference for (method, reference) in auth_info]
+            self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
+
+        response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
+        self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(
+            response_authn['class_ref'], req_authn_context.authn_context_class_ref[0].text))
         self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
+
         _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
-                                               authn = _authn, sign_assertion = True, **resp_args)
+                                               authn = response_authn, sign_assertion = True, **resp_args)
 
         self.logger.info("AuthNResponse\n\n{!r}\n\n".format(_resp))
 
@@ -296,6 +321,7 @@ class SSO(Service):
         _info = self.unpack_either()
 
         _ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_POST)
+
         if self.user and not _ticket.req_info.message.force_authn:
             self.logger.debug("Continuing with posted Authn request {!r}".format(_ticket.req_info))
             return self.perform_login(_ticket)
@@ -308,6 +334,12 @@ class SSO(Service):
         return self._not_authn(_ticket, _ticket.req_info.message.requested_authn_context)
 
     def artifact(self):
+        """
+        The HTTP-Artifact endpoint
+
+        :return: HTTP response data as string
+        :raise eduid_idp.error.BadRequest:
+        """
         # Can be either by HTTP_Redirect or HTTP_POST
         info = self.unpack_either()
         if not info:
@@ -345,24 +377,28 @@ class SSO(Service):
         Authenticate user. Either, the user hasn't logged in yet,
         or the service provider forces re-authentication.
         :param ticket: SSOLoginData instance
-        :param requested_authn_context: SAML AuthnContext as string
+        :param requested_authn_context: saml2.samlp.RequestedAuthnContext instance
         :returns: HTTP response data as string
         """
+        assert isinstance(ticket, SSOLoginData)
         redirect_uri = eduid_idp.mischttp.geturl(query = False)
 
         self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
 
-        auth_info = self.AUTHN_BROKER.pick(requested_authn_context)
+        authn_ctx = eduid_idp.assurance.canonical_req_authn_context(requested_authn_context, self.logger)
+        auth_info = self.AUTHN_BROKER.pick(authn_ctx)
 
-        if len(auth_info):
-            method, reference = auth_info[0]
-            self.logger.debug("Authn chosen: %s (ref=%s)" % (method, reference))
-            # `method' is, for example, the function username_password_authn
-            return self.show_login_page(reference, ticket, redirect_uri)
+        if authn_ctx and len(auth_info):
+            # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
+            # filter out the `reference' values (canonical class_ref strings)
+            auth_levels = [reference for (method, reference) in auth_info]
+            self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
+
+            return self.show_login_page(ticket, auth_levels, redirect_uri)
 
         raise eduid_idp.error.Unauthorized("No usable authentication method", logger = self.logger)
 
-    def show_login_page(self, reference, ticket, redirect_uri):
+    def show_login_page(self, ticket, auth_levels, redirect_uri):
         """
         Display the login form for all authentication methods.
 
@@ -370,8 +406,8 @@ class SSO(Service):
         requested AuthnContext and local configuration, and then calls this method
         to render the login page for this method.
 
-        :param reference: AuthnBroker() reference to invoked authn context
         :param ticket: SSOLoginData instance
+        :param auth_levels: list of strings with auth level names that would be valid for this request
         :param redirect_uri: string with URL to proceed to after authentication
         :returns: HTTP response data as string
         """
@@ -382,7 +418,7 @@ class SSO(Service):
             "username": "",
             "password": "",
             "key": ticket.key,
-            "authn_reference": reference,
+            "authn_reference": auth_levels[0],
             "redirect_uri": redirect_uri,
             "alert_msg": "",
             "sp_entity_id": "",
@@ -418,8 +454,8 @@ class SSO(Service):
 
 def verify_username_and_password(dic, idp_app, min_length=0):
     """
-    :params dic: dict() with POST parameters
-    :params idp_app: IdPApplication instance
+    :param dic: dict() with POST parameters
+    :param idp_app: IdPApplication instance
     :returns: (verdict, res,) where verdict is bool()
     """
     username = dic["username"]
@@ -448,23 +484,25 @@ def do_verify(environ, start_response, idp_app):
     # the login web page was to be rendered. It is passed to us here through an HTTP POST
     # parameter (authn_reference) so it can't be trusted. XXX is this a problem? Not sure.
 
-    _authn = None
+    user_authn = None
     authn_ref = query.get('authn_reference')
     if authn_ref:
-        _authn = idp_app.get_authn_by_ref(authn_ref)
-    if not _authn:
+        user_authn = idp_app.get_authn_by_ref(authn_ref)
+    if not user_authn:
         raise eduid_idp.error.Unauthorized("Bad authentication reference", logger = idp_app.logger)
 
-    idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(_authn['class_ref'], authn_ref))
+    idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(
+        user_authn['class_ref'], authn_ref))
 
     try:
-        if _authn['class_ref'] == 'urn:oasis:names:tc:SAML:2.0:ac:classes:Password':
+        if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
             _ok, user = verify_username_and_password(query, idp_app)
-        elif _authn['class_ref'] == 'http://www.swamid.se/assurance/al2':
+        elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
             _ok, user = verify_username_and_password(query, idp_app, min_length=20)
         else:
-            idp_app.logger.info("Authentication for class {!r} not implemented".format(_authn['class_ref']))
-            raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented", logger=idp_app.logger)
+            idp_app.logger.info("Authentication for class {!r} not implemented".format(user_authn['class_ref']))
+            raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
+                user_authn['class_ref'], logger=idp_app.logger))
     except Exception as excp:
         idp_app.logger.error("Failed authenticating user:\n {!s}".format(exception_trace(excp)))
         _ok = False
@@ -478,23 +516,23 @@ def do_verify(environ, start_response, idp_app):
         if _referer:
             raise eduid_idp.mischttp.Redirect(str(_referer))
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
-    else:
-        idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, _authn['class_ref']))
-        _data = {'username': user.username,
-                 'authn_ref': authn_ref,
-                 'authn_class_ref': _authn['class_ref'],
-                 'authn_timestamp': int(time.time()),
-                 }
-        # This session contains information about the fact that the user was authenticated. It is
-        # used to avoid requiring subsequent authentication for the same user during a limited
-        # period of time, by storing the session-id in a browser cookie.
-        _session_id = idp_app.IDP.cache.add_session(user.username, _data)
-        idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(user, _session_id))
-        eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
 
-        lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id, query["key"])
-        idp_app.logger.debug("Redirect => %s" % lox)
-        raise eduid_idp.mischttp.Redirect(lox)
+    idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, user_authn['class_ref']))
+    _data = {'username': user.username,
+             'authn_ref': authn_ref,
+             'authn_class_ref': user_authn['class_ref'],
+             'authn_timestamp': int(time.time()),
+             }
+    # This session contains information about the fact that the user was authenticated. It is
+    # used to avoid requiring subsequent authentication for the same user during a limited
+    # period of time, by storing the session-id in a browser cookie.
+    _session_id = idp_app.IDP.cache.add_session(user.username, _data)
+    idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(user, _session_id))
+    eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
+
+    lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id, query["key"])
+    idp_app.logger.debug("Redirect => %s" % lox)
+    raise eduid_idp.mischttp.Redirect(lox)
 
 
 # ----------------------------------------------------------------------------
