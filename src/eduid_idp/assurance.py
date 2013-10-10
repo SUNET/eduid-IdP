@@ -115,8 +115,11 @@ def canonical_req_authn_context(req_authn_ctx, logger, contexts=_context_to_inte
     :param contexts: context class_ref lookup table (dict)
     :return: saml2.samlp.RequestedAuthnContext instance
     """
-    class_ref = req_authn_ctx.authn_context_class_ref[0].text
-    if class_ref not in contexts:
+    try:
+        class_ref = req_authn_ctx.authn_context_class_ref[0].text
+    except AttributeError:
+        class_ref = None
+    if class_ref is None or class_ref not in contexts:
         if 'undefined' not in contexts:
             logger.debug("Can't canonicalize unknown AuthnContext : {!r}".format(class_ref))
             return None
@@ -154,12 +157,16 @@ def response_authn(req_authn_ctx, actual_authn, auth_levels, logger, response_co
         'authn_auth': actual_authn['authn_auth'],
     }
 
-    req_class_ref = req_authn_ctx.authn_context_class_ref[0].text
+    try:
+        req_class_ref = req_authn_ctx.authn_context_class_ref[0].text
+    except AttributeError:
+        req_class_ref = None
 
     lowered = actual_authn['class_ref'] not in auth_levels
-    if lowered:
-        logger.debug('Lowered authentication detected, {!r} required {!r}, got {!r}'.format(
-            req_class_ref, auth_levels, actual_authn['class_ref']))
+    if lowered or req_class_ref is None:
+        if req_class_ref is not None:
+            logger.debug('Lowered authentication detected, {!r} required {!r}, got {!r}'.format(
+                req_class_ref, auth_levels, actual_authn['class_ref']))
         logger.debug('Response Authn: Asserting AuthnContext {!r} based on authentication level ({!r})'.format(
             res['class_ref'], actual_authn['class_ref']))
         return res

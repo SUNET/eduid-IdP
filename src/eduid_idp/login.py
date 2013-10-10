@@ -276,8 +276,13 @@ class SSO(Service):
             self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
 
         response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
-        self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(
-            response_authn['class_ref'], req_authn_context.authn_context_class_ref[0].text))
+
+        try:
+            self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(
+                response_authn['class_ref'], req_authn_context.authn_context_class_ref[0].text))
+        except AttributeError:
+            self.logger.debug("Asserting AuthnContext {!r} (none requested)".format(response_authn['class_ref']))
+
         self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
 
         _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,

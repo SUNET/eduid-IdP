@@ -110,6 +110,12 @@ class TestCanonical_req_authn_context(TestCase):
                                                                     _context_to_internal)
         self.assertEqual(canon_ctx, None)
 
+    def test_no_req_authn_context(self):
+        req_authn_ctx = None
+        canon_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_ctx, self.logger,
+                                                                    self._context_to_internal)
+        self.assertEqual(canon_ctx.authn_context_class_ref[0].text, EDUID_INTERNAL_1_NAME)
+
 
 class TestResponse_authn(TestCase):
     def setUp(self):
@@ -140,6 +146,19 @@ class TestResponse_authn(TestCase):
         response_ctx = eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
                                                           response_contexts=self._response_translation)
         self.assertEqual(response_ctx['class_ref'], TEST_AL1)
+
+    def test_response_authn_AL1_2(self):
+        # Test SP not asking for anything, authn at AL2.
+        # Expect AuthnContext AL2 in response.
+        req_authn_ctx = None
+        actual_authn = {
+            'class_ref': EDUID_INTERNAL_2_NAME,
+            'authn_auth': 'me'
+        }
+        auth_levels = [EDUID_INTERNAL_1_NAME, EDUID_INTERNAL_2_NAME, EDUID_INTERNAL_3_NAME]
+        response_ctx = eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
+                                                          response_contexts=self._response_translation)
+        self.assertEqual(response_ctx['class_ref'], TEST_AL2)
 
     def test_response_authn_AL2_1(self):
         # Test SP asking for MOBILE (AL2), authn at AL2.
