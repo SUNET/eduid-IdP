@@ -80,6 +80,9 @@ class TestCanonical_req_authn_context(TestCase):
         }
 
     def test_canonical_req_authn_context(self):
+        """
+        Test straight forward translations for each AL level.
+        """
         req_authn_ctx = requested_authn_context(PASSWORD)
         canon_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_ctx, self.logger,
                                                                     self._context_to_internal)
@@ -96,6 +99,9 @@ class TestCanonical_req_authn_context(TestCase):
         self.assertEqual(canon_ctx.authn_context_class_ref[0].text, EDUID_INTERNAL_3_NAME)
 
     def test_unknown_canonical_req_authn_context(self):
+        """
+        Test SP requesting unknown AuthnContext.
+        """
         _context_to_internal = self._context_to_internal.copy()
 
         req_authn_ctx = requested_authn_context('http://www.example.org/homemadeassurancce')
@@ -111,6 +117,9 @@ class TestCanonical_req_authn_context(TestCase):
         self.assertEqual(canon_ctx, None)
 
     def test_no_req_authn_context(self):
+        """
+        Test what happens when an SP does not request any AuthnContext at all.
+        """
         req_authn_ctx = None
         canon_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_ctx, self.logger,
                                                                     self._context_to_internal)
@@ -135,8 +144,10 @@ class TestResponse_authn(TestCase):
         }
 
     def test_response_authn_AL1_1(self):
-        # Test SP asking for UNSPECIFIED (AL1), authn at AL2.
-        # Expect AuthnContext AL1 in response.
+        """
+        Test SP asking for UNSPECIFIED (AL1), authn at AL2.
+        Expect AuthnContext AL1 in response.
+        """
         req_authn_ctx = requested_authn_context(UNSPECIFIED)
         actual_authn = {
             'class_ref': EDUID_INTERNAL_2_NAME,
@@ -148,8 +159,10 @@ class TestResponse_authn(TestCase):
         self.assertEqual(response_ctx['class_ref'], TEST_AL1)
 
     def test_response_authn_AL1_2(self):
-        # Test SP not asking for anything, authn at AL2.
-        # Expect AuthnContext AL2 in response.
+        """
+        Test SP not asking for anything, authn at AL2.
+        Expect AuthnContext AL2 in response.
+        """
         req_authn_ctx = None
         actual_authn = {
             'class_ref': EDUID_INTERNAL_2_NAME,
@@ -161,8 +174,10 @@ class TestResponse_authn(TestCase):
         self.assertEqual(response_ctx['class_ref'], TEST_AL2)
 
     def test_response_authn_AL2_1(self):
-        # Test SP asking for MOBILE (AL2), authn at AL2.
-        # Expect AuthnContext MOBILE in response.
+        """
+        Test SP asking for MOBILE (AL2), authn at AL2.
+        Expect AuthnContext MOBILE in response.
+        """
         req_authn_ctx = requested_authn_context(MOBILETWOFACTORCONTRACT)
         actual_authn = {
             'class_ref': EDUID_INTERNAL_2_NAME,
@@ -174,8 +189,10 @@ class TestResponse_authn(TestCase):
         self.assertEqual(response_ctx['class_ref'], MOBILETWOFACTORCONTRACT)
 
     def test_response_authn_AL2_2(self):
-        # Test SP asking for MOBILE (AL2), authn at AL3.
-        # Expect AuthnContext MOBILE in response.
+        """
+        Test SP asking for MOBILE (AL2), authn at AL3.
+        Expect AuthnContext MOBILE in response.
+        """
         req_authn_ctx = requested_authn_context(MOBILETWOFACTORCONTRACT)
         actual_authn = {
             'class_ref': EDUID_INTERNAL_3_NAME,
@@ -187,8 +204,10 @@ class TestResponse_authn(TestCase):
         self.assertEqual(response_ctx['class_ref'], MOBILETWOFACTORCONTRACT)
 
     def test_response_authn_AL2_3(self):
-        # Test SP asking for MOBILE (AL2), authn at AL1.
-        # Expect AuthnContext AL1 default class_ref in response.
+        """
+        Test SP asking for MOBILE (AL2), authn at AL1.
+        Expect AuthnContext AL1 default class_ref in response.
+        """
         req_authn_ctx = requested_authn_context(MOBILETWOFACTORCONTRACT)
         actual_authn = {
             'class_ref': EDUID_INTERNAL_1_NAME,
@@ -200,8 +219,10 @@ class TestResponse_authn(TestCase):
         self.assertEqual(response_ctx['class_ref'], TEST_AL1)
 
     def test_response_authn_AL3_1(self):
-        # Test SP asking for AL3, authn at AL3.
-        # Expect AuthnContext AL3 in response.
+        """
+        Test SP asking for AL3, authn at AL3.
+        Expect AuthnContext AL3 in response.
+        """
         req_authn_ctx = requested_authn_context(TEST_AL3)
         actual_authn = {
             'class_ref': EDUID_INTERNAL_3_NAME,
@@ -213,8 +234,10 @@ class TestResponse_authn(TestCase):
         self.assertEqual(response_ctx['class_ref'], TEST_AL3)
 
     def test_response_authn_AL3_2(self):
-        # Test SP asking for PASSWORD, authn at AL3.
-        # Expect AuthnContext AL3 in response.
+        """
+        Test SP asking for PASSWORD, authn at AL3.
+        Expect AuthnContext AL3 in response.
+        """
         req_authn_ctx = requested_authn_context(PASSWORD)
         actual_authn = {
             'class_ref': EDUID_INTERNAL_3_NAME,
