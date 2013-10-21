@@ -186,3 +186,13 @@ def parse_query_string():
         _qs = cherrypy.request.query_string
         query = dict([(k, v[0]) for k, v in parse_qs(_qs).items()])
     return query
+
+
+def parse_accept_lang_header(lang_string):
+    """
+    Parses the lang_string, which is the body of an HTTP Accept-Language
+    header, and returns a list of (lang, q-value), ordered by 'q' values.
+
+    Any format errors in lang_string results in an empty list being returned.
+    """
+    return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)

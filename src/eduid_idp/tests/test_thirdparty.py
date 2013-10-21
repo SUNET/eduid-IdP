@@ -1,3 +1,4 @@
+#!/usr/bin/python
 #
 # Copyright (c) 2013 NORDUnet A/S
 # All rights reserved.
@@ -31,19 +32,14 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
-__version__ = '0.1'
-__copyright__ = 'NORDUnet A/S'
-__organization__ = 'NORDUnet'
-__license__ = 'BSD'
-__authors__ = ['Fredrik Thulin']
 
-from . import config
-from . import idp_user
-from . import service
-from . import cache
-from . import login
-from . import logout
-from . import mischttp
-from . import error
-from . import assurance
-from . import thirdparty
+from unittest import TestCase
+import eduid_idp
+
+__author__ = 'ft'
+
+
+class TestParse_accept_lang_header(TestCase):
+    def test_parse_accept_lang_header(self):
+        res = eduid_idp.thirdparty.parse_accept_lang_header('sv-se,sv;q=0.8,en-us;q=0.5,en;q=0.3')
+        self.assertEqual(res, [('sv-se', 1.0), ('sv', 0.8), ('en-us', 0.5), ('en', 0.3)])
