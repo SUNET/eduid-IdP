@@ -55,6 +55,7 @@ _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'userdb_mongo_database': None,
                     'sso_session_lifetime': '15', # Lifetime of SSO session in minutes
                     'sso_session_mongo_uri': None,
+                    'raven_dsn': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -209,3 +210,10 @@ class IdPConfig():
         If not set, an in-memory SSO session cache will be used.
         """
         return self.config.get(self.section, 'sso_session_mongo_uri')
+
+    @property
+    def raven_dsn(self):
+        """
+        Raven DSN (string) for logging exceptions to Sentry.
+        """
+        return self.config.get(self.section, 'raven_dsn')

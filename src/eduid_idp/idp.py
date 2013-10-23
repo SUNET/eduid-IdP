@@ -87,6 +87,12 @@ from eduid_idp.logout import SLO
 
 from saml2 import server
 
+try:
+    import raven
+    raven_imported = True
+except ImportError:
+    raven = None
+
 default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
 
@@ -320,6 +326,16 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
         syslog_h.setFormatter(formatter)
         logger.addHandler(syslog_h)
+    if config.raven_dsn:
+        if raven:
+            from raven.handlers.logging import SentryHandler
+            logger.debug("Setting up Raven exception logging")
+            client = raven.Client(config.raven_dsn)
+            handler = SentryHandler(client)
+            handler.level = 'ERROR'
+            raven.conf.setup_logging(handler)
+        else:
+            logger.warning("Config option raven_dsn set, but raven not available")
 
     cherry_conf = {'server.thread_pool': config.num_threads,
                    'server.socket_host': config.listen_addr,
