@@ -330,9 +330,8 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         if raven:
             from raven.handlers.logging import SentryHandler
             logger.debug("Setting up Raven exception logging")
-            client = raven.Client(config.raven_dsn)
-            handler = SentryHandler(client)
-            handler.level = 'ERROR'
+            client = raven.Client(config.raven_dsn, timeout=10)
+            handler = SentryHandler(client, level=logging.ERROR)
             raven.conf.setup_logging(handler)
         else:
             logger.warning("Config option raven_dsn set, but raven not available")
