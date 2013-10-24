@@ -10,7 +10,7 @@
 #
 
 """
-Code handling Single Sign On logins.
+Common code for SSO login/logout requests.
 """
 
 import pprint
@@ -22,6 +22,7 @@ from eduid_idp.mischttp import Response, Redirect
 
 
 class Service(object):
+
     def __init__(self, environ, start_response, idp_app):
         self.environ = environ
         idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
