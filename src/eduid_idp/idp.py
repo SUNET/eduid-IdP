@@ -153,6 +153,8 @@ class IdPApplication(object):
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
+        cherrypy.config.update({'request.error_response': self.handle_error})
+
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
@@ -293,6 +295,23 @@ class IdPApplication(object):
         except KeyError:
             self.logger.warning("No AuthN context found using ref {!r}".format(ref))
             pass
+
+    def handle_error(self):
+        cherrypy.response.status = 500
+        cherrypy.response.body = ["<html><body>Sorry, an error occured.</body></html>"]  # default error
+        # Look for error page in user preferred language
+        static_fn = eduid_idp.mischttp.localized_static_filename(self.config, 'error', '.html')
+        self.logger.debug("Localized error page: {!r}".format(static_fn))
+        if static_fn:
+            res = eduid_idp.mischttp.static_file(self._my_start_response, static_fn)
+            if len(res) == 1:
+                res = res[0]
+            cherrypy.response.body = res
+        self.logger.error("Error in IdP application",
+                          exc_info = 1, extra={'stack': True,
+                                               'request': cherrypy.request,
+                                               })
+
 
 # ----------------------------------------------------------------------------
 
