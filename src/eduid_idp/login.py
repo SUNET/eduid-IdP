@@ -11,7 +11,6 @@
 """
 Code handling Single Sign On logins.
 """
-import re
 
 import time
 import pprint
@@ -28,11 +27,6 @@ from saml2.sigver import verify_redirect_signature
 from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
-
-_LANGUAGE_RE = re.compile(
-            r'''
-            ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|)      # "en", "en-au", "x-y-z", "es-419", NOT the "*"
-            ''', re.VERBOSE)
 
 
 class SSOLoginData(object):
@@ -447,22 +441,7 @@ class SSO(Service):
         self.logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
         # Look for login page in user preferred language
-        languages = eduid_idp.mischttp.parse_accept_lang_header(cherrypy.request.headers['Accept-Language'])
-        #self.logger.debug("Client language preferences: {!r}".format(languages))
-
-        static_fn = None
-        if languages:
-            for (lang, q_val) in languages:
-                if _LANGUAGE_RE.match(lang):
-                    filename = 'login-{!s}.html'.format(lang.lower())
-                    #self.logger.debug('Looking for language {!r} login page: {!r}'.format(lang, filename))
-                    static_fn = eduid_idp.mischttp.static_filename(self.config, filename)
-                    if static_fn:
-                        break
-
-        if not static_fn:
-            # default language file
-            static_fn = eduid_idp.mischttp.static_filename(self.config, 'login.html')
+        static_fn = eduid_idp.mischttp.localized_static_filename(self.config, 'login', '.html')
 
         self.logger.debug('Serving login page from file {!r}'.format(static_fn))
 

@@ -14,6 +14,7 @@ Miscellaneous HTTP related functions.
 """
 
 import os
+import re
 import base64
 import cherrypy
 
@@ -196,3 +197,41 @@ def parse_accept_lang_header(lang_string):
     Any format errors in lang_string results in an empty list being returned.
     """
     return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)
+
+
+def localized_static_filename(config, base, extension, separator='-', logger=None):
+    """
+    Locate a static page in the users preferred language.
+
+    :param config: IdP config instance
+    :param base: string, base part of filename ('login' for example)
+    :param extension: string, extension to append ('.html' for example)
+    :param separator: string, filename separator to use
+    :param logger: optional logging logger, for debug log messages
+    """
+    _LANGUAGE_RE = re.compile(
+            r'''
+            ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|)      # "en", "en-au", "x-y-z", "es-419", NOT the "*"
+            ''', re.VERBOSE)
+
+    # Look for some static page in user preferred language
+    languages = eduid_idp.mischttp.parse_accept_lang_header(cherrypy.request.headers['Accept-Language'])
+    if logger:
+        logger.debug("Client language preferences: {!r}".format(languages))
+
+    static_fn = None
+    if languages:
+        for (lang, q_val) in languages:
+            if _LANGUAGE_RE.match(lang):
+                filename = '{!s}{!s}{!s}{!s}'.format(base, separator, lang.lower(), extension)
+                if logger:
+                    logger.debug('Looking for language {!r} login page: {!r}'.format(lang, filename))
+                static_fn = eduid_idp.mischttp.static_filename(config, filename)
+                if static_fn:
+                    break
+
+    if not static_fn:
+        # default language file
+        static_fn = eduid_idp.mischttp.static_filename(config, base + extension)
+
+    return static_fn
