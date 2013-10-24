@@ -467,7 +467,7 @@ class SSO(Service):
         self.logger.debug('Serving login page from file {!r}'.format(static_fn))
 
         if static_fn:
-            res = eduid_idp.mischttp.static_file(self.environ, self.start_response, static_fn)
+            res = eduid_idp.mischttp.static_file(self.start_response, static_fn)
             if len(res) == 1:
                 res = res[0]
                 # apply simplistic HTML formatting to template in 'res'

@@ -97,7 +97,7 @@ def static_filename(config, path):
         return None
 
 
-def static_file(environ, start_response, filename):
+def static_file(start_response, filename):
     types = {'ico': 'image/x-icon',
              'png': 'image/png',
              'html': 'text/html',

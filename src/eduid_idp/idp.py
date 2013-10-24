@@ -206,11 +206,10 @@ class IdPApplication(object):
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.info("<application> PATH: %s" % path)
 
-        environ = {}
         static_fn = eduid_idp.mischttp.static_filename(self.config, path)
         if static_fn:
             self.logger.debug("Serving static file {!r}".format(static_fn))
-            return eduid_idp.mischttp.static_file(environ, self._my_start_response, static_fn)
+            return eduid_idp.mischttp.static_file(self._my_start_response, static_fn)
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
