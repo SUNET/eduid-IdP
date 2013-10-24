@@ -511,8 +511,10 @@ def do_verify(environ, start_response, idp_app):
             idp_app.logger.info("Authentication for class {!r} not implemented".format(user_authn['class_ref']))
             raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
                 user_authn['class_ref'], logger=idp_app.logger))
-    except Exception as excp:
-        idp_app.logger.error("Failed authenticating user:\n {!s}".format(exception_trace(excp)))
+    except Exception:
+        idp_app.logger.error("Failed authenticating user", exc_info=1, extra={'stack': True,
+                                                                              'request': cherrypy.request,
+                                                                              })
         _ok = False
         user = None
 
