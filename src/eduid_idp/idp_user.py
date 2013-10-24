@@ -114,7 +114,11 @@ class IdPUserDb():
         self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
         # XXX for now, try the password sequentially against all the users password credentials
         for cred in user.passwords:
-            factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
+            try:
+                factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
+            except ValueError as exc:
+                self.logger.info("User {!r} password factor {!s} unusable : {!r}".format(username, cred['id'], exc))
+                continue
             self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
                     username, cred['id'], factor))
             if self.auth_client.authenticate(username, [factor]):
