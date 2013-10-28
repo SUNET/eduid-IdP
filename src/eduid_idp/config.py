@@ -38,14 +38,14 @@ Configuration (file) handling for eduID IdP.
 import os
 import ConfigParser
 
-_CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
+_CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'num_threads': '8',
                     'logdir': None,
                     'logfile': None,
-                    'syslog': '1',	# '1' for on, '0' for off
+                    'syslog': '1',  # '1' for on, '0' for off
                     'listen_addr': '0.0.0.0',
                     'listen_port': '8088',
-                    'pysaml2_config': 'idp_conf.py', # path prepended in IdPConfig.__init__()
+                    'pysaml2_config': 'idp_conf.py',  # path prepended in IdPConfig.__init__()
                     'static_dir': None,
                     'ssl_adapter': 'builtin',  # one of cherrypy.wsgiserver.ssl_adapters
                     'server_cert': None,  # SSL cert filename
@@ -53,14 +53,25 @@ _CONFIG_DEFAULTS = {'debug': False, # overwritten in IdPConfig.__init__()
                     'cert_chain': None,   # SSL certificate chain filename, or None
                     'userdb_mongo_uri': None,
                     'userdb_mongo_database': None,
-                    'sso_session_lifetime': '15', # Lifetime of SSO session in minutes
+                    'sso_session_lifetime': '15',  # Lifetime of SSO session in minutes
                     'sso_session_mongo_uri': None,
                     'raven_dsn': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
 
-class IdPConfig():
+
+class IdPConfig(object):
+
+    """
+    Class holding IdP application configuration.
+
+    Loads configuration from an INI-file at instantiation.
+
+    :param filename: string, INI-file name
+    :param debug: boolean, default debug value
+    :raise ValueError: if INI-file can't be parsed
+    """
 
     def __init__(self, filename, debug):
         self.section = _CONFIG_SECTION
