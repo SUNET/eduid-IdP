@@ -106,18 +106,22 @@ def static_filename(config, path):
         return None
 
 
-def static_file(start_response, filename, fp=None):
+def static_file(start_response, filename, fp=None, status=None):
     """
     Serve a static file, 'known' to exist.
 
     :param start_response: WSGI-like start_response function
     :param filename: OS path to the files whose content should be served
     :param fp: optional file-like object implementing read()
+    :param status: string, optional HTML result data ('404 Not Found' for example)
     :return: string with file content
     """
     content_type = get_content_type(filename)
     if not content_type:
         raise eduid_idp.error.NotFound()
+
+    if not status:
+        status = '200 Ok'
 
     try:
         if not fp:
@@ -128,7 +132,7 @@ def static_file(start_response, filename, fp=None):
     finally:
         fp.close()
 
-    start_response('200 Ok', [('Content-Type', content_type)])
+    start_response(status, [('Content-Type', content_type)])
     return text
 
 
@@ -233,7 +237,7 @@ def parse_accept_lang_header(lang_string):
     return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)
 
 
-def localized_resource(start_response, filename, config, logger=None):
+def localized_resource(start_response, filename, config, logger=None, status=None):
     """
     Locate a static page in the users preferred language. Such pages are
     packaged in separate Python packages that allow access through
@@ -243,6 +247,7 @@ def localized_resource(start_response, filename, config, logger=None):
     :param filename: string, name of resource
     :param config: IdP config instance
     :param logger: optional logging logger, for debug log messages
+    :param status: string, optional HTML result data ('404 Not Found' for example)
     """
     _LANGUAGE_RE = re.compile(
             r'''
@@ -264,10 +269,10 @@ def localized_resource(start_response, filename, config, logger=None):
                             package, lang, langfile))
                     try:
                         res = pkg_resources.resource_stream(package, langfile)
-                        return eduid_idp.mischttp.static_file(start_response, langfile, fp=res)
+                        return eduid_idp.mischttp.static_file(start_response, langfile, fp=res, status=status)
                     except IOError:
                         pass
 
     # default language file
     static_fn = eduid_idp.mischttp.static_filename(config, path)
-    return eduid_idp.mischttp.static_file(start_response, static_fn)
+    return eduid_idp.mischttp.static_file(start_response, static_fn, status=status)

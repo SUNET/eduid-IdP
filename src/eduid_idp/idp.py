@@ -153,7 +153,9 @@ class IdPApplication(object):
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 
-        cherrypy.config.update({'request.error_response': self.handle_error})
+        cherrypy.config.update({'request.error_response': self.handle_error,
+                                'error_page.default': self.error_page_default,
+                                })
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
@@ -304,16 +306,57 @@ class IdPApplication(object):
         post-mortem analysis in Sentry as easy as possible.
         """
         cherrypy.response.status = 500
-        cherrypy.response.body = ["<html><body>Sorry, an error occured.</body></html>"]  # default error
+        cherrypy.response.body = self._render_error_page(500, 'Server Internal Error')
+
+    def error_page_default(self, status, message, traceback, version):
+        """
+        Function called by CherryPy when there is an unhandled exception processing a request.
+
+        Display a 'fail whale' page (error.html), and log the error in a way that makes
+        post-mortem analysis in Sentry as easy as possible.
+
+        :param status: integer, HTML error code
+        :param message: string, HTML error message
+        :param traceback: traceback of error
+        :param version: cherrypy version
+        """
+        path = cherrypy.request.path_info.lstrip('/')
+        self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
+        return self._render_error_page(status, message, traceback)
+
+    def _render_error_page(self, status, reason, traceback=None):
         # Look for error page in user preferred language
         res = eduid_idp.mischttp.localized_resource(
-            self._my_start_response, 'error.html', self.config, logger=self.logger)
-        if res:
-            cherrypy.response.body = res
-        self.logger.error("Error in IdP application",
-                          exc_info = 1, extra={'stack': True,
-                                               'request': cherrypy.request,
-                                               })
+            self._my_start_response, 'error.html', self.config, logger=self.logger, status=status)
+        if not res:
+            # default error message
+            res = ["<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
+                status=status, reason=reason)]
+
+        status_code = 'unknown'
+        try:
+            status_code = int(status.split()[0])
+        except Exception:
+            pass
+
+        # apply simplistic HTML formatting to template in 'res'
+        argv = {
+            'error_status': status,
+            'error_code': status_code,
+            'error_reason': reason,
+            'error_traceback': str(traceback),
+        }
+        res = res.format(**argv)
+
+        if not status.startswith("404 "):
+            self.logger.error("Error in IdP application",
+                              exc_info = 1, extra={'stack': True,
+                                                   'request': cherrypy.request,
+                                                   'traceback': traceback,
+                                                   'status': status,
+                                                   'reason': reason,
+                                                   })
+        return res
 
 
 # ----------------------------------------------------------------------------
