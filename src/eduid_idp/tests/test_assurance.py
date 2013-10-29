@@ -38,9 +38,7 @@ import logging
 from unittest import TestCase
 from saml2.authn_context import MOBILETWOFACTORCONTRACT
 from saml2.authn_context import PASSWORD
-from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 from saml2.authn_context import UNSPECIFIED
-from saml2.authn_context import authn_context_class_ref
 from saml2.authn_context import requested_authn_context
 
 import eduid_idp

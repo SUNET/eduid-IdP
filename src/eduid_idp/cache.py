@@ -18,7 +18,7 @@ import datetime
 import pymongo
 
 
-class NoOpLock():
+class NoOpLock(object):
     """
     A No-op lock class, to avoid a lot of "if self.lock:" in code using locks.
     """
@@ -28,13 +28,21 @@ class NoOpLock():
 
     # noinspection PyUnusedLocal
     def acquire(self, _block = True):
+        """
+        Fake acquiring a lock.
+
+        :param _block: boolean, whether to block or not (NO-OP in this implementation)
+        """
         return True
 
     def release(self):
+        """
+        Fake releasing a lock.
+        """
         pass
 
 
-class ExpiringCache():
+class ExpiringCache(object):
     """
     Simplistic implementation of a cache that removes entrys as they become too old.
 
@@ -42,6 +50,11 @@ class ExpiringCache():
     is believed to be a pragmatic approach for small to medium sites. For a large
     site with e.g. load balancers causing uneven traffic patterns, this might not
     work that well and the use of an external cache such as memcache is recommended.
+
+    :param name: name of cache as string, only used for debugging
+    :param logger: logging logger instance
+    :param ttl: data time to live in this cache, as seconds (integer)
+    :param lock: threading.Lock compatible locking instance
     """
 
     def __init__(self, name, logger, ttl, lock = None):
@@ -55,6 +68,12 @@ class ExpiringCache():
             self.lock = NoOpLock()
 
     def key(self, something):
+        """
+        Generate a unique (not strictly guaranteed) key based on `something'.
+
+        :param something: object
+        :return:
+        """
         return sha1(something).hexdigest()
 
     def add(self, key, info, now = None):
@@ -79,6 +98,7 @@ class ExpiringCache():
     def purge_expired(self, timestamp):
         """
         Purge expired records.
+
         :param timestamp: Purge any entrys older than this (integer)
         :return: None
         """
@@ -103,12 +123,27 @@ class ExpiringCache():
             self.lock.release()
 
     def get(self, key):
+        """
+        Fetch data from cache based on `key'.
+
+        :param key: hash key to use for lookup
+        :returns: Any data found matching `key', or None.
+        """
         return self._data.get(key)
 
     def items(self):
+        """
+        Return all items from cache.
+        """
         return self._data
 
     def delete(self, key):
+        """
+        Delete an item from the cache.
+
+        :param key: hash key to delete
+        :return: True on success
+        """
         try:
             del self._data[key]
             return True
@@ -239,8 +274,8 @@ class SSOSessionCacheMDB(SSOSessionCache):
                     raise
                 self.logger.error('Failed ensuring mongodb index, retrying ({!r})'.format(e))
 
-    def remove_session(self, lid):
-        return self.sso_sessions.remove({'session_id': lid}, w = 1, getLastError = True)
+    def remove_session(self, sid):
+        return self.sso_sessions.remove({'session_id': sid}, w = 1, getLastError = True)
 
     def add_session(self, username, data):
         _ts = time.time()

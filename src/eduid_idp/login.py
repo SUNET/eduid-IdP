@@ -21,7 +21,6 @@ import eduid_idp.mischttp
 
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
-from saml2.s_utils import exception_trace
 from saml2.sigver import verify_redirect_signature
 
 from saml2 import BINDING_HTTP_ARTIFACT
@@ -99,19 +98,19 @@ class SSOLoginData(object):
 
 
 class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
+    """
+    Login data is state kept between rendering the login screen, to when the user is
+    completely logged in and redirected from the IdP to the original resource the
+    user is accessing.
+
+    :param idp_app: saml2.server.Server() instance
+    :param name: string describing this cache
+    :param logger: logging logger
+    :param ttl: expire time of data in seconds
+    :param lock: threading.Lock() instance
+    """
 
     def __init__(self, idp_app, name, logger, ttl, lock = None):
-        """
-        Login data is state kept between rendering the login screen, to when the user is
-        completely logged in and redirected from the IdP to the original resource the
-        user is accessing.
-
-        :param idp_app: saml2.server.Server() instance
-        :param name: string describing this cache
-        :param logger: logging logger
-        :param ttl: expire time of data in seconds
-        :param lock: threading.Lock() instance
-        """
         self.IDP = idp_app
         eduid_idp.cache.ExpiringCache.__init__(self, name, logger, ttl, lock)
 
@@ -469,7 +468,7 @@ def verify_username_and_password(dic, idp_app, min_length=0):
     return False, ""
 
 
-def do_verify(environ, start_response, idp_app):
+def do_verify(environ, idp_app):
     query = eduid_idp.mischttp.get_post()
 
     _loggable = query.copy()

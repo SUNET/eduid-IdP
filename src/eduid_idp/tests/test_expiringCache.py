@@ -42,7 +42,7 @@ import eduid_idp
 logger = logging.getLogger()
 
 
-class BusyLock():
+class BusyLock(object):
     """
     Locking class that never succeeds acquire()
     """

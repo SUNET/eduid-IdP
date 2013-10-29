@@ -42,7 +42,7 @@ class Service(object):
         self.logger.debug("unpack_post:: %s" % info)
         try:
             return dict([(k, v) for k, v in info.items()])
-        except Exception:
+        except AttributeError:
             return None
 
     def unpack_either(self):
@@ -57,7 +57,10 @@ class Service(object):
 
     def response(self, binding, http_args):
         if binding == BINDING_HTTP_ARTIFACT:
-            resp = Redirect()
+            # XXX This URL extraction code is untested in practice, but it appears
+            # the should be HTTP headers in http_args['headers']
+            urls = [v for (k, v) in http_args['headers'] if k == 'Location']
+            resp = Redirect(urls)
         else:
             resp = Response(http_args["data"], headers = http_args["headers"])
         return resp(self.environ, self.start_response)

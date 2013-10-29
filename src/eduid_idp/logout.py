@@ -14,7 +14,8 @@ Code handling Single Log Out requests.
 import pprint
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Response, Redirect, delete_cookie
+from eduid_idp.mischttp import Response, delete_cookie
+from eduid_idp.error import BadRequest
 import eduid_idp.mischttp
 
 from saml2 import BINDING_HTTP_REDIRECT
@@ -51,13 +52,17 @@ class SLO(Service):
         return self.perform_logout(_dict, BINDING_SOAP)
 
     def unpack_soap(self):
-        try:
-            # XXX suspect this is broken - get_post() returns a dict() now
-            # and it looks like the old get_post returned the body as string
-            query = eduid_idp.mischttp.get_post()
-            return {"SAMLRequest": query, "RelayState": ""}
-        except Exception:
-            return None
+        """
+        Turn a SOAP request into the common format of a dict.
+
+        :return: dict with 'SAMLRequest' and 'RelayState' items
+        """
+        # XXX suspect this is broken - get_post() returns a dict() now
+        # and it looks like the old get_post returned the body as string
+        query = eduid_idp.mischttp.get_post()
+        return {'SAMLRequest': query,
+                'RelayState': '',
+                }
 
     def perform_logout(self, info, binding):
         """
@@ -127,7 +132,7 @@ class SLO(Service):
         try:
             # remove the authentication
             # XXX would be useful if remove_authn_statements() returned how many statements it actually removed
-            res = self.IDP.session_db.remove_authn_statements(name_id)
+            self.IDP.session_db.remove_authn_statements(name_id)
         except KeyError as exc:
             self.logger.error("ServiceError removing authn : %s" % exc)
             raise eduid_idp.error.ServiceError(logger = self.logger)

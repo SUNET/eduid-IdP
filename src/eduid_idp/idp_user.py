@@ -42,9 +42,17 @@ class NoSuchUser(Exception):
     pass
 
 
-class IdPUser():
+class IdPUser(object):
+    """
+    Representation of a user. Used to load data about a user from the
+    userdb, and then represent it in a readable way.
 
-    def __init__(self, username, userdb=None):
+    :param username: string, username to search for in userdb
+    :param userdb: IdPUserDb instance
+    :raise NoSuchUser: if 'username' was not found in the userdb
+    """
+
+    def __init__(self, username, userdb):
         self._username = username
         for field in ['mail', 'eduPersonPrincipalName']:
             self._data = userdb.get_user_by_field(field, username)
@@ -77,8 +85,7 @@ class IdPUser():
         return self._data['passwords']
 
 
-class IdPUserDb():
-
+class IdPUserDb(object):
     def __init__(self, logger, config, userdb = None, auth_client = None):
         self.logger = logger
         self.config = config
@@ -120,7 +127,7 @@ class IdPUserDb():
                 self.logger.info("User {!r} password factor {!s} unusable : {!r}".format(username, cred['id'], exc))
                 continue
             self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
-                    username, cred['id'], factor))
+                username, cred['id'], factor))
             if self.auth_client.authenticate(username, [factor]):
                 self.logger.debug("VCCS authenticated user {!r}".format(user))
                 return user
@@ -135,6 +142,6 @@ class IdPUserDb():
         :return: IdPUser or None
         """
         try:
-            return IdPUser(username, userdb=self.userdb)
+            return IdPUser(username, userdb = self.userdb)
         except NoSuchUser:
             return None

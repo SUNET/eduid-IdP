@@ -274,5 +274,5 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
                         pass
 
     # default language file
-    static_fn = eduid_idp.mischttp.static_filename(config, path)
+    static_fn = eduid_idp.mischttp.static_filename(config, filename)
     return eduid_idp.mischttp.static_file(start_response, static_fn, status=status)

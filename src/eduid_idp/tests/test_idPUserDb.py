@@ -46,7 +46,6 @@ logger = logging.getLogger()
 def _create_passwords(username, factors):
     res = []
     for _f in factors:
-        _cred_id = '{!s}.{!s}'.format(username, len(res))
         _this = {'id': _f.credential_id,
                  'salt': _f.salt,
                  'hash': _f.hash,
@@ -70,18 +69,18 @@ _USERDB = [
     }]
 
 
-class FakeUserDb():
+class FakeUserDb(object):
     def get_user_by_field(self, field, username):
         for _user in _USERDB:
-            if _user.get(field) == username:
+            if _user.get(field)==username:
                 return _user
 
 
-class FakeAuthClient():
+class FakeAuthClient(object):
     userdb = FakeUserDb()
 
     def authenticate(self, username, factors):
-        assert (len(factors) == 1)
+        assert (len(factors)==1)
         _f = factors[0]
         _expect = {'id': _f.credential_id,
                    'salt': _f.salt,
@@ -91,7 +90,7 @@ class FakeAuthClient():
             _user = self.userdb.get_user_by_field(field, username)
             if _user:
                 for _cred in _user['passwords']:
-                    if _cred == _expect:
+                    if _cred==_expect:
                         return True
         return False
 

@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from saml2 import BINDING_HTTP_REDIRECT, BINDING_URI
+
+"""
+Example configuration for eduid-IdP.
+"""
+
+from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_SOAP
@@ -18,8 +23,7 @@ if get_xmlsec_binary:
 else:
     xmlsec_path = '/usr/bin/xmlsec1'
 
-#BASE = "http://lingon.ladok.umu.se:8088"
-#BASE = "http://lingon.catalogix.se:8088"
+
 BASE = "http://localhost:8088"
 
 CONFIG = {
@@ -56,26 +60,11 @@ CONFIG = {
                     ("%s/slo/post" % BASE, BINDING_HTTP_POST),
                     ("%s/slo/redirect" % BASE, BINDING_HTTP_REDIRECT)
                 ],
-                "artifact_resolve_service": [
-                    ("%s/ars" % BASE, BINDING_SOAP)
-                ],
-                "assertion_id_request_service": [
-                    ("%s/airs" % BASE, BINDING_URI)
-                ],
-                "manage_name_id_service": [
-                    ("%s/mni/soap" % BASE, BINDING_SOAP),
-                    ("%s/mni/post" % BASE, BINDING_HTTP_POST),
-                    ("%s/mni/redirect" % BASE, BINDING_HTTP_REDIRECT),
-                    ("%s/mni/art" % BASE, BINDING_HTTP_ARTIFACT)
-                ],
-                "name_id_mapping_service": [
-                    ("%s/nim" % BASE, BINDING_SOAP),
-                ],
             },
             "policy": {
                 "default": {
                     "lifetime": {"minutes": 15},
-                    "attribute_restrictions": None, # means all I have
+                    "attribute_restrictions": None,  # means all I have
                     "name_form": NAME_FORMAT_URI,
                     "entity_categories": ["swamid", "edugain"]
                 },
@@ -89,7 +78,7 @@ CONFIG = {
     "key_file": "pki/mykey.pem",
     "cert_file": "pki/mycert.pem",
     "metadata": {
-        "local": ["../metadata.xml"],
+        "local": ["/home/ft/work/NORDUnet/eduid-IdP/metadata.xml"],
     },
     "organization": {
         "display_name": "Rolands Identiteter",

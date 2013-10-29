@@ -336,7 +336,7 @@ class IdPApplication(object):
         status_code = 'unknown'
         try:
             status_code = int(status.split()[0])
-        except Exception:
+        except (ValueError, AttributeError, IndexError):
             pass
 
         # apply simplistic HTML formatting to template in 'res'
