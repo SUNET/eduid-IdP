@@ -260,7 +260,8 @@ def localized_resource(start_response, filename, config, logger=None):
                 for (package, path) in config.content_packages:
                     langfile = path + '/' + lang.lower() + '/' + filename  # pkg_resources paths do not use os.path.join
                     if logger:
-                        logger.debug('Looking for package {!r} path: {!r}'.format(lang, langfile))
+                        logger.debug('Looking for package {!r}, language {!r}, path: {!r}'.format(
+                            package, lang, langfile))
                     try:
                         res = pkg_resources.resource_stream(package, langfile)
                         return eduid_idp.mischttp.static_file(start_response, langfile, fp=res)
