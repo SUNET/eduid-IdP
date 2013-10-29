@@ -30,6 +30,10 @@ import saml2.samlp
 
 
 class SLO(Service):
+    """
+    Single Log Out service.
+    """
+
     def redirect(self):
         """ Expects a HTTP-redirect request """
 

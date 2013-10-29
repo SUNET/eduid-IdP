@@ -222,6 +222,14 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
 
 
 class SSO(Service):
+    """
+    Single Sign On service.
+
+    :param environ: environ dict() (see eduid_idp.idp._request_environment())
+    :param start_response: WSGI-like start_response function pointer
+    :param idp_app: IdPApplication instance
+    """
+
     def __init__(self, environ, start_response, idp_app):
         Service.__init__(self, environ, start_response, idp_app)
         self.binding = ""
@@ -456,19 +464,27 @@ def verify_username_and_password(dic, idp_app, min_length=0):
     """
     :param dic: dict() with POST parameters
     :param idp_app: IdPApplication instance
-    :returns: (verdict, res,) where verdict is bool()
+    :returns: IdPUser instance or False
     """
     username = dic["username"]
     password = dic["password"]
 
-    res = idp_app.userdb.verify_username_and_password(username, password)
-    if res:
+    user = idp_app.userdb.verify_username_and_password(username, password)
+    if user:
         if len(password) >= min_length:
-            return True, res
-    return False, ""
+            return user
+        idp_app.logger("User {!r} authenticated, but denied by password length constraints".format(user))
+    return False
 
 
 def do_verify(environ, idp_app):
+    """
+    Perform authentication of user based on user provided credentials.
+
+    :param environ: environ dict() (see eduid_idp.idp._request_environment())
+    :param idp_app: IdPApplication instance
+    :raise eduid_idp.mischttp.Redirect:
+    """
     query = eduid_idp.mischttp.get_post()
 
     _loggable = query.copy()
@@ -496,9 +512,9 @@ def do_verify(environ, idp_app):
 
     try:
         if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
-            _ok, user = verify_username_and_password(query, idp_app)
+            user = verify_username_and_password(query, idp_app)
         elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            _ok, user = verify_username_and_password(query, idp_app, min_length=20)
+            user = verify_username_and_password(query, idp_app, min_length=20)
         else:
             idp_app.logger.info("Authentication for class {!r} not implemented".format(user_authn['class_ref']))
             raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
@@ -507,10 +523,9 @@ def do_verify(environ, idp_app):
         idp_app.logger.error("Failed authenticating user", exc_info=1, extra={'stack': True,
                                                                               'request': cherrypy.request,
                                                                               })
-        _ok = False
         user = None
 
-    if not _ok:
+    if not user:
         _ticket.FailCount += 1
         idp_app.IDP.ticket.store_ticket(_ticket)
         idp_app.logger.info("Unknown user or wrong password")

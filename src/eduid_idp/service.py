@@ -22,6 +22,13 @@ from eduid_idp.mischttp import Response, Redirect
 
 
 class Service(object):
+    """
+    Base service class. Common code for SSO and SLO classes.
+
+    :param environ: environ dict() (see eduid_idp.idp._request_environment())
+    :param start_response: WSGI-like start_response function pointer
+    :param idp_app: IdPApplication instance
+    """
 
     def __init__(self, environ, start_response, idp_app):
         self.environ = environ

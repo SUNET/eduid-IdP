@@ -284,6 +284,7 @@ class IdPApplication(object):
         """
         Look up an authentication context by reference.
         :param ref: object
+        :param class_ref: Authn class ref as string
         :return: authn context or None
         """
         try:
@@ -296,7 +297,6 @@ class IdPApplication(object):
             return _authn
         except KeyError:
             self.logger.warning("No AuthN context found using ref {!r}".format(ref))
-            pass
 
     def handle_error(self):
         """
@@ -330,8 +330,8 @@ class IdPApplication(object):
             self._my_start_response, 'error.html', self.config, logger=self.logger, status=status)
         if not res:
             # default error message
-            res = ["<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
-                status=status, reason=reason)]
+            res = "<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
+                status=status, reason=reason)
 
         status_code = 'unknown'
         try:
