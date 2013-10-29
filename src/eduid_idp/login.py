@@ -441,18 +441,10 @@ class SSO(Service):
         self.logger.debug("Login page HTML substitution arguments :\n{!s}".format(pprint.pformat(argv)))
 
         # Look for login page in user preferred language
-        static_fn = eduid_idp.mischttp.localized_static_filename(self.config, 'login', '.html')
+        content = eduid_idp.mischttp.localized_resource(self.start_response, 'login.html', self.config, self.logger)
 
-        self.logger.debug('Serving login page from file {!r}'.format(static_fn))
-
-        if static_fn:
-            res = eduid_idp.mischttp.static_file(self.start_response, static_fn)
-            if len(res) == 1:
-                res = res[0]
-                # apply simplistic HTML formatting to template in 'res'
-            return res.format(**argv)
-
-        raise eduid_idp.error.NotFound(logger = self.logger)
+        # apply simplistic HTML formatting to template in 'res'
+        return content.format(**argv)
 
 
 # -----------------------------------------------------------------------------

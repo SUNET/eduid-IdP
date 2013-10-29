@@ -56,6 +56,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'sso_session_lifetime': '15',  # Lifetime of SSO session in minutes
                     'sso_session_mongo_uri': None,
                     'raven_dsn': None,
+                    'content_packages': []  # List of Python packages ("name:path") with content resources
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -74,6 +75,7 @@ class IdPConfig(object):
     """
 
     def __init__(self, filename, debug):
+        self._parsed_content_packages = None
         self.section = _CONFIG_SECTION
         _CONFIG_DEFAULTS['debug'] = str(debug)
         cfgdir = os.path.dirname(filename)
@@ -228,3 +230,25 @@ class IdPConfig(object):
         Raven DSN (string) for logging exceptions to Sentry.
         """
         return self.config.get(self.section, 'raven_dsn')
+
+    @property
+    def content_packages(self):
+        """
+        Get list of tuples with packages and paths to content resources, such as login.html.
+
+        The expected format in the INI file is
+
+            content_packages = pkg1:some/path/, pkg2:foo
+
+        :return: list of (pkg, path) tuples
+        """
+        if self._parsed_content_packages:
+            return self._parsed_content_packages
+        value = self.config.get(self.section, 'content_packages')
+        res = []
+        for this in value.split(','):
+            this = this.strip()
+            name, _sep, path, = this.partition(':')
+            res.append((name, path))
+        self._parsed_content_packages = res
+        return res

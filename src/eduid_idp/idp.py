@@ -297,15 +297,18 @@ class IdPApplication(object):
             pass
 
     def handle_error(self):
+        """
+        Function called by CherryPy when there is an unhandled exception processing a request.
+
+        Display a 'fail whale' page (error.html), and log the error in a way that makes
+        post-mortem analysis in Sentry as easy as possible.
+        """
         cherrypy.response.status = 500
         cherrypy.response.body = ["<html><body>Sorry, an error occured.</body></html>"]  # default error
         # Look for error page in user preferred language
-        static_fn = eduid_idp.mischttp.localized_static_filename(self.config, 'error', '.html')
-        self.logger.debug("Localized error page: {!r}".format(static_fn))
-        if static_fn:
-            res = eduid_idp.mischttp.static_file(self._my_start_response, static_fn)
-            if len(res) == 1:
-                res = res[0]
+        res = eduid_idp.mischttp.localized_resource(
+            self._my_start_response, 'error.html', self.config, logger=self.logger)
+        if res:
             cherrypy.response.body = res
         self.logger.error("Error in IdP application",
                           exc_info = 1, extra={'stack': True,

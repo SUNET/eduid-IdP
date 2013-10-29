@@ -19,6 +19,7 @@ import base64
 import cherrypy
 
 from urlparse import parse_qs
+import pkg_resources
 
 import eduid_idp
 
@@ -86,6 +87,13 @@ def get_post():
 
 
 def static_filename(config, path):
+    """
+    Check if there is a static file matching 'path'.
+
+    :param config: IdP config instance
+    :param path: string, URL part to check
+    :return: False, None or filename as string
+    """
     if not isinstance(path, basestring):
         return False
     if not config.static_dir:
@@ -98,7 +106,39 @@ def static_filename(config, path):
         return None
 
 
-def static_file(start_response, filename):
+def static_file(start_response, filename, fp=None):
+    """
+    Serve a static file, 'known' to exist.
+
+    :param start_response: WSGI-like start_response function
+    :param filename: OS path to the files whose content should be served
+    :param fp: optional file-like object implementing read()
+    :return: string with file content
+    """
+    content_type = get_content_type(filename)
+    if not content_type:
+        raise eduid_idp.error.NotFound()
+
+    try:
+        if not fp:
+            fp = open(filename)
+        text = fp.read()
+    except IOError:
+        raise eduid_idp.error.NotFound()
+    finally:
+        fp.close()
+
+    start_response('200 Ok', [('Content-Type', content_type)])
+    return text
+
+
+def get_content_type(filename):
+    """
+    Figure out the content type to use from a filename.
+
+    :param filename: string
+    :return: string like 'text/html'
+    """
     types = {'ico': 'image/x-icon',
              'png': 'image/png',
              'html': 'text/html',
@@ -108,17 +148,9 @@ def static_file(start_response, filename):
              'xml': 'text/xml',
     }
     ext = filename.rsplit('.', 1)[-1]
-
-    if not ext in types:
-        raise eduid_idp.error.NotFound()
-
-    try:
-        text = open(filename).read()
-    except IOError:
-        raise eduid_idp.error.NotFound()
-
-    start_response('200 Ok', [('Content-Type', types[ext])])
-    return [text]
+    if ext not in types:
+        return None
+    return types[ext]
 
 
 # ----------------------------------------------------------------------------
@@ -130,6 +162,7 @@ def read_cookie(logger):
 
     The idpauthn cookie holds a value used to lookup `userdata' in IDP.cache.
 
+    :param logger: logging logger
     :returns: string with cookie content, or None
     """
     cookie = cherrypy.request.cookie
@@ -195,18 +228,20 @@ def parse_accept_lang_header(lang_string):
     header, and returns a list of (lang, q-value), ordered by 'q' values.
 
     Any format errors in lang_string results in an empty list being returned.
+    :param lang_string: string
     """
     return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)
 
 
-def localized_static_filename(config, base, extension, separator='-', logger=None):
+def localized_resource(start_response, filename, config, logger=None):
     """
-    Locate a static page in the users preferred language.
+    Locate a static page in the users preferred language. Such pages are
+    packaged in separate Python packages that allow access through
+    pkg_resource.
 
+    :param start_response: WSGI-like start_response function
+    :param filename: string, name of resource
     :param config: IdP config instance
-    :param base: string, base part of filename ('login' for example)
-    :param extension: string, extension to append ('.html' for example)
-    :param separator: string, filename separator to use
     :param logger: optional logging logger, for debug log messages
     """
     _LANGUAGE_RE = re.compile(
@@ -219,19 +254,19 @@ def localized_static_filename(config, base, extension, separator='-', logger=Non
     if logger:
         logger.debug("Client language preferences: {!r}".format(languages))
 
-    static_fn = None
     if languages:
-        for (lang, q_val) in languages:
+        for (lang, q_val) in languages[:50]:  # cap somewhere to prevent DoS
             if _LANGUAGE_RE.match(lang):
-                filename = '{!s}{!s}{!s}{!s}'.format(base, separator, lang.lower(), extension)
-                if logger:
-                    logger.debug('Looking for language {!r} login page: {!r}'.format(lang, filename))
-                static_fn = eduid_idp.mischttp.static_filename(config, filename)
-                if static_fn:
-                    break
+                for (package, path) in config.content_packages:
+                    langfile = path + '/' + lang.lower() + '/' + filename  # pkg_resources paths do not use os.path.join
+                    if logger:
+                        logger.debug('Looking for package {!r} path: {!r}'.format(lang, langfile))
+                    try:
+                        res = pkg_resources.resource_stream(package, langfile)
+                        return eduid_idp.mischttp.static_file(start_response, langfile, fp=res)
+                    except IOError:
+                        pass
 
-    if not static_fn:
-        # default language file
-        static_fn = eduid_idp.mischttp.static_filename(config, base + extension)
-
-    return static_fn
+    # default language file
+    static_fn = eduid_idp.mischttp.static_filename(config, path)
+    return eduid_idp.mischttp.static_file(start_response, static_fn)
