@@ -427,11 +427,12 @@ class SSO(Service):
             "redirect_uri": redirect_uri,
             "alert_msg": "",
             "sp_entity_id": "",
+            "failcount": ticket.FailCount,
         }
 
         # Set alert msg if FailCount is greater than zero
         if ticket.FailCount:
-            argv["alert_msg"] = "Incorrect username or password ({!s} attempts)".format(ticket.FailCount)
+            argv["alert_msg"] = "INCORRECT"  # "Incorrect username or password ({!s} attempts)".format(ticket.FailCount)
 
         try:
             argv["sp_entity_id"] = ticket.req_info.message.issuer.text
