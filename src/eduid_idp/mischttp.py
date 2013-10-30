@@ -47,11 +47,11 @@ def create_html_response(binding, http_args, start_response, logger):
 
     :return: HTML response
 
-    :type binding: basestring
+    :type binding: string
     :type http_args: dict
     :type start_response: function
     :type logger: logging.Logger
-    :rtype: basestring
+    :rtype: string
     """
     if binding == BINDING_HTTP_ARTIFACT or binding == BINDING_HTTP_REDIRECT:
         # XXX This URL extraction code is untested in practice, but it appears
@@ -238,11 +238,11 @@ def set_cookie(name, expire, path, logger, value=''):
 
     :return: True on success
 
-    :type name: basestring
+    :type name: string
     :type expire: int
-    :type path: basestring
+    :type path: string
     :type logger: logging.Logger
-    :type value: basestring
+    :type value: string
     :rtype: bool
     """
     cookie = cherrypy.response.cookie
@@ -257,13 +257,17 @@ def set_cookie(name, expire, path, logger, value=''):
 
 def parse_query_string():
     """
-    Parse HTML request query string into (key, value) tuples.
+    Parse HTML request query string into a dict like
 
-    NOTE: Only the first header value for each header is returned.
+    {'Accept': string,
+     'Host': string,
+    }
+
+    NOTE: Only the first header value for each header is included in the result.
 
     :return: parsed query string
 
-    :rtype: list[(string, string)]
+    :rtype: dict
     """
     query = None
     if cherrypy.request.query_string:
@@ -281,7 +285,7 @@ def parse_accept_lang_header(lang_string):
 
     :param lang_string: Accept-Language header
 
-    :type lang_string: basestring
+    :type lang_string: string
     :rtype: list[(string, string)]
     """
     return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)
@@ -301,11 +305,11 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     :return: HTML response data
 
     :type start_response: function
-    :type filename: basestring
-    :type config: config.Config
+    :type filename: string
+    :type config: config.IdPConfig
     :type logger: logging.Logger
-    :type status: basestring
-    :rtype: basestring
+    :type status: string
+    :rtype: string
     """
     _LANGUAGE_RE = re.compile(
             r'''

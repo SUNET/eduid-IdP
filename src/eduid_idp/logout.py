@@ -148,9 +148,9 @@ class SLO(Service):
         :return: HTML response
 
         :type req_info: saml2.request.LogoutRequest
-        :type status_code: basestring
+        :type status_code: string
         :type sign_response: bool
-        :rtype: basestring
+        :rtype: string
         """
         self.logger.info("LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(), req_info.sender(),
                                                                            status_code))

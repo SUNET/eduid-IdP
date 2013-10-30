@@ -94,7 +94,7 @@ def init_AuthnBroker(my_id):
     :param my_id: The IdP entity id as string
     :return: AuthnBroker instance
 
-    :type my_id: basestring
+    :type my_id: string
     :rtype: AuthnBroker
     """
     # NOTE: The function pointers supplied to the AUTHN_BROKER is not for authentication,

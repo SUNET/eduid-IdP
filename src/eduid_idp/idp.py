@@ -315,7 +315,7 @@ class IdPApplication(object):
         :param class_ref: Authn class ref as string
         :return: authn context or None
 
-        :type class_ref: basestring
+        :type class_ref: string
         :rtype: dict | None
         """
         try:
@@ -351,10 +351,10 @@ class IdPApplication(object):
         :param traceback: traceback of error
         :param version: cherrypy version
 
-        :type status: basestring
-        :type message: basestring
-        :type traceback: basestring
-        :type version: basestring
+        :type status: string
+        :type message: string
+        :type traceback: string
+        :type version: string
         """
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
@@ -371,10 +371,10 @@ class IdPApplication(object):
         :param traceback: traceback of error
         :return: HTML
 
-        :type status: basestring
-        :type reason: basestring
-        :type traceback: basestring
-        :rtype: basestring
+        :type status: string
+        :type reason: string
+        :type traceback: string
+        :rtype: string
         """
         res = eduid_idp.mischttp.localized_resource(
             self._my_start_response, 'error.html', self.config, logger=self.logger, status=status)

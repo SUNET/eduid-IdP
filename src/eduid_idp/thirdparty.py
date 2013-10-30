@@ -53,7 +53,7 @@ def parse_accept_lang_header(lang_string):
 
     :param lang_string: Accept-Language header
 
-    :type lang_string: basestring
+    :type lang_string: string
     :rtype: list[(string, string)]
     """
     result = []

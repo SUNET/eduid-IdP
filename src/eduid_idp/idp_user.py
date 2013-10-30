@@ -58,7 +58,7 @@ class IdPUser(object):
     :param backend: user database instance, probably a Celery task
     :raise NoSuchUser: if 'username' was not found in the userdb
 
-    :type username: basestring
+    :type username: string
     :type backend:
     """
 
@@ -97,7 +97,7 @@ class IdPUser(object):
 
         :return: username
 
-        :rtype: basestring
+        :rtype: string
         """
         return self._username
 
@@ -148,8 +148,8 @@ class IdPUserDb(object):
         :param password: password given by user
         :return: IdPUser on successful authentication
 
-        :type username: basestring
-        :type password: basestring
+        :type username: string
+        :type password: string
         :rtype: IdPUser | None
         """
         user = self.lookup_user(username)
