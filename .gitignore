@@ -11,3 +11,4 @@ idp.log.*
 idp.subject
 *.pem
 metadata.xml
+.idea
