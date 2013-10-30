@@ -56,7 +56,8 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'sso_session_lifetime': '15',  # Lifetime of SSO session in minutes
                     'sso_session_mongo_uri': None,
                     'raven_dsn': None,
-                    'content_packages': []  # List of Python packages ("name:path") with content resources
+                    'content_packages': [],  # List of Python packages ("name:path") with content resources
+                    'verify_request_signatures': '0',  # '1' for True, '0' for False
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -252,3 +253,14 @@ class IdPConfig(object):
             res.append((name, path))
         self._parsed_content_packages = res
         return res
+
+    @property
+    def verify_request_signatures(self):
+        """
+        Verify request signatures, if they exist.
+
+        This defaults to False since it is a trivial DoS to consume all the IdP:s
+        CPU resources if this is set to True.
+        """
+        res = self.config.get(self.section, 'verify_request_signatures')
+        return bool(int(res))

@@ -125,6 +125,16 @@ def parse_args():
 
 
 class IdPApplication(object):
+    """
+    Main CherryPy application for the eduid IdP.
+
+    :param logger: logging logger
+    :param config: IdP configuration data
+
+    :type logger: logging.Logger
+    :type config: eduid_idp.config.IdPConfig
+    """
+
     def __init__(self, logger, config):
         self.logger = logger
         self.config = config
@@ -147,7 +157,9 @@ class IdPApplication(object):
         self.IDP = server.Server(cfgfile, cache = _SSOSessions)
         # restore path
         sys.path = old_path
-        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, 5 * 60, threading.Lock())
+        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, 5 * 60,
+                                                            self.config, threading.Lock())
+
 
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)

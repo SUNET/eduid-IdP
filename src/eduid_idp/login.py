@@ -124,17 +124,21 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
     :param name: string describing this cache
     :param logger: logging logger
     :param ttl: expire time of data in seconds
+    :param config: IdP configuration data
     :param lock: threading.Lock() instance
 
     :type idp_app: saml2.server.Server
     :type name: basestring
     :type logger: logging.Logger
     :type ttl: int
+    :type config: IdPConfig
     :type lock: threading.Lock
     """
 
-    def __init__(self, idp_app, name, logger, ttl, lock = None):
+    def __init__(self, idp_app, name, logger, ttl, config, lock = None):
+        assert isinstance(config, eduid_idp.config.IdPConfig)
         self.IDP = idp_app
+        self.config = config
         eduid_idp.cache.ExpiringCache.__init__(self, name, logger, ttl, lock)
 
     def store_ticket(self, ticket):
@@ -246,14 +250,17 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
             _certs = self.IDP.metadata.certs(issuer, "any", "signing")
-            verified_ok = False
-            for cert in _certs:
-                if verify_redirect_signature(info, cert):
-                    verified_ok = True
-                    break
-            if not verified_ok:
-                self.logger.info("Message signature verification failure")
-                raise eduid_idp.error.BadRequest("Message signature verification failure", logger = self.logger)
+            if self.config.verify_request_signatures:
+                verified_ok = False
+                for cert in _certs:
+                    if verify_redirect_signature(info, cert):
+                        verified_ok = True
+                        break
+                if not verified_ok:
+                    self.logger.info("Message signature verification failure")
+                    raise eduid_idp.error.BadRequest("Message signature verification failure", logger = self.logger)
+            else:
+                self.logger.debug("Ignoring existing request signature based on verify_request_signature")
         else:
             # XXX check if metadata says request should be signed ???
             self.logger.debug("No signature in SAMLRequest")
@@ -548,7 +555,7 @@ def verify_username_and_password(dic, idp_app, min_length=0):
     if user:
         if len(password) >= min_length:
             return user
-        idp_app.logger("User {!r} authenticated, but denied by password length constraints".format(user))
+        idp_app.logger.debug("User {!r} authenticated, but denied by password length constraints".format(user))
     return False
 
 
