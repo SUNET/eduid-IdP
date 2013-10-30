@@ -14,7 +14,6 @@ Code handling Single Log Out requests.
 import pprint
 
 from eduid_idp.service import Service
-from eduid_idp.mischttp import Response, delete_cookie
 from eduid_idp.error import BadRequest
 import eduid_idp.mischttp
 
@@ -23,6 +22,7 @@ from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_SOAP
 from saml2.s_utils import exception_trace, error_status_factory
 import saml2.samlp
+import saml2.request
 
 # -----------------------------------------------------------------------------
 # === Single log out ===
@@ -89,6 +89,7 @@ class SLO(Service):
 
         try:
             req_info = self.IDP.parse_logout_request(request, binding)
+            assert isinstance(req_info, saml2.request.LogoutRequest)
             self.logger.debug("Parsed Logout request: {!s}".format(req_info.message))
         except Exception as exc:
             self.logger.error("Bad request parsing logout request : {!r}".format(exc))
@@ -102,11 +103,7 @@ class SLO(Service):
         # look for the subject
         subject = req_info.subject_id()
         self.logger.debug("Logout subject: {!s}".format(subject.text.strip()))
-        try:
-            # XXX should verify issuer somehow perhaps
-            self.logger.debug("Logout request issuer : {!s}".format(req_info.issuer()))
-        except AttributeError:
-            pass
+        # XXX should verify issuer (a.k.a. sender()) somehow perhaps
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
         _name_id = req_info.message.name_id
@@ -118,8 +115,7 @@ class SLO(Service):
 
         status_code = self._logout_using_name_id(_lid, _name_id)
         self.logger.debug("Logout of local-id {!r} result : {!r}".format(_lid, status_code))
-        resp = self._logout_response(req_info, status_code)
-        return resp(self.environ, self.start_response)
+        return self._logout_response(req_info, status_code)
 
     def _logout_using_name_id(self, local_id, name_id):
         """
@@ -143,6 +139,19 @@ class SLO(Service):
         return saml2.samlp.STATUS_SUCCESS
 
     def _logout_response(self, req_info, status_code, sign_response=True):
+        """
+        Create logout response.
+
+        :param req_info: Logout request
+        :param status_code: logout result (e.g. 'urn:oasis:names:tc:SAML:2.0:status:Success')
+        :param sign_response: cryptographically sign response or not
+        :return: HTML response
+
+        :type req_info: saml2.request.LogoutRequest
+        :type status_code: basestring
+        :type sign_response: bool
+        :rtype: basestring
+        """
         self.logger.info("LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(), req_info.sender(),
                                                                            status_code))
         if req_info.binding != BINDING_SOAP:
@@ -170,9 +179,12 @@ class SLO(Service):
         self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 
         # Delete the SSO session cookie in the browser
-        delete_cookie("idpauthn", self.logger)
+        eduid_idp.mischttp.delete_cookie("idpauthn", self.logger)
 
-        if req_info.binding == BINDING_HTTP_REDIRECT:
-            _loc = [v for (k, v) in ht_args['headers'] if k == 'Location']
-            raise eduid_idp.mischttp.Redirect(_loc)
-        return Response(ht_args['data'], **ht_args)
+        # XXX old code checked 'if req_info.binding == BINDING_HTTP_REDIRECT:', but it looks like
+        # it would be more correct to look at bindings[0] here, since `bindings' is what was used
+        # with create_logout_response() and apply_binding().
+        if req_info.binding != bindings[0]:
+            self.logger.debug("Creating response with binding {!r] instead of {!r} used before".format(
+                bindings[0], req_info.binding))
+        return eduid_idp.mischttp.create_html_response(bindings[0], ht_args, self.start_response, self.logger)

@@ -192,6 +192,9 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         :type binding: basestring
         :rtype: SSOLoginData
         """
+        if not info:
+            raise eduid_idp.error.BadRequest("Bad request, please re-initiate login", logger = self.logger)
+
         # Try ticket-cache lookup based on key, or key derived from SAMLRequest
         if "key" in info:
             _key = info["key"]
@@ -352,7 +355,7 @@ class SSO(Service):
         http_args = self.IDP.apply_binding(self.binding_out, str(_resp), self.destination,
                                            ticket.RelayState, response = True)
         #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
-        return self.response(self.binding_out, http_args)
+        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
 
     def redirect(self):
         """ This is the HTTP-redirect endpoint.

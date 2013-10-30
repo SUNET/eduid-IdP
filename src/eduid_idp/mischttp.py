@@ -16,47 +16,16 @@ Miscellaneous HTTP related functions.
 import os
 import re
 import base64
+import pprint
 import cherrypy
+import pkg_resources
 
 from urlparse import parse_qs
-import pkg_resources
 
 import eduid_idp
 
-
-class Response(object):
-    """
-    Legacy Response callable object, to handle response creation where
-    pysaml2 have been used to generate the input parameters (such as using
-    the function apply_binding()).
-    """
-    _template = None
-    _status = '200 OK'
-    _content_type = 'text/html'
-
-    def __init__(self, message = None, **kwargs):
-        self.status = kwargs.get('status', self._status)
-        self.response = kwargs.get('response', self._response)
-        self.template = kwargs.get('template', self._template)
-
-        self.message = message
-
-        self.headers = kwargs.get('headers', [])
-        _content_type = kwargs.get('content', self._content_type)
-        headers_lc = [x[0].lower() for x in self.headers]
-        if 'content-type' not in headers_lc:
-            self.headers.append(('Content-Type', _content_type))
-
-    def __call__(self, environ, start_response):
-        start_response(self.status, self.headers)
-        return self.response(self.message or geturl())
-
-    def _response(self, message = ""):
-        if self.template:
-            return [self.template % message]
-        elif isinstance(message, basestring):
-            return [message]
-        return message
+from saml2 import BINDING_HTTP_ARTIFACT
+from saml2 import BINDING_HTTP_REDIRECT
 
 
 class Redirect(cherrypy.HTTPRedirect):
@@ -64,6 +33,53 @@ class Redirect(cherrypy.HTTPRedirect):
     Class 'copy' just to avoid having references to CherryPy in other modules.
     """
     pass
+
+
+def create_html_response(binding, http_args, start_response, logger):
+    """
+    Create a HTML response based on parameters compiled by pysaml2 functions
+    like apply_binding().
+
+    :param binding: SAML binding
+    :param http_args: response data
+    :param start_response: WSGI-like start_response function
+    :param logger: logging logger
+
+    :return: HTML response
+
+    :type binding: basestring
+    :type http_args: dict
+    :type start_response: function
+    :type logger: logging.Logger
+    :rtype: basestring
+    """
+    if binding == BINDING_HTTP_ARTIFACT or binding == BINDING_HTTP_REDIRECT:
+        # XXX This URL extraction code is untested in practice, but it appears
+        # the should be HTTP headers in http_args['headers']
+        urls = [v for (k, v) in http_args['headers'] if k == 'Location']
+        logger.debug('Binding {!r} redirecting to {!r}'.format(binding, urls))
+        if 'url' in http_args:
+            del http_args['headers']  # less debug log below
+            logger.debug('XXX there is also a "url" in http_args :\n{!s}'.format(pprint.pformat(http_args)))
+            if not urls:
+                urls = [http_args.get('url')]
+        raise cherrypy.HTTPRedirect(urls)
+
+    # Parse the parts of http_args we know how to parse, and then warn about any remains.
+    message = http_args.pop('data')
+    status = http_args.pop('status', '200 Ok')
+    headers = http_args.pop('headers', [])
+    headers_lc = [x[0].lower() for x in headers]
+    if 'content-type' not in headers_lc:
+        _content_type = http_args.pop('content', 'text/html')
+        headers.append(('Content-Type', _content_type))
+
+    if http_args != {}:
+        logger.debug('Unknown HTTP args when creating {!r} response :\n{!s}'.format(
+            status, pprint.pformat(http_args)))
+
+    start_response(status, headers)
+    return message
 
 
 def geturl(query = True, path = True):
@@ -87,13 +103,13 @@ def geturl(query = True, path = True):
 
 def get_post():
     """
-    Return the query string equivalent from a HTML POST request.
+    Return the parsed query string equivalent from a HTML POST request.
 
     When the method is POST the query string will be sent in the HTTP request body.
 
     :return: query string
 
-    :rtype: basestring
+    :rtype: dict
     """
     return cherrypy.request.body_params
 
