@@ -201,7 +201,7 @@ class IdPApplication(object):
         self.logger.debug("--- Verify ---")
         assert not (self._lookup_userdata())  # just to verify when refactoring
         environ = {}
-        return eduid_idp.login.do_verify(environ, self._my_start_response, self)
+        return eduid_idp.login.do_verify(environ, self)
 
     @cherrypy.expose
     def static(self, *_args, **_kwargs):
