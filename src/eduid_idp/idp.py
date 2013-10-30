@@ -220,6 +220,14 @@ class IdPApplication(object):
     def _my_start_response(self, status, headers):
         """
         The IdP used to be a WSGI application, and this function is a remaining trace of that.
+
+        Headers are expected to be a list of (Name, Value) tuples, e.g. [('Content-Type', 'text/html')].
+
+        :param status: HTML status code of response
+        :param headers: HTML headers to add to the response
+
+        :type status: int
+        :type headers: list[(string, string)]
         """
         self.logger.debug("Initiating HTTP response {!r}, headers {!s}".format(status, pprint.pformat(headers)))
         if hasattr(cherrypy.response, 'idp_response_status') and cherrypy.response.idp_response_status:
@@ -234,7 +242,8 @@ class IdPApplication(object):
         """
         Initialize well-known environment for this request.
 
-        :returns: environ dict()
+        :returns: environment data
+        :rtype: dict
         """
         environ = {'idp.user': None,
                    }
@@ -251,6 +260,13 @@ class IdPApplication(object):
         return environ
 
     def _lookup_userdata(self):
+        """
+        See if a valid SSO session exists for this request, and return the data about
+        the currently logged in user from the session store.
+
+        :return: Data about currently logged in user
+        :rtype: dict | None
+        """
         userdata = None
         _session_id = eduid_idp.mischttp.read_cookie(self.logger)
         if _session_id:
@@ -286,6 +302,9 @@ class IdPApplication(object):
         :param ref: object
         :param class_ref: Authn class ref as string
         :return: authn context or None
+
+        :type class_ref: basestring
+        :rtype: dict | None
         """
         try:
             _authn = self.AUTHN_BROKER[ref]
@@ -315,10 +334,15 @@ class IdPApplication(object):
         Display a 'fail whale' page (error.html), and log the error in a way that makes
         post-mortem analysis in Sentry as easy as possible.
 
-        :param status: integer, HTML error code
-        :param message: string, HTML error message
+        :param status: HTML error code like '404 Not Found'
+        :param message: HTML error message
         :param traceback: traceback of error
         :param version: cherrypy version
+
+        :type status: basestring
+        :type message: basestring
+        :type traceback: basestring
+        :type version: basestring
         """
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
@@ -326,6 +350,20 @@ class IdPApplication(object):
 
     def _render_error_page(self, status, reason, traceback=None):
         # Look for error page in user preferred language
+        """
+        Render localized error page `error.html' or a default string based one if
+        that page is not found in the configured content packages.
+
+        :param status: HTML error code
+        :param reason: HTML error message
+        :param traceback: traceback of error
+        :return: HTML
+
+        :type status: basestring
+        :type reason: basestring
+        :type traceback: basestring
+        :rtype: basestring
+        """
         res = eduid_idp.mischttp.localized_resource(
             self._my_start_response, 'error.html', self.config, logger=self.logger, status=status)
         if not res:
@@ -426,7 +464,6 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     cherrypy.config.update(cherry_conf)
 
     cherrypy.quickstart(IdPApplication(logger, config))
-
 
 if __name__ == '__main__':
     try:
