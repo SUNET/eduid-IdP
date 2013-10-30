@@ -32,6 +32,10 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+"""
+User and user database module.
+"""
+
 import pprint
 
 import vccs_client
@@ -39,6 +43,9 @@ from eduid_am.celery import celery, get_attribute_manager
 
 
 class NoSuchUser(Exception):
+    """
+    Exception raised when a user can't be found in the userdb.
+    """
     pass
 
 
@@ -47,19 +54,23 @@ class IdPUser(object):
     Representation of a user. Used to load data about a user from the
     userdb, and then represent it in a readable way.
 
-    :param username: string, username to search for in userdb
-    :param userdb: IdPUserDb instance
+    :param username: username to search for in userdb
+    :param backend: user database instance, probably a Celery task
     :raise NoSuchUser: if 'username' was not found in the userdb
+
+    :type username: basestring
+    :type backend:
     """
 
-    def __init__(self, username, userdb):
+    def __init__(self, username, backend):
         self._username = username
         for field in ['mail', 'eduPersonPrincipalName']:
-            self._data = userdb.get_user_by_field(field, username)
+            self._data = backend.get_user_by_field(field, username)
             if self._data:
                 break
         if not self._data:
             raise NoSuchUser("User {!r} not found".format(username))
+        assert isinstance(self._data, dict)
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -70,10 +81,24 @@ class IdPUser(object):
 
     @property
     def identity(self):
+        """
+        All the key-value pairs of this user in the user database.
+
+        :return: Full user identity
+
+        :rtype: dict
+        """
         return self._data
 
     @property
     def username(self):
+        """
+        Primary identifying username for this user.
+
+        :return: username
+
+        :rtype: basestring
+        """
         return self._username
 
     @property
@@ -86,19 +111,31 @@ class IdPUser(object):
 
 
 class IdPUserDb(object):
-    def __init__(self, logger, config, userdb = None, auth_client = None):
+    """
+
+    :param logger: logging logger
+    :param config: IdP config
+    :param backend: User database
+    :param auth_client: VCCS authentication client
+
+    :type logger: logging.Logger
+    :type config: eduid_idp.config.IdPConfig
+    :type auth_client: vccs_client.VCCSClient
+    """
+
+    def __init__(self, logger, config, backend = None, auth_client = None):
         self.logger = logger
         self.config = config
         self.auth_client = auth_client
         if auth_client is None:
             self.auth_client = vccs_client.VCCSClient()
-        self.userdb = userdb
-        if userdb is None:
+        self.backend = backend
+        if backend is None:
             if config.userdb_mongo_uri and config.userdb_mongo_database:
                 settings = {'MONGO_URI': config.userdb_mongo_uri,
                             }
                 celery.conf.update(settings)
-            self.userdb = get_attribute_manager(celery)
+            self.backend = get_attribute_manager(celery)
 
     def verify_username_and_password(self, username, password):
         """
@@ -107,9 +144,13 @@ class IdPUserDb(object):
         Currently, the naive approach of looping through all the users password credentials
         is taken. This is bad because the more passwords a user has, the more likely an
         online attacker is to guess any one of them.
-        :param username: string
-        :param password: string
+        :param username: identifier given by user, probably an e-mail address or eppn
+        :param password: password given by user
         :return: IdPUser on successful authentication
+
+        :type username: basestring
+        :type password: basestring
+        :rtype: IdPUser | None
         """
         user = self.lookup_user(username)
         if not user:
@@ -139,9 +180,10 @@ class IdPUserDb(object):
         Load IdPUser from userdb.
 
         :param username: string
-        :return: IdPUser or None
+        :return: user found in database
+        :rtype: IdPUser | None
         """
         try:
-            return IdPUser(username, userdb = self.userdb)
+            return IdPUser(username, backend = self.backend)
         except NoSuchUser:
             return None

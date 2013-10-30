@@ -25,9 +25,13 @@ class Service(object):
     """
     Base service class. Common code for SSO and SLO classes.
 
-    :param environ: environ dict() (see eduid_idp.idp._request_environment())
+    :param environ: environment (see eduid_idp.idp._request_environment())
     :param start_response: WSGI-like start_response function pointer
     :param idp_app: IdPApplication instance
+
+    :type environ: dict
+    :type start_response: function
+    :type idp_app: idp.IdPApplication
     """
 
     def __init__(self, environ, start_response, idp_app):
