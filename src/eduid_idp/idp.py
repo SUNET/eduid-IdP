@@ -306,7 +306,7 @@ class IdPApplication(object):
         post-mortem analysis in Sentry as easy as possible.
         """
         cherrypy.response.status = 500
-        cherrypy.response.body = self._render_error_page(500, 'Server Internal Error')
+        cherrypy.response.body = self._render_error_page('500', 'Server Internal Error')
 
     def error_page_default(self, status, message, traceback, version):
         """
@@ -341,14 +341,14 @@ class IdPApplication(object):
 
         # apply simplistic HTML formatting to template in 'res'
         argv = {
-            'error_status': status,
-            'error_code': status_code,
-            'error_reason': reason,
+            'error_status': str(status),
+            'error_code': str(status_code),
+            'error_reason': str(reason),
             'error_traceback': str(traceback),
         }
         res = res.format(**argv)
 
-        if not status.startswith("404 "):
+        if status_code != 404:
             self.logger.error("Error in IdP application",
                               exc_info = 1, extra={'stack': True,
                                                    'request': cherrypy.request,
