@@ -93,6 +93,9 @@ def init_AuthnBroker(my_id):
 
     :param my_id: The IdP entity id as string
     :return: AuthnBroker instance
+
+    :type my_id: basestring
+    :rtype: AuthnBroker
     """
     # NOTE: The function pointers supplied to the AUTHN_BROKER is not for authentication,
     # but for displaying proper login forms it seems. In eduid_idp, a single function
@@ -110,10 +113,15 @@ def canonical_req_authn_context(req_authn_ctx, logger, contexts=_context_to_inte
     """
     Return internal representation (canonical form) of RequestedAuthnContext requested by SP.
 
-    :param req_authn_ctx: saml2.samlp.RequestedAuthnContext instance
+    :param req_authn_ctx: RequestedAuthnContext from SAML request
     :param logger: logging logger
     :param contexts: context class_ref lookup table (dict)
-    :return: saml2.samlp.RequestedAuthnContext instance
+    :return: Canonical RequestedAuthnContext
+
+    :type req_authn_ctx: saml2.samlp.RequestedAuthnContext
+    :type logger: logging.Logger
+    :type contexts: dict
+    :rtype: saml2.samlp.RequestedAuthnContext
     """
     try:
         class_ref = req_authn_ctx.authn_context_class_ref[0].text
@@ -141,11 +149,18 @@ def response_authn(req_authn_ctx, actual_authn, auth_levels, logger, response_co
     given the RequestedAuthnContext from the SAML request.
 
     :param req_authn_ctx: saml2.samlp.RequestedAuthnContext instance
-    :param actual_authn: dict with information about the authenticated context
+    :param actual_authn: information about the authenticated context
     :param auth_levels: list with class_ref strings OK for req_authn_ctx
     :param logger: logging logger
-    :param response_contexts: response context class_ref lookup table (dict)
+    :param response_contexts: response context class_ref lookup table
     :return: dict with information about the authn context (pysaml2 style)
+
+    :type req_authn_ctx: saml2.samlp.RequestedAuthnContext
+    :type actual_authn: dict
+    :type auth_levels: list[string]
+    :type logger: logging.Logger
+    :type response_contexts: dict
+    :rtype: dict
     """
     # Start out with result template (res) based only on the actual authentication performed
     if actual_authn['class_ref'] not in response_contexts:

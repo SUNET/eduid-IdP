@@ -98,7 +98,7 @@ class FakeAuthClient(object):
 class TestIdPUserDb(TestCase):
     def setUp(self):
         config = None
-        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, userdb = FakeUserDb(),
+        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, backend = FakeUserDb(),
                                                        auth_client = FakeAuthClient())
 
     def test_lookup_user(self):

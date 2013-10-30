@@ -50,6 +50,11 @@ def parse_accept_lang_header(lang_string):
     header, and returns a list of (lang, q-value), ordered by 'q' values.
 
     Any format errors in lang_string results in an empty list being returned.
+
+    :param lang_string: Accept-Language header
+
+    :type lang_string: basestring
+    :rtype: list[(string, string)]
     """
     result = []
     pieces = accept_language_re.split(lang_string)

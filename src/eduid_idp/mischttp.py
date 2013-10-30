@@ -25,6 +25,11 @@ import eduid_idp
 
 
 class Response(object):
+    """
+    Legacy Response callable object, to handle response creation where
+    pysaml2 have been used to generate the input parameters (such as using
+    the function apply_binding()).
+    """
     _template = None
     _status = '200 OK'
     _content_type = 'text/html'
@@ -81,8 +86,15 @@ def geturl(query = True, path = True):
 
 
 def get_post():
-    # When the method is POST the query string will be sent
-    # in the HTTP request body
+    """
+    Return the query string equivalent from a HTML POST request.
+
+    When the method is POST the query string will be sent in the HTTP request body.
+
+    :return: query string
+
+    :rtype: basestring
+    """
     return cherrypy.request.body_params
 
 
@@ -150,7 +162,7 @@ def get_content_type(filename):
              'js': 'application/javascript',
              'txt': 'text/plain',
              'xml': 'text/xml',
-    }
+             }
     ext = filename.rsplit('.', 1)[-1]
     if ext not in types:
         return None
@@ -176,7 +188,7 @@ def read_cookie(logger):
         try:
             cookie_val = base64.b64decode(_authn.value)
             logger.debug("idpauthn cookie value={!r}".format(cookie_val))
-            return cookie_val  # XXX should maybe split on ':' to be consistent with set_cookie
+            return cookie_val
         except KeyError:
             return None
     else:
@@ -196,7 +208,7 @@ def delete_cookie(name, logger):
     return set_cookie(name, 0, '/', logger)
 
 
-def set_cookie(name, expire, path, logger, *args):
+def set_cookie(name, expire, path, logger, value=''):
     """
     Ask browser to store a cookie.
 
@@ -206,10 +218,19 @@ def set_cookie(name, expire, path, logger, *args):
     :param expire: Number of minutes before this cookie goes stale
     :param path: The path specification for the cookie
     :param logger: logging instance
+    :param value: The value to assign to the cookie
+
     :return: True on success
+
+    :type name: basestring
+    :type expire: int
+    :type path: basestring
+    :type logger: logging.Logger
+    :type value: basestring
+    :rtype: bool
     """
     cookie = cherrypy.response.cookie
-    cookie[name] = base64.b64encode(":".join(args))
+    cookie[name] = base64.b64encode(str(value))
     cookie[name]['path'] = path
     cookie[name]['max-age'] = expire * 60
     cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
@@ -219,6 +240,15 @@ def set_cookie(name, expire, path, logger, *args):
 
 
 def parse_query_string():
+    """
+    Parse HTML request query string into (key, value) tuples.
+
+    NOTE: Only the first header value for each header is returned.
+
+    :return: parsed query string
+
+    :rtype: list[(string, string)]
+    """
     query = None
     if cherrypy.request.query_string:
         _qs = cherrypy.request.query_string
@@ -232,7 +262,11 @@ def parse_accept_lang_header(lang_string):
     header, and returns a list of (lang, q-value), ordered by 'q' values.
 
     Any format errors in lang_string results in an empty list being returned.
-    :param lang_string: string
+
+    :param lang_string: Accept-Language header
+
+    :type lang_string: basestring
+    :rtype: list[(string, string)]
     """
     return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)
 
@@ -248,6 +282,14 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     :param config: IdP config instance
     :param logger: optional logging logger, for debug log messages
     :param status: string, optional HTML result data ('404 Not Found' for example)
+    :return: HTML response data
+
+    :type start_response: function
+    :type filename: basestring
+    :type config: config.Config
+    :type logger: logging.Logger
+    :type status: basestring
+    :rtype: basestring
     """
     _LANGUAGE_RE = re.compile(
             r'''

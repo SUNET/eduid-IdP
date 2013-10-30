@@ -553,6 +553,14 @@ def do_verify(environ, idp_app):
     """
     Perform authentication of user based on user provided credentials.
 
+    What kind of authentication to perform was chosen by SSO._not_authn() when
+    the login web page was to be rendered. It is passed to this function through
+    an HTTP POST parameter (authn_reference).
+
+    This function should not be thought of as a "was login successful" or not.
+    It will figure out what authentication level to assert based on the authncontext
+    requested, and the actual authentication that succeeded.
+
     :param environ: environ dict() (see eduid_idp.idp._request_environment())
     :param idp_app: IdPApplication instance
     :returns: Does not return
@@ -568,10 +576,6 @@ def do_verify(environ, idp_app):
     idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
 
     _ticket = idp_app.IDP.ticket.get_ticket(query)
-
-    # What kind of authentication to perform was chosen by SSO._not_authn() when
-    # the login web page was to be rendered. It is passed to us here through an HTTP POST
-    # parameter (authn_reference) so it can't be trusted. XXX is this a problem? Not sure.
 
     user_authn = None
     authn_ref = query.get('authn_reference')
