@@ -579,9 +579,11 @@ def do_verify(environ, idp_app):
     :raise eduid_idp.mischttp.Redirect: On successful authentication, redirect to redirect_uri.
     """
     query = eduid_idp.mischttp.get_post()
-
+    # extract password to keep it away from as much code as possible
+    password = query['password']
+    del query['password']
     _loggable = query.copy()
-    if 'password' in _loggable:
+    if password:
         _loggable['password'] = '<redacted>'
     idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
@@ -600,11 +602,16 @@ def do_verify(environ, idp_app):
         user_authn['class_ref'], authn_ref))
 
     try:
+        login_data = {'username': query.get('username'),
+                      'password': password,
+                      }
         if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
-            user = verify_username_and_password(query, idp_app)
+            user = verify_username_and_password(login_data, idp_app)
         elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            user = verify_username_and_password(query, idp_app, min_length=20)
+            user = verify_username_and_password(login_data, idp_app, min_length=20)
         else:
+            del login_data  # keep out of any exception logs
+            del password    # keep out of any exception logs
             idp_app.logger.info("Authentication for class {!r} not implemented".format(user_authn['class_ref']))
             raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
                 user_authn['class_ref'], logger=idp_app.logger))
@@ -613,6 +620,8 @@ def do_verify(environ, idp_app):
                                                                               'request': cherrypy.request,
                                                                               })
         user = None
+
+    del password  # keep out of any exception logs
 
     if not user:
         _ticket.FailCount += 1
