@@ -255,7 +255,7 @@ class IdPApplication(object):
             self.logger.debug("Username {!r} in status request is not on the list "
                               "of permitted usernames : {!r}".format(parsed['username'],
                                                                      self.config.status_test_usernames))
-            raise eduid_idp.error.BadRequest(logger = self.logger)
+            raise eduid_idp.error.Forbidden(logger = self.logger)
 
         response = {'status': 'FAIL'}
 

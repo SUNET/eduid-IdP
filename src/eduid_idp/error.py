@@ -62,12 +62,14 @@ class Unauthorized(HTTPError):
     def __init__(self, message=None, logger=None, extra={}):
         HTTPError.__init__(self, status=401, message=message, logger=logger, extra=extra)
 
-
-class ServiceError(HTTPError):
+class Forbidden(HTTPError):
     def __init__(self, message=None, logger=None, extra={}):
-        HTTPError.__init__(self, status=500, message=message, logger=logger, extra=extra)
-
+        HTTPError.__init__(self, status=403, message=message, logger=logger, extra=extra)
 
 class NotFound(HTTPError):
     def __init__(self, message=None, logger=None, extra={}):
         HTTPError.__init__(self, status=404, message=message, logger=logger, extra=extra)
+
+class ServiceError(HTTPError):
+    def __init__(self, message=None, logger=None, extra={}):
+        HTTPError.__init__(self, status=500, message=message, logger=logger, extra=extra)
