@@ -355,6 +355,7 @@ class IdPApplication(object):
         :type message: string
         :type traceback: string
         :type version: string
+        :rtype: string
         """
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
@@ -374,7 +375,7 @@ class IdPApplication(object):
         :type status: string
         :type reason: string
         :type traceback: string
-        :rtype: string
+        :rtype: unicode
         """
         res = eduid_idp.mischttp.localized_resource(
             self._my_start_response, 'error.html', self.config, logger=self.logger, status=status)
@@ -397,6 +398,12 @@ class IdPApplication(object):
             'error_traceback': str(traceback),
         }
         res = res.format(**argv)
+
+        # Some of the error pages will be in UTF-8
+        try:
+            res = res.decode('utf-8')
+        except UnicodeDecodeError:
+            pass
 
         if status_code != 404:
             self.logger.error("Error in IdP application",

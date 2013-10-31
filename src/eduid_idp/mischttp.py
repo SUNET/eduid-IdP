@@ -118,9 +118,13 @@ def static_filename(config, path):
     """
     Check if there is a static file matching 'path'.
 
-    :param config: IdP config instance
-    :param path: string, URL part to check
+    :param config: IdP config
+    :param path: URL part to check
     :return: False, None or filename as string
+
+    :type config: config.IdPConfig
+    :type path: string
+    :rtype: False | None | string
     """
     if not isinstance(path, basestring):
         return False
@@ -141,8 +145,14 @@ def static_file(start_response, filename, fp=None, status=None):
     :param start_response: WSGI-like start_response function
     :param filename: OS path to the files whose content should be served
     :param fp: optional file-like object implementing read()
-    :param status: string, optional HTML result data ('404 Not Found' for example)
-    :return: string with file content
+    :param status: optional HTML result data ('404 Not Found' for example)
+    :return: file content
+
+    :type start_response: function
+    :type filename: string
+    :type fp: File
+    :type status: string
+    :rtype: string
     """
     content_type = get_content_type(filename)
     if not content_type:
@@ -170,6 +180,9 @@ def get_content_type(filename):
 
     :param filename: string
     :return: string like 'text/html'
+
+    :type filename: string
+    :rtype: string
     """
     types = {'ico': 'image/x-icon',
              'png': 'image/png',
@@ -196,6 +209,9 @@ def read_cookie(logger):
 
     :param logger: logging logger
     :returns: string with cookie content, or None
+
+    :type logger: logging.Logger
+    :rtype: string | None
     """
     cookie = cherrypy.request.cookie
     logger.debug("Parsing cookie(s): {!s}".format(cookie))
@@ -219,6 +235,10 @@ def delete_cookie(name, logger):
     :param name: cookie name as string
     :param logger: logging logger
     :return: True on success
+
+    :type name: string
+    :type logger: logging.Logger
+    :rtype: bool
     """
     logger.debug("Delete cookie: {!s}".format(name))
     return set_cookie(name, 0, '/', logger)
