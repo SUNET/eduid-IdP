@@ -58,6 +58,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'raven_dsn': None,
                     'content_packages': [],  # List of Python packages ("name:path") with content resources
                     'verify_request_signatures': '0',  # '1' for True, '0' for False
+                    'status_test_usernames': []
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -77,6 +78,7 @@ class IdPConfig(object):
 
     def __init__(self, filename, debug):
         self._parsed_content_packages = None
+        self._parsed_status_test_usernames = None
         self.section = _CONFIG_SECTION
         _CONFIG_DEFAULTS['debug'] = str(debug)
         cfgdir = os.path.dirname(filename)
@@ -264,3 +266,21 @@ class IdPConfig(object):
         """
         res = self.config.get(self.section, 'verify_request_signatures')
         return bool(int(res))
+
+    @property
+    def status_test_usernames(self):
+        """
+        Get list of usernames valid for use with the /status URL.
+
+        If this list is ['*'], all usernames are allowed for /status.
+
+        :return: list of usernames
+
+        :rtype: list[string]
+        """
+        if self._parsed_status_test_usernames:
+            return self._parsed_status_test_usernames
+        value = self.config.get(self.section, 'status_test_usernames')
+        res = [x.strip() for x in value.split(',')]
+        self._parsed_content_packages = res
+        return res

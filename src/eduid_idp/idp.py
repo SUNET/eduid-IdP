@@ -80,6 +80,7 @@ import argparse
 import threading
 
 import cherrypy
+import simplejson
 
 import eduid_idp
 from eduid_idp.login import SSO
@@ -160,7 +161,6 @@ class IdPApplication(object):
         self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, 5 * 60,
                                                             self.config, threading.Lock())
 
-
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
@@ -228,6 +228,39 @@ class IdPApplication(object):
             return eduid_idp.mischttp.static_file(self._my_start_response, static_fn)
 
         raise eduid_idp.error.NotFound(logger = self.logger)
+
+    @cherrypy.expose
+    def status(self, request=None):
+        """
+        Check that the userdb and authentication backends are operational.
+
+        :param request: The HTTP POST parameter `request'
+        :return: HTML response with JSON data
+
+        :rtype: string
+        """
+        self.logger.debug("Status request")
+
+        parsed = simplejson.loads(request)
+        if 'username' not in parsed or 'password' not in parsed:
+            raise eduid_idp.error.BadRequest(logger = self.logger)
+
+        if parsed['username'] not in self.config.status_test_usernames \
+                and self.config.status_test_usernames != ['*']:
+            self.logger.debug("Username {!r} in status request is not on the list "
+                              "of permitted usernames : {!r}".format(parsed['username'],
+                                                                     self.config.status_test_usernames))
+            raise eduid_idp.error.BadRequest(logger = self.logger)
+
+        response = {'status': 'FAIL'}
+
+        user = eduid_idp.login.verify_username_and_password(parsed, self)
+        if user:
+            response = {'status': 'OK',
+                        'testuser_name': user.identity.get('displayName'),
+                        }
+
+        return "{}\n".format(simplejson.dumps(response))
 
     def _my_start_response(self, status, headers):
         """
