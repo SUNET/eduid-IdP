@@ -337,7 +337,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
             ''', re.VERBOSE)
 
     # Look for some static page in user preferred language
-    languages = eduid_idp.mischttp.parse_accept_lang_header(cherrypy.request.headers['Accept-Language'])
+    languages = eduid_idp.mischttp.parse_accept_lang_header(cherrypy.request.headers.get('Accept-Language', ''))
     if logger:
         logger.debug("Client language preferences: {!r}".format(languages))
 
