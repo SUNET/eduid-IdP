@@ -88,11 +88,16 @@ from eduid_idp.logout import SLO
 
 from saml2 import server
 
+# Load Raven (exception logging to Sentry), if available.
 try:
+    #noinspection PyPackageRequirements
     import raven
-    raven_imported = True
+    #noinspection PyPackageRequirements
+    from raven.handlers.logging import SentryHandler
 except ImportError:
     raven = None
+    SentryHandler = None
+
 
 default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
@@ -455,6 +460,15 @@ class IdPApplication(object):
 def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     """
     Initialize everything and start the IdP application.
+
+    :param myname: name of IdP application
+    :param args: Object with attributes
+    :param logger: logging logger
+    :return: Does not return
+
+    :type myname: string
+    :type args: None | object
+    :type logger: logging.Logger
     """
     if not args:
         args = parse_args()
@@ -481,8 +495,7 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         syslog_h.setFormatter(formatter)
         logger.addHandler(syslog_h)
     if config.raven_dsn:
-        if raven:
-            from raven.handlers.logging import SentryHandler
+        if raven and SentryHandler:
             logger.debug("Setting up Raven exception logging")
             client = raven.Client(config.raven_dsn, timeout=10)
             handler = SentryHandler(client, level=logging.ERROR)
