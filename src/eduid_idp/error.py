@@ -38,7 +38,7 @@ import cherrypy
 
 class HTTPError(cherrypy.HTTPError):
 
-    def __init__(self, status=500, message=None, logger=None):
+    def __init__(self, status=500, message=None, logger=None, extra={}):
         if logger:
             caller = None
             try:
@@ -49,25 +49,25 @@ class HTTPError(cherrypy.HTTPError):
                     caller = stack[2][1:]
             except ValueError:
                 pass
-            logger.error("HTTP error {!s} {!s} (at {!r})".format(status, message, caller))
+            logger.error("HTTP error {!s} {!s} (at {!r})".format(status, message, caller), extra=extra)
         cherrypy.HTTPError.__init__(self, status, message)
 
 
 class BadRequest(HTTPError):
-    def __init__(self, message=None, logger=None):
-        HTTPError.__init__(self, status=400, message=message, logger=logger)
+    def __init__(self, message=None, logger=None, extra={}):
+        HTTPError.__init__(self, status=400, message=message, logger=logger, extra=extra)
 
 
 class Unauthorized(HTTPError):
-    def __init__(self, message=None, logger=None):
-        HTTPError.__init__(self, status=401, message=message, logger=logger)
+    def __init__(self, message=None, logger=None, extra={}):
+        HTTPError.__init__(self, status=401, message=message, logger=logger, extra=extra)
 
 
 class ServiceError(HTTPError):
-    def __init__(self, message=None, logger=None):
-        HTTPError.__init__(self, status=500, message=message, logger=logger)
+    def __init__(self, message=None, logger=None, extra={}):
+        HTTPError.__init__(self, status=500, message=message, logger=logger, extra=extra)
 
 
 class NotFound(HTTPError):
-    def __init__(self, message=None, logger=None):
-        HTTPError.__init__(self, status=404, message=message, logger=logger)
+    def __init__(self, message=None, logger=None, extra={}):
+        HTTPError.__init__(self, status=404, message=message, logger=logger, extra=extra)
