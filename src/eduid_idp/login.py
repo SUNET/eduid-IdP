@@ -587,8 +587,6 @@ def do_verify(environ, idp_app):
         _loggable['password'] = '<redacted>'
     idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
-    idp_app.logger.debug("ENVIRON:\n{!s}".format(pprint.pformat(environ)))
-
     _ticket = idp_app.IDP.ticket.get_ticket(query)
 
     user_authn = None
