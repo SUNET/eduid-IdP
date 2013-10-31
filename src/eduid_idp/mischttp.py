@@ -358,3 +358,15 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     # default language file
     static_fn = eduid_idp.mischttp.static_filename(config, filename)
     return eduid_idp.mischttp.static_file(start_response, static_fn, status=status)
+
+
+def get_http_method():
+    """
+    Get the HTTP method verb for this request.
+
+    This function keeps other modules from having to know that CherryPy is used.
+
+    :return: 'GET', 'POST' or other
+    :rtype: string
+    """
+    return cherrypy.request.method

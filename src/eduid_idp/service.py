@@ -15,8 +15,6 @@ Common code for SSO login/logout requests.
 
 import pprint
 
-from saml2 import BINDING_HTTP_ARTIFACT
-
 import eduid_idp.mischttp
 
 
@@ -44,9 +42,21 @@ class Service(object):
         self.user = environ['idp.user']
 
     def unpack_redirect(self):
+        """
+        Unpack redirect (GET) parameters.
+
+        :return: query parameters as dict
+        :rtype: dict
+        """
         return eduid_idp.mischttp.parse_query_string()
 
     def unpack_post(self):
+        """
+        Unpack POSTed parameters.
+
+        :return: query parameters as dict
+        :rtype: dict
+        """
         #info = parse_qs(get_post(self.environ))
         info = eduid_idp.mischttp.get_post()
         self.logger.debug("unpack_post:: %s" % info)
@@ -56,9 +66,15 @@ class Service(object):
             return None
 
     def unpack_either(self):
-        if self.environ["REQUEST_METHOD"] == "GET":
+        """
+        Unpack either redirect (GET) or POST parameters.
+
+        :return: query parameters as dict
+        :rtype: dict
+        """
+        if eduid_idp.mischttp.get_http_method() == 'GET':
             _dict = self.unpack_redirect()
-        elif self.environ["REQUEST_METHOD"] == "POST":
+        elif eduid_idp.mischttp.get_http_method() == 'POST':
             _dict = self.unpack_post()
         else:
             _dict = None
