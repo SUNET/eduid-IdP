@@ -216,7 +216,12 @@ class IdPApplication(object):
     def verify(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
         self.logger.debug("--- Verify ---")
-        assert not (self._lookup_userdata())  # just to verify when refactoring
+        if self._lookup_userdata():
+            # If an already logged in user presses 'back' or similar, we can't really expect to
+            # manage to log them in again (think OTPs) and just continue 'back' to the SP.
+            # Better to show a nice looking 'error' page.
+            raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
+                                               logger = self.logger)
         environ = {}
         return eduid_idp.login.do_verify(environ, self)
 
@@ -396,10 +401,17 @@ class IdPApplication(object):
         :rtype: string
         """
         path = cherrypy.request.path_info.lstrip('/')
+        status_code = 'unknown'
+        try:
+            status_code = int(status.split()[0])
+        except (ValueError, AttributeError, IndexError):
+            pass
+        if status_code == 440:
+            return self._render_error_page(status, message, traceback, filename='session_timeout.html')
         self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
         return self._render_error_page(status, message, traceback)
 
-    def _render_error_page(self, status, reason, traceback=None):
+    def _render_error_page(self, status, reason, traceback=None, filename='error.html'):
         # Look for error page in user preferred language
         """
         Render localized error page `error.html' or a default string based one if
@@ -416,7 +428,7 @@ class IdPApplication(object):
         :rtype: unicode
         """
         res = eduid_idp.mischttp.localized_resource(
-            self._my_start_response, 'error.html', self.config, logger=self.logger, status=status)
+            self._my_start_response, filename, self.config, logger=self.logger, status=status)
         if not res:
             # default error message
             res = "<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
@@ -443,7 +455,7 @@ class IdPApplication(object):
         except UnicodeDecodeError:
             pass
 
-        if status_code != 404:
+        if status_code not in [404, 440]:
             self.logger.error("Error in IdP application",
                               exc_info = 1, extra={'stack': True,
                                                    'request': cherrypy.request,

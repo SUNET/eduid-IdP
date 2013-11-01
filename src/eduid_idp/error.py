@@ -49,7 +49,12 @@ class HTTPError(cherrypy.HTTPError):
                     caller = stack[2][1:]
             except ValueError:
                 pass
-            logger.error("HTTP error {!s} {!s} (at {!r})".format(status, message, caller), extra=extra)
+            if extra is None:
+                extra = {}
+            if status not in [404, 440]:
+                logger.error("HTTP error {!s} {!s} (at {!r})".format(status, message, caller), extra=extra)
+            else:
+                logger.debug("HTTP error {!s} {!s} (at {!r})".format(status, message, caller), extra=extra)
         cherrypy.HTTPError.__init__(self, status, message)
 
 

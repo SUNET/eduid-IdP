@@ -214,8 +214,8 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         if _ticket is None:
             self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
             if "key" in info:
-                raise eduid_idp.error.BadRequest("Missing IdP ticket, please re-initiate login",
-                                                 logger = self.logger, extra = {'info': info, 'binding': binding})
+                raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
+                                                   logger = self.logger, extra = {'info': info, 'binding': binding})
 
             # cache miss, parse SAMLRequest
             _ticket = self.create_ticket(info, binding, key=_key)
