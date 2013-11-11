@@ -295,7 +295,7 @@ class IdPConfig(object):
         return self.config.get(self.section, 'signup_link')
 
     @property
-    def passsword_reset_link(self):
+    def password_reset_link(self):
         """
         URL (string) for use in simple templating of login.html.
         """
