@@ -513,6 +513,8 @@ class SSO(Service):
             "alert_msg": "",
             "sp_entity_id": "",
             "failcount": ticket.FailCount,
+            "signup_link": self.config.signup_link,
+            "password_reset_link": self.config.password_reset_link,
         }
 
         # Set alert msg if FailCount is greater than zero

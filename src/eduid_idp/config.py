@@ -58,7 +58,9 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'raven_dsn': None,
                     'content_packages': [],  # List of Python packages ("name:path") with content resources
                     'verify_request_signatures': '0',  # '1' for True, '0' for False
-                    'status_test_usernames': []
+                    'status_test_usernames': [],
+                    'signup_link': '#',  # for login.html
+                    'password_reset_link': '#',  # for login.html
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -284,3 +286,17 @@ class IdPConfig(object):
         res = [x.strip() for x in value.split(',')]
         self._parsed_content_packages = res
         return res
+
+    @property
+    def signup_link(self):
+        """
+        URL (string) for use in simple templating of login.html.
+        """
+        return self.config.get(self.section, 'signup_link')
+
+    @property
+    def passsword_reset_link(self):
+        """
+        URL (string) for use in simple templating of login.html.
+        """
+        return self.config.get(self.section, 'password_reset_link')
