@@ -61,6 +61,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'status_test_usernames': [],
                     'signup_link': '#',  # for login.html
                     'password_reset_link': '#',  # for login.html
+                    'default_language': 'en',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -300,3 +301,10 @@ class IdPConfig(object):
         URL (string) for use in simple templating of login.html.
         """
         return self.config.get(self.section, 'password_reset_link')
+
+    @property
+    def default_language(self):
+        """
+        Default language code to use when looking for web pages ('en').
+        """
+        return self.config.get(self.section, 'default_language')

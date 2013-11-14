@@ -530,6 +530,8 @@ class SSO(Service):
 
         # Look for login page in user preferred language
         content = eduid_idp.mischttp.localized_resource(self.start_response, 'login.html', self.config, self.logger)
+        if not content:
+            raise eduid_idp.error.NotFound()
 
         # apply simplistic HTML formatting to template in 'res'
         return content.format(**argv)

@@ -342,7 +342,11 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
         logger.debug("Client language preferences: {!r}".format(languages))
 
     if languages:
-        for (lang, q_val) in languages[:50]:  # cap somewhere to prevent DoS
+        languages = [lang for (lang, q_val) in languages[:50]]  # cap somewhere to prevent DoS
+        if not config.default_language in languages:
+            languages.append(config.default_language)
+        logger.debug("Languages list : {!r}".format(languages))
+        for lang in languages:
             if _LANGUAGE_RE.match(lang):
                 for (package, path) in config.content_packages:
                     langfile = path + '/' + lang.lower() + '/' + filename  # pkg_resources paths do not use os.path.join
@@ -357,6 +361,10 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
 
     # default language file
     static_fn = eduid_idp.mischttp.static_filename(config, filename)
+    if not static_fn:
+        logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
+        return None
+    logger.debug('Using default file for {!r}: {!r}'.format(filename, static_fn))
     return eduid_idp.mischttp.static_file(start_response, static_fn, status=status)
 
 
