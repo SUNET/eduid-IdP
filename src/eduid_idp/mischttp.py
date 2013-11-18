@@ -191,6 +191,7 @@ def get_content_type(filename):
              'js': 'application/javascript',
              'txt': 'text/plain',
              'xml': 'text/xml',
+             'svg': 'image/svg+xml',
              }
     ext = filename.rsplit('.', 1)[-1]
     if ext not in types:
