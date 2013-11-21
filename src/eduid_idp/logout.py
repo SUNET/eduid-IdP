@@ -82,8 +82,7 @@ class SLO(Service):
 
         self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(info)))
         if not info:
-            resp = BadRequest('Error parsing request or no request')
-            return resp(self.environ, self.start_response)
+            raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
 
         request = info["SAMLRequest"]
 
