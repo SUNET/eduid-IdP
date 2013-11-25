@@ -75,6 +75,9 @@ class FakeUserDb(object):
             if _user.get(field)==username:
                 return _user
 
+    def get_user_by_mail(self, email):
+        return self.get_user_by_field('mail', email)
+
 
 class FakeAuthClient(object):
     userdb = FakeUserDb()
