@@ -98,6 +98,7 @@ class FakeAuthClient(object):
 class TestIdPUserDb(TestCase):
     def setUp(self):
         config = None
+        #noinspection PyTypeChecker
         self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, backend = FakeUserDb(),
                                                        auth_client = FakeAuthClient())
 
