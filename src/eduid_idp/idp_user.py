@@ -64,10 +64,11 @@ class IdPUser(object):
 
     def __init__(self, username, backend):
         self._username = username
-        for field in ['mail', 'eduPersonPrincipalName']:
-            self._data = backend.get_user_by_field(field, username)
-            if self._data:
-                break
+        self._data = None
+        if '@' in username:
+            self._data = backend.get_user_by_mail(username)
+        if not self._data:
+            self._data = backend.get_user_by_field('eduPersonPrincipalName', username)
         if not self._data:
             raise NoSuchUser("User {!r} not found".format(username))
         assert isinstance(self._data, dict)
