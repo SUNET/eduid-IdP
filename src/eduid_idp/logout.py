@@ -14,7 +14,6 @@ Code handling Single Log Out requests.
 import pprint
 
 from eduid_idp.service import Service
-from eduid_idp.error import BadRequest
 import eduid_idp.mischttp
 
 from saml2 import BINDING_HTTP_REDIRECT
