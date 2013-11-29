@@ -169,10 +169,16 @@ class IdPUserDb(object):
                 self.logger.info("User {!r} password factor {!s} unusable : {!r}".format(username, cred['id'], exc))
                 continue
             self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
-                username, cred['id'], factor))
-            if self.auth_client.authenticate(username, [factor]):
-                self.logger.debug("VCCS authenticated user {!r}".format(user))
-                return user
+                username, str(cred['id']), factor))
+            # Old credentials were created using the username (user['mail']) of the user
+            # instead of the user['_id']. Try both during a transition period.
+            user_ids = [str(user.identity['_id']), user.identity['mail']]
+            if cred.get('user_id_hint') is not None:
+                user_ids.insert(0, cred.get('user_id_hint'))
+            for user_id in user_ids:
+                if self.auth_client.authenticate(user_id, [factor]):
+                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                    return user
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         return None
 
