@@ -60,10 +60,12 @@ _PASSWORDS = [VCCSPasswordFactor("foo", "0"),
 ]
 
 _USERDB = [
-    {'mail': 'test@example.com',
+    {'_id': '0',
+     'mail': 'test@example.com',
      'passwords': _create_passwords('user1', [_PASSWORDS[0], _PASSWORDS[1]])
     },
-    {'eduPersonPrincipalName': 'test2@eduid.se',
+    {'_id': '1',
+     'eduPersonPrincipalName': 'test2@eduid.se',
      'mail': 'test2@example.com',
      'passwords': _create_passwords('user1', [_PASSWORDS[2]]),
     }]
