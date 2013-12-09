@@ -49,9 +49,7 @@ class SLO(Service):
         """
         Single log out using HTTP_SOAP binding
         """
-        self.logger.debug("- SOAP -")
         _dict = self.unpack_soap()
-        self.logger.debug("_dict: %s" % _dict)
         return self.perform_logout(_dict, BINDING_SOAP)
 
     def unpack_soap(self):
@@ -60,9 +58,7 @@ class SLO(Service):
 
         :return: dict with 'SAMLRequest' and 'RelayState' items
         """
-        # XXX suspect this is broken - get_post() returns a dict() now
-        # and it looks like the old get_post returned the body as string
-        query = eduid_idp.mischttp.get_post()
+        query = eduid_idp.mischttp.get_request_body()
         return {'SAMLRequest': query,
                 'RelayState': '',
                 }
@@ -79,7 +75,6 @@ class SLO(Service):
         """
         self.logger.info("--- Single Log Out Service ---")
 
-        self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(info)))
         if not info:
             raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
 
@@ -88,8 +83,9 @@ class SLO(Service):
         try:
             req_info = self.IDP.parse_logout_request(request, binding)
             assert isinstance(req_info, saml2.request.LogoutRequest)
-            self.logger.debug("Parsed Logout request: {!s}".format(req_info.message))
+            self.logger.debug("Parsed Logout request ({!s}):\n{!s}".format(binding, req_info.message))
         except Exception as exc:
+            self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(info)))
             self.logger.error("Bad request parsing logout request : {!r}".format(exc))
             self.logger.debug("Exception parsing logout request :\n{!s}".format(exception_trace(exc)))
             raise eduid_idp.error.BadRequest("Failed parsing logout request", logger = self.logger)

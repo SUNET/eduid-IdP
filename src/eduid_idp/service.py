@@ -70,15 +70,16 @@ class Service(object):
         Unpack either redirect (GET) or POST parameters.
 
         :return: query parameters as dict
-        :rtype: dict
+        :rtype: dict or None
         """
-        if eduid_idp.mischttp.get_http_method() == 'GET':
+        method = eduid_idp.mischttp.get_http_method()
+        if method == 'GET':
             _dict = self.unpack_redirect()
-        elif eduid_idp.mischttp.get_http_method() == 'POST':
+        elif method == 'POST':
             _dict = self.unpack_post()
         else:
             _dict = None
-        self.logger.debug("_dict: %s" % _dict)
+        self.logger.debug("Unpacked {!r}, _dict: {!s}".format(method, _dict))
         return _dict
 
     def redirect(self):

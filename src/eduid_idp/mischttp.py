@@ -114,6 +114,19 @@ def get_post():
     return cherrypy.request.body_params
 
 
+def get_request_body():
+    """
+    Return the request body from a HTML POST request.
+
+    :return: raw body
+
+    :rtype: string
+    """
+    length = cherrypy.request.headers['Content-Length']
+    raw_body = cherrypy.request.body.read(int(length))
+    return raw_body
+
+
 def static_filename(config, path):
     """
     Check if there is a static file matching 'path'.
