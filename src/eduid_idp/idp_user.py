@@ -58,17 +58,21 @@ class IdPUser(object):
     :param backend: user database instance, probably a Celery task
     :raise NoSuchUser: if 'username' was not found in the userdb
 
-    :type username: string
+    :type username: string or ObjectId
     :type backend:
     """
 
     def __init__(self, username, backend):
         self._username = username
         self._data = None
-        if '@' in username:
-            self._data = backend.get_user_by_mail(username)
+        if isinstance(username, basestring):
+            if '@' in username:
+                self._data = backend.get_user_by_mail(username)
+            if not self._data:
+                self._data = backend.get_user_by_field('eduPersonPrincipalName', username)
         if not self._data:
-            self._data = backend.get_user_by_field('eduPersonPrincipalName', username)
+            # username will be ObjectId if this is a lookup using an existing SSO session
+            self._data = backend.get_user_by_id(username, raise_on_missing=False)
         if not self._data:
             raise NoSuchUser("User {!r} not found".format(username))
         assert isinstance(self._data, dict)

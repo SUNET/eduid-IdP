@@ -635,7 +635,7 @@ def do_verify(environ, idp_app):
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
 
     idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, user_authn['class_ref']))
-    _data = {'username': user.username,
+    _data = {'username': user.identity['_id'],
              'authn_ref': authn_ref,
              'authn_class_ref': user_authn['class_ref'],
              'authn_timestamp': int(time.time()),
@@ -643,7 +643,7 @@ def do_verify(environ, idp_app):
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = idp_app.IDP.cache.add_session(user.username, _data)
+    _session_id = idp_app.IDP.cache.add_session(user.identity['_id'], _data)
     idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(user, _session_id))
     eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
 
