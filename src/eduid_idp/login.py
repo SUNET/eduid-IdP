@@ -265,6 +265,10 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                 self.logger.debug("Ignoring existing request signature based on verify_request_signature")
         else:
             # XXX check if metadata says request should be signed ???
+            # Leif says requests are typically not signed, and that verifying signatures
+            # on SAML requests is considered a possible DoS attack vector, so it is typically
+            # not done.
+            # XXX implement configuration flag to disable signature verification
             self.logger.debug("No signature in SAMLRequest")
         return _req_info
 
