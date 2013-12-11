@@ -71,7 +71,11 @@ class SLO(Service):
 
         :param info: Dict with SAMLRequest and possibly RelayState
         :param binding: SAML2 binding as string
-        :return: Response as string
+        :return: SAML StatusCode
+
+        :type info: dict
+        :type binding: string
+        :rtype: string
         """
         self.logger.info("--- Single Log Out Service ---")
 
@@ -101,27 +105,47 @@ class SLO(Service):
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
         _name_id = req_info.message.name_id
-        _lid = eduid_idp.mischttp.read_cookie(self.logger)
-        if not _lid:
-            _lid = self.IDP.ident.find_local_id(_name_id)
-            self.logger.debug("Logout message name_id: {!r} found local-id {!r}".format(
-                _name_id, _lid))
+        _session_id = eduid_idp.mischttp.read_cookie(self.logger)
+        if _session_id:
+            # If the binding is REDIRECT, we can get the SSO session to log out from the
+            # client idpauthn cookie
+            session_ids = [_session_id]
+        else:
+            # For SOAP binding, no cookie is sent - only NameID. Have to figure out
+            # the user based on NameID and then destroy *all* the users SSO sessions
+            # unfortunately.
+            _username = self.IDP.ident.find_local_id(_name_id)
+            self.logger.debug("Logout message name_id: {!r} found username {!r}".format(
+                _name_id, _username))
+            session_ids = self.IDP.cache.get_sessions_for_user(_username)
+            if not session_ids:
+                self.logger.error("Could not find any SSO sessions for username {!r}".format(_username))
+        if not self._logout_session_ids(session_ids):
+            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
 
-        status_code = self._logout_using_name_id(_lid, _name_id)
-        self.logger.debug("Logout of local-id {!r} result : {!r}".format(_lid, status_code))
+        status_code = self._logout_name_id(_name_id)
+        self.logger.debug("Logout of NameID {!r} result : {!r}".format(_name_id, status_code))
         return self._logout_response(req_info, status_code)
 
-    def _logout_using_name_id(self, local_id, name_id):
+    def _logout_session_ids(self, session_ids):
         """
-        :param local_id: Local ID (db key in SSO session database)
+        :param session_ids: List of db keys in SSO session database
+        :return: True on success (at least one session was removed)
+        """
+        for this in session_ids:
+            self.logger.info("Logging out SSO session with key: {!s}".format(this))
+            if not self.IDP.cache.remove_session(this):
+                return False
+        if session_ids:
+            return True
+
+    def _logout_name_id(self, name_id):
+        """
         :param name_id: NameID from LogoutRequest
         :return: SAML StatusCode (string)
         """
-        if not local_id or not name_id:
-            self.logger.error("Could not find local identifier (SSO session key) using provided name-id")
-            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
-        self.logger.info("Logging out session with local identifier: {!s}".format(local_id))
-        if not self.IDP.cache.remove_session(local_id):
+        if not name_id:
+            self.logger.error("No NameID provided for logout")
             return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
         try:
             # remove the authentication

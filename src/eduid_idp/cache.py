@@ -198,6 +198,16 @@ class SSOSessionCache(object):
         """
         raise NotImplementedError()
 
+    def get_sessions_for_user(self, username):
+        """
+        Lookup all SSO sessions for a given username. Used in SLO with SOAP binding.
+
+        :param username: The username to look for
+
+        :return: Zero or more SSO session_id's
+        :rtype: [string]
+        """
+
     def _create_session_id(self):
         """
         Create a unique value suitable for use as session identifier.
@@ -213,6 +223,9 @@ class SSOSessionCacheMem(SSOSessionCache):
     This cache holds all SSO sessions, meaning information about what users
     have a valid session with the IdP in order to not be authenticated again
     (until the SSO session expires).
+
+    Do NOT use this in-memory SSO session cache in a clustered setup -
+    only for a (small) single IdP.
     """
 
     def __init__(self, logger, ttl, lock = None):
@@ -238,6 +251,18 @@ class SSOSessionCacheMem(SSOSessionCache):
         except KeyError:
             self.logger.debug('Failed looking up SSO session with session id={!r}'.format(sid))
             raise
+
+    def get_sessions_for_user(self, username):
+        res = []
+        for _key, _val in self.lid2data.items():
+            # Traversing all of lid2data could be a bit slow, but any non-trivial
+            # setup of eduid-IdP is expected to use another backend anyways. In-memory
+            # backend won't work well with multiple IdP:s anyway (think log in to one IdP,
+            # log out to another).
+            if _val.get('username') == username:
+                res.append(_key)
+        self.logger.debug('Found SSO sessions for user {!r}: {!r}'.format(username, res))
+        return res
 
 
 class SSOSessionCacheMDB(SSOSessionCache):
@@ -268,6 +293,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
             try:
                 self.sso_sessions.ensure_index('created_ts', name = 'created_ts_idx', unique = False)
                 self.sso_sessions.ensure_index('session_id', name = 'session_id_idx', unique = True)
+                self.sso_sessions.ensure_index('username', name = 'username_idx', unique = False)
                 break
             except pymongo.errors.AutoReconnect, e:
                 if this == 1:
@@ -303,6 +329,13 @@ class SSOSessionCacheMDB(SSOSessionCache):
         except KeyError:
             self.logger.debug('Failed looking up SSO session with id={!r}'.format(sid))
             raise
+
+    def get_sessions_for_user(self, username):
+        res = []
+        entrys = self.sso_sessions.find({'username': username})
+        for this in entrys:
+            res.append(this['session_id'])
+        return res
 
     def expire_old_sessions(self, force=False):
         """
