@@ -62,6 +62,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'signup_link': '#',  # for login.html
                     'password_reset_link': '#',  # for login.html
                     'default_language': 'en',
+                    'base_url': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -308,3 +309,13 @@ class IdPConfig(object):
         Default language code to use when looking for web pages ('en').
         """
         return self.config.get(self.section, 'default_language')
+
+    @property
+    def base_url(self):
+        """
+        Base URL of the IdP. The default base URL is constructed from the
+        Request URI, but for example if there is a load balancer/SSL
+        terminator in front of the IdP it might be required to specify
+        the URL of the service.
+        """
+        return self.config.get(self.section, 'base_url')

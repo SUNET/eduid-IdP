@@ -82,18 +82,21 @@ def create_html_response(binding, http_args, start_response, logger):
     return message
 
 
-def geturl(query = True, path = True):
+def geturl(config, query = True, path = True):
     """Rebuilds a request URL (from PEP 333).
 
+    :param config: IdP config
     :param query: Is QUERY_STRING included in URI (default: True)
     :param path: Is path included in URI (default: True)
     """
-    # For some reason, cherrypy.request.base always have host 127.0.0.1 -
-    # work around that with much more elaborate code, based on pysaml2.
-    #return cherrypy.request.base + cherrypy.request.path_info
-    url = [cherrypy.request.scheme, '://',
-           cherrypy.request.headers['Host'], ':',
-           str(cherrypy.request.local.port), '/']
+    url = [config.base_url]
+    if not url[0]:
+        # For some reason, cherrypy.request.base always have host 127.0.0.1 -
+        # work around that with much more elaborate code, based on pysaml2.
+        #return cherrypy.request.base + cherrypy.request.path_info
+        url = [cherrypy.request.scheme, '://',
+               cherrypy.request.headers['Host'], ':',
+               str(cherrypy.request.local.port), '/']
     if path:
         url.append(cherrypy.request.path_info.lstrip('/'))
     if query:

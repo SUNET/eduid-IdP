@@ -478,7 +478,7 @@ class SSO(Service):
         :rtype: string
         """
         assert isinstance(ticket, SSOLoginData)
-        redirect_uri = eduid_idp.mischttp.geturl(query = False)
+        redirect_uri = eduid_idp.mischttp.geturl(self.config, query = False)
 
         self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
 
