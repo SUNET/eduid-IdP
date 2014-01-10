@@ -132,6 +132,9 @@ def canonical_req_authn_context(req_authn_ctx, logger, contexts=_context_to_inte
             logger.debug("Can't canonicalize unknown AuthnContext : {!r}".format(class_ref))
             return None
         new_ctx = contexts['undefined']
+        logger.debug('Using default AuthnContext {!r} ({!r} not in contexts {!r}'.format(
+            new_ctx.authn_context_class_ref.text, class_ref, contexts
+        ))
     else:
         new_ctx = contexts[class_ref]
 

@@ -343,7 +343,12 @@ class SSO(Service):
         if authn_ctx and len(auth_info):
             # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
             # filter out the `reference' values (canonical class_ref strings)
-            auth_levels = [reference for (method, reference) in auth_info]
+            levels_dict = {}
+            # Turn references (e.g. 'eduid:level:1:100') into base levels (e.g. 'eduid:level:1')
+            for (method, reference) in auth_info:
+                this = self.AUTHN_BROKER[reference]
+                levels_dict[this['class_ref']] = 1
+            auth_levels = sorted(levels_dict.keys())
             self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
 
         response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
