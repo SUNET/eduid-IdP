@@ -448,6 +448,7 @@ class IdPApplication(object):
             'error_code': str(status_code),
             'error_reason': str(reason),
             'error_traceback': str(traceback),
+            'dashboard_link': self.config.dashboard_link,
         }
         res = res.format(**argv)
 
