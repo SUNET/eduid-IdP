@@ -353,6 +353,11 @@ class SSO(Service):
 
         response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
 
+        if not eduid_idp.assurance.permitted_authn(self.user, response_authn, self.logger):
+            # XXX should return a login failure SAML response instead of an error in the IdP here.
+            # The SP could potentially help the user much better than the IdP here.
+            raise eduid_idp.error.Forbidden("Authn not permitted".format())
+
         try:
             self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(
                 response_authn['class_ref'], req_authn_context.authn_context_class_ref[0].text))
@@ -619,7 +624,7 @@ def do_verify(environ, idp_app):
         if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
             user = verify_username_and_password(login_data, idp_app)
         elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            user = verify_username_and_password(login_data, idp_app, min_length=20)
+            user = verify_username_and_password(login_data, idp_app, min_length=12)
         else:
             del login_data  # keep out of any exception logs
             del password    # keep out of any exception logs

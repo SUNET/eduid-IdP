@@ -406,6 +406,8 @@ class IdPApplication(object):
             status_code = int(status.split()[0])
         except (ValueError, AttributeError, IndexError):
             pass
+        if status_code == 403:
+            return self._render_error_page(status, message, traceback, filename='forbidden.html')
         if status_code == 440:
             return self._render_error_page(status, message, traceback, filename='session_timeout.html')
         self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
