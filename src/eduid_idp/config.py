@@ -60,6 +60,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'verify_request_signatures': '0',  # '1' for True, '0' for False
                     'status_test_usernames': [],
                     'signup_link': '#',  # for login.html
+                    'dashboard_link': '#',  # for forbidden.html
                     'password_reset_link': '#',  # for login.html
                     'default_language': 'en',
                     'base_url': None,
@@ -295,6 +296,13 @@ class IdPConfig(object):
         URL (string) for use in simple templating of login.html.
         """
         return self.config.get(self.section, 'signup_link')
+
+    @property
+    def dashboard_link(self):
+        """
+        URL (string) for use in simple templating of forbidden.html.
+        """
+        return self.config.get(self.section, 'dashboard_link')
 
     @property
     def password_reset_link(self):
