@@ -11,10 +11,10 @@ version = '0.2'
 
 install_requires = [
     'pymongo == 2.5.1',
-    'vccs_client == 0.3',
     'pysaml2 == 1.2.0beta',
     'python-memcached == 1.53',
     'cherrypy == 3.2.4',
+    'vccs_client == 0.4.0',
     'eduid_am == 0.2',
 ]
 

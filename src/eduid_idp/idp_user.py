@@ -170,9 +170,9 @@ class IdPUserDb(object):
             try:
                 factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
             except ValueError as exc:
-                self.logger.info("User {!r} password factor {!s} unusable : {!r}".format(username, cred['id'], exc))
+                self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred['id'], exc))
                 continue
-            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS : {!r}".format(
+            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
                 username, str(cred['id']), factor))
             # Old credentials were created using the username (user['mail']) of the user
             # instead of the user['_id']. Try both during a transition period.
@@ -180,9 +180,14 @@ class IdPUserDb(object):
             if cred.get('user_id_hint') is not None:
                 user_ids.insert(0, cred.get('user_id_hint'))
             for user_id in user_ids:
-                if self.auth_client.authenticate(user_id, [factor]):
-                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
-                    return user
+                try:
+                    if self.auth_client.authenticate(user_id, [factor]):
+                        self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                        return user
+                except vccs_client.VCCSClientHTTPError as exc:
+                    if exc.http_code == 500:
+                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
+                        continue
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         return None
 
