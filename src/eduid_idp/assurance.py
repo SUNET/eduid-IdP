@@ -230,7 +230,7 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
     internal_class_ref = contexts[authn['class_ref']]
     if internal_class_ref == EDUID_INTERNAL_2:
         if 'norEduPersonNIN' in user.identity:
-            if len(user.identity['norEduPersonNIN']) and isinstance(user.identity['norEduPersonNIN'][0], str):
+            if len(user.identity['norEduPersonNIN']) and isinstance(user.identity['norEduPersonNIN'][0], basestring):
                 logger.debug('Asserting AL2 based on norEduPersonNIN attribute')
             else:
                 logger.info('NOT asserting AL2 for invalid norEduPersonNIN {!r}'.format(
@@ -239,7 +239,7 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
         else:
             logger.debug('NOT asserting AL2 - no norEduPersonNIN')
             raise eduid_idp.error.Forbidden("The SP requires AuthnContext {!r} (AL2)".format(authn['class_ref']))
-    if internal_class_ref != EDUID_INTERNAL_1:
+    elif internal_class_ref != EDUID_INTERNAL_1:
         logger.error('Id-proofing Authn rules not defined for internal level {!r}'.format(internal_class_ref))
         return False
     return True
