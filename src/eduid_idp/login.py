@@ -90,7 +90,7 @@ class SSOLoginData(object):
 
         :rtype: string
         """
-        return self._data['RelayState']
+        return self._data.get('RelayState', '')
 
     @property
     def FailCount(self):
