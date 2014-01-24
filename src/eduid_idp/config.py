@@ -64,6 +64,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'password_reset_link': '#',  # for login.html
                     'default_language': 'en',
                     'base_url': None,
+                    'default_eppn_scope': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -327,3 +328,11 @@ class IdPConfig(object):
         the URL of the service.
         """
         return self.config.get(self.section, 'base_url')
+
+    @property
+    def default_eppn_scope(self):
+        """
+        The scope to append to any unscoped eduPersonPrincipalName
+        attributes found on users in the userdb.
+        """
+        return self.config.get(self.section, 'default_eppn_scope')

@@ -366,7 +366,8 @@ class SSO(Service):
 
         self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
 
-        _resp = self.IDP.create_authn_response(self.user.identity, userid = self.user.username,
+        attributes = self._make_scoped_eppn(self.user.identity)
+        _resp = self.IDP.create_authn_response(attributes, userid = self.user.username,
                                                authn = response_authn, sign_assertion = True, **resp_args)
 
         self.logger.info("AuthNResponse\n\n{!r}\n\n".format(_resp))
@@ -550,6 +551,27 @@ class SSO(Service):
         # apply simplistic HTML formatting to template in 'res'
         return content.format(**argv)
 
+    def _make_scoped_eppn(self, attributes):
+        """
+        Add scope to unscopged eduPersonPrincipalName attributes before relasing them.
+
+        What scope to add, if any, is currently controlled by the configuration parameter
+        `default_eppn_scope'.
+
+        :param attributes: Attributes of a user
+        :return: New attributes
+
+        :type attributes: dict
+        :rtype: dict
+        """
+        eppn = attributes.get('eduPersonPrincipalName')
+        if not eppn:
+            return attributes
+        if '@' not in eppn:
+            scope = self.config.default_eppn_scope
+            if scope:
+                attributes['eduPersonPrincipalName'] = eppn + '@' + scope
+        return attributes
 
 # -----------------------------------------------------------------------------
 # === Authentication ====
