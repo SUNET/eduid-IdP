@@ -219,9 +219,11 @@ class IdPApplication(object):
         if self._lookup_userdata():
             # If an already logged in user presses 'back' or similar, we can't really expect to
             # manage to log them in again (think OTPs) and just continue 'back' to the SP.
-            # Better to show a nice looking 'error' page.
-            raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
-                                               logger = self.logger)
+            # However, with forceAuthn, this is exactly what happens so maybe it isn't really
+            # an error case.
+            #raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
+            #                                   logger = self.logger)
+            self.logger.debug("User is already logged in - verifying credentials again might not work")
         environ = {}
         return eduid_idp.login.do_verify(environ, self)
 
