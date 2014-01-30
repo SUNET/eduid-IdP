@@ -82,6 +82,8 @@ import threading
 import cherrypy
 import simplejson
 
+import logging.handlers
+
 import eduid_idp
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
@@ -503,7 +505,7 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         logger.addHandler(stream_h)
     if config.logfile:
         formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
-        file_h = logging.FileHandler(config.logfile)
+        file_h = logging.handlers.RotatingFileHandler(config.logfile, maxBytes=10 * 1024 * 1024)
         file_h.setFormatter(formatter)
         logger.addHandler(file_h)
     if config.syslog:
