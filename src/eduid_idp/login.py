@@ -51,7 +51,7 @@ class SSOLoginData(object):
     def __str__(self):
         return pprint.pformat({'key': self._key,
                                'req_info': self._req_info,
-                               'data': self._data,
+                               'data[:48]': str(self._data)[:48],
                                'FailCount': self._FailCount,
                                })
 
@@ -242,12 +242,17 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         :type binding: string
         :rtype: AuthnRequest
         """
-        self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
+        #self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
         _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], binding)
         assert isinstance(_req_info, AuthnRequest)
 
-        self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n{!s}".format(
-            _req_info.message, _req_info.message))
+        # Only perform expensive parse/pretty-print if debugging
+        if self.config.debug:
+            import lxml.etree as etree
+            parser = etree.XMLParser(remove_blank_text=True)
+            xml = etree.XML(str(_req_info.message), parser)
+            self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n\n{!s}\n\n".format(
+                _req_info.message, etree.tostring(xml, pretty_print=True)))
 
         if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
@@ -370,7 +375,12 @@ class SSO(Service):
         _resp = self.IDP.create_authn_response(attributes, userid = self.user.username,
                                                authn = response_authn, sign_assertion = True, **resp_args)
 
-        self.logger.info("AuthNResponse\n\n{!r}\n\n".format(_resp))
+        # Only perform expensive parse/pretty-print if debugging
+        if self.config.debug:
+            import lxml.etree as etree
+            parser = etree.XMLParser(remove_blank_text=True)
+            xml = etree.XML(_resp, parser)
+            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(etree.tostring(xml, pretty_print=True)))
 
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
