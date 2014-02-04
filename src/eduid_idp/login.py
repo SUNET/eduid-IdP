@@ -18,6 +18,7 @@ import cherrypy
 
 from eduid_idp.service import Service
 import eduid_idp.mischttp
+import eduid_idp.util
 
 from saml2.request import AuthnRequest
 
@@ -248,11 +249,9 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
 
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
-            import lxml.etree as etree
-            parser = etree.XMLParser(remove_blank_text=True)
-            xml = etree.XML(str(_req_info.message), parser)
+            xmlstr = eduid_idp.util.maybe_xml_to_string(_req_info.message)
             self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n\n{!s}\n\n".format(
-                _req_info.message, etree.tostring(xml, pretty_print=True)))
+                _req_info.message, xmlstr))
 
         if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
@@ -377,10 +376,8 @@ class SSO(Service):
 
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
-            import lxml.etree as etree
-            parser = etree.XMLParser(remove_blank_text=True)
-            xml = etree.XML(_resp, parser)
-            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(etree.tostring(xml, pretty_print=True)))
+            xmlstr = eduid_idp.util.maybe_xml_to_string(_resp)
+            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(xmlstr))
 
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse

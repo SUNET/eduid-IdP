@@ -15,6 +15,7 @@ import pprint
 
 from eduid_idp.service import Service
 import eduid_idp.mischttp
+import eduid_idp.util
 
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
@@ -189,7 +190,10 @@ class SLO(Service):
         issuer = self.IDP._issuer(self.IDP.config.entityid)
         response = self.IDP.create_logout_response(req_info.message, bindings, status, sign = sign_response,
                                                    issuer = issuer)
-        self.logger.debug("Logout SAMLResponse :\n{!s}".format(response))
+        # Only perform expensive parse/pretty-print if debugging
+        if self.config.debug:
+            xmlstr = eduid_idp.util.maybe_xml_to_string(response)
+            self.logger.debug("Logout SAMLResponse :\n\n{!s}\n\n".format(xmlstr))
 
         ht_args = self.IDP.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
                                          response = True)
