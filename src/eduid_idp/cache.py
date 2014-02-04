@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S
+# Copyright (c) 2013, 2014 NORDUnet A/S
 # Copyright 2012 Roland Hedberg. All rights reserved.
 # All rights reserved.
 #
@@ -184,7 +184,7 @@ class SSOSessionCache(object):
         logout (SLO).
 
         :param username: Username as string
-        :param data: opaque, should be dict
+        :param data: opaque, should be SSOSession
         :return: Unique session identifier as string
         """
         raise NotImplementedError()
@@ -194,7 +194,7 @@ class SSOSessionCache(object):
         Lookup an SSO session using the session id (same `sid' previously used with add_session).
 
         :param sid: Unique session identifier as string
-        :return: opaque, should be dict
+        :return: opaque, should be SSOSession
         """
         raise NotImplementedError()
 

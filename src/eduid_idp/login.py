@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S. All rights reserved.
+# Copyright (c) 2013, 2014 NORDUnet A/S. All rights reserved.
 # Copyright 2012 Roland Hedberg. All rights reserved.
 #
 # See the file eduid-IdP/LICENSE.txt for license statement.
@@ -12,13 +12,13 @@
 Code handling Single Sign On logins.
 """
 
-import time
 import pprint
 import cherrypy
 
 from eduid_idp.service import Service
-import eduid_idp.mischttp
+from eduid_idp.sso_session import SSOSession
 import eduid_idp.util
+import eduid_idp.mischttp
 
 from saml2.request import AuthnRequest
 
@@ -180,7 +180,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         if not key:
             key = self.key(data["SAMLRequest"])
         ticket = SSOLoginData(key, req_info, data)
-        self.logger.debug("Created login state (IdP ticket) :\n{!s}".format(ticket))
+        self.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
         return ticket
 
     def get_ticket(self, info, binding=None):
@@ -263,10 +263,12 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                         verified_ok = True
                         break
                 if not verified_ok:
-                    self.logger.info("Message signature verification failure")
-                    raise eduid_idp.error.BadRequest("Message signature verification failure", logger = self.logger)
+                    _key = self.key(_req_info["SAMLRequest"])
+                    self.logger.info("{!s}: SAML request signature verification failure".format(_key))
+                    raise eduid_idp.error.BadRequest("SAML request signature verification failure",
+                                                     logger = self.logger)
             else:
-                self.logger.debug("Ignoring existing request signature based on verify_request_signature")
+                self.logger.debug("Ignoring existing request signature, verify_request_signature is False")
         else:
             # XXX check if metadata says request should be signed ???
             # Leif says requests are typically not signed, and that verifying signatures
@@ -313,6 +315,7 @@ class SSO(Service):
         :rtype: string
         """
         assert isinstance(ticket, SSOLoginData)
+        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
 
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
@@ -323,14 +326,14 @@ class SSO(Service):
                 raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(ticket.req_info.message)
         except UnknownPrincipal as excp:
-            self.logger.error("Could not verify request: UnknownPrincipal: {!s}".format(excp))
+            self.logger.info("{!s}: Unknown service provider: {!s}".format(self.sso_session.public_id, excp))
             raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
         except UnsupportedBinding as excp:
-            self.logger.error("Could not verify request: UnsupportedBinding: {!s}".format(excp))
+            self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(self.sso_session.public_id, excp))
             raise eduid_idp.error.BadRequest("Don't know how to reply to the SP that referred you here",
                                              logger = self.logger)
 
-        self.logger.info("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
+        self.logger.debug("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
 
         #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
         _authn = self.environ["idp.authn"]
@@ -386,6 +389,11 @@ class SSO(Service):
         http_args = self.IDP.apply_binding(self.binding_out, str(_resp), self.destination,
                                            ticket.RelayState, response = True)
         #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
+
+        # INFO-Log the SSO session id and the AL and destination
+        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(self.sso_session.public_id,
+                                                                      response_authn['class_ref'],
+                                                                      self.destination))
         return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
 
     def redirect(self):
@@ -394,7 +402,7 @@ class SSO(Service):
         :return: HTTP response
         :rtype: string
         """
-        self.logger.info("--- In SSO Redirect ---")
+        self.logger.debug("--- In SSO Redirect ---")
         _info = self.unpack_redirect()
         self.logger.debug("Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
@@ -408,7 +416,7 @@ class SSO(Service):
         :return: HTTP response
         :rtype: string
         """
-        self.logger.info("--- In SSO POST ---")
+        self.logger.debug("--- In SSO POST ---")
         _info = self.unpack_either()
 
         ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_POST)
@@ -427,9 +435,9 @@ class SSO(Service):
             return self.perform_login(ticket)
 
         if not self.user:
-            self.logger.info("Not authenticated")
+            self.logger.info("{!s}: Not authenticated".format(ticket.key))
         if _force_authn:
-            self.logger.info("Forcing authentication for user {!r}".format(self.user))
+            self.logger.info("{!s}: Forcing authentication".format(self.sso_session.public_id))
 
         return self._not_authn(ticket, ticket.req_info.message.requested_authn_context)
 
@@ -528,7 +536,7 @@ class SSO(Service):
         :param ticket: SSOLoginData instance
         :param auth_levels: list of strings with auth level names that would be valid for this request
         :param redirect_uri: string with URL to proceed to after authentication
-        :returns: HTTP response
+        :return: HTTP response
 
         :rtype: string
         """
@@ -600,7 +608,7 @@ def verify_username_and_password(dic, idp_app, min_length=0):
     :param idp_app: IdPApplication instance
     :param min_length: Minimum required length of password
 
-    :returns: IdPUser instance or False
+    :return: IdPUser instance or False
 
     :type dic: dict
     :type idp_app: idp.IdPApplication
@@ -631,7 +639,7 @@ def do_verify(environ, idp_app):
 
     :param environ: environ dict() (see eduid_idp.idp._request_environment())
     :param idp_app: IdPApplication instance
-    :returns: Does not return
+    :return: Does not return
     :raise eduid_idp.mischttp.Redirect: On successful authentication, redirect to redirect_uri.
     """
     query = eduid_idp.mischttp.get_post()
@@ -687,18 +695,20 @@ def do_verify(environ, idp_app):
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
 
     idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, user_authn['class_ref']))
-    _data = {'username': user.identity['_id'],
-             'authn_ref': authn_ref,
-             'authn_class_ref': user_authn['class_ref'],
-             'authn_timestamp': int(time.time()),
-             }
+    _sso_session = SSOSession(user.identity['_id'], authn_ref, user_authn['class_ref'])
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = idp_app.IDP.cache.add_session(user.identity['_id'], _data)
-    idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(user, _session_id))
+    _session_id = idp_app.IDP.cache.add_session(user.identity['_id'], _sso_session.to_dict())
+    idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(_sso_session, _session_id))
     eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
 
+    # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
+    idp_app.logger.info("{!s}: sso_session={!s}, authn={!s}".format(query['key'], _sso_session.public_id,
+                                                                    _sso_session.user_authn_class_ref))
+
+    # Now that an SSO session has been created, redirect the users browser back to
+    # the main entry point of the IdP (the 'redirect_uri').
     lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id, query["key"])
     idp_app.logger.debug("Redirect => %s" % lox)
     raise eduid_idp.mischttp.Redirect(lox)

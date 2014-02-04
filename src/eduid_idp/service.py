@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S
+# Copyright (c) 2013, 2014 NORDUnet A/S
 # Copyright 2012 Roland Hedberg. All rights reserved.
 # All rights reserved.
 #
@@ -40,6 +40,7 @@ class Service(object):
         self.AUTHN_BROKER = idp_app.AUTHN_BROKER
         self.config = idp_app.config
         self.user = environ['idp.user']
+        self.sso_session = environ['idp.session']
 
     def unpack_redirect(self):
         """

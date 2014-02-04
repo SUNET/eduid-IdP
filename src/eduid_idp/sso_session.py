@@ -1,0 +1,121 @@
+#!/usr/bin/python
+#
+# Copyright (c) 2014 NORDUnet A/S
+# All rights reserved.
+#
+#   Redistribution and use in source and binary forms, with or
+#   without modification, are permitted provided that the following
+#   conditions are met:
+#
+#     1. Redistributions of source code must retain the above copyright
+#        notice, this list of conditions and the following disclaimer.
+#     2. Redistributions in binary form must reproduce the above
+#        copyright notice, this list of conditions and the following
+#        disclaimer in the documentation and/or other materials provided
+#        with the distribution.
+#     3. Neither the name of the NORDUnet nor the names of its
+#        contributors may be used to endorse or promote products derived
+#        from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+# Author : Fredrik Thulin <fredrik@thulin.net>
+#
+
+import time
+
+class SSOSession(object):
+
+    def __init__(self, user_id, authn_ref, authn_class_ref, ts=None):
+        if ts is None:
+            ts = int(time.time())
+        self._data = {'user_id': user_id,
+                      'authn_ref': authn_ref,
+                      'authn_class_ref': authn_class_ref,
+                      'authn_timestamp': ts,
+                      }
+
+    def __repr__(self):
+        return '<{cl} instance at {addr}: uid={uid!s}, class={clref!s}, ts={ts!s}>'.format(
+            cl = self.__class__.__name__,
+            addr = hex(id(self)),
+            uid = str(self._data['user_id']),
+            clref = self._data['authn_class_ref'],
+            ts = self._data['authn_timestamp'],
+            )
+
+    def to_dict(self):
+        """
+        Return the object in dict format (serialized for storing in MongoDB).
+        :return: serialized object
+        :rtype: dict
+        """
+        return self._data
+
+    @property
+    def authn_timestamp(self):
+        return self._data['authn_timestamp']
+
+    @property
+    def user_id(self):
+        """
+        Return the user id (MongoDB _id) of the user for this SSO session.
+
+        :rtype: bson.ObjectId
+        """
+        return self._data['user_id']
+
+    @property
+    def public_id(self):
+        """
+        Return a identifier for this session that can't be used to hijack sessions
+        if leaked through a log file etc.
+        """
+        return "{!s}.{!s}".format(str(self._data['user_id']), self._data['authn_timestamp'])
+
+    @property
+    def user_authn_class_ref(self):
+        """
+        Return the (internal) name of the AL-level of authentication performed
+        SSO session was created.
+
+        E.g. u'eduid.se:level:1'
+        """
+        return self._data['authn_class_ref']
+
+    @property
+    def user_authn_ref(self):
+        """
+        Return the (internal) name of the authentication mechanism the user used
+        when SSO session was created.
+
+        E.g. u'eduid.se:level:1:100'
+        """
+        return self._data['authn_ref']
+
+def from_dict(data):
+    """
+    Re-create object from serialized format (after loading it from MongoDB).
+
+    :param data: dict
+    :return: SSO session object
+
+    :type data: dict
+    :rtype: SSOSession
+    """
+    return SSOSession(data['user_id'],
+                      data['authn_ref'],
+                      data['authn_class_ref'],
+                      data['authn_timestamp'],
+                      )

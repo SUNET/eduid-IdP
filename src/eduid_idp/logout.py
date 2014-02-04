@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S. All rights reserved.
+# Copyright (c) 2013, 2014 NORDUnet A/S. All rights reserved.
 # Copyright 2012 Roland Hedberg. All rights reserved.
 #
 # See the file eduid-IdP/LICENSE.txt for license statement.

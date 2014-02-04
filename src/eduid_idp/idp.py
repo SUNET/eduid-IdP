@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2013 NORDUnet A/S. All rights reserved.
+# Copyright (c) 2013, 2014 NORDUnet A/S. All rights reserved.
 # Copyright 2012 Roland Hedberg. All rights reserved.
 #
 # See the file eduid-IdP/LICENSE.txt for license statement.
@@ -78,6 +78,7 @@ import pprint
 import logging
 import argparse
 import threading
+import sso_session
 
 import cherrypy
 import simplejson
@@ -181,7 +182,7 @@ class IdPApplication(object):
         self.logger.debug("\n\n")
         self.logger.debug("--- SSO ---")
         path = cherrypy.request.path_info.lstrip('/').split('/')
-        self.logger.info("<application> PATH: %s" % path)
+        self.logger.debug("<application> PATH: %s" % path)
 
         environ = self._request_environment()
 
@@ -200,7 +201,7 @@ class IdPApplication(object):
         self.logger.debug("\n\n")
         self.logger.debug("--- SLO ---")
         path = cherrypy.request.path_info.lstrip('/').split('/')
-        self.logger.info("<application> PATH: %s" % path)
+        self.logger.debug("<application> PATH: %s" % path)
 
         environ = self._request_environment()
 
@@ -234,7 +235,7 @@ class IdPApplication(object):
         self.logger.debug("\n\n")
         self.logger.debug("--- Static file ---")
         path = cherrypy.request.path_info.lstrip('/')
-        self.logger.info("<application> PATH: %s" % path)
+        self.logger.debug("<application> PATH: %s" % path)
 
         static_fn = eduid_idp.mischttp.static_filename(self.config, path)
         if static_fn:
@@ -306,16 +307,17 @@ class IdPApplication(object):
         """
         environ = {'idp.user': None,
                    }
-        userdata = self._lookup_userdata()
-        if userdata:
-            environ['idp.user'] = self.userdb.lookup_user(userdata['username'])
-            environ['idp.authn'] = self.get_authn_by_ref(userdata['authn_ref'], userdata.get('authn_class_ref'))
-            self.logger.info("SSO session for user {!r} found in IdP cache".format(userdata['username']))
+        _sso_session = self._lookup_userdata()
+        if _sso_session:
+            self.logger.debug("SSO session for user {!r} found in IdP cache".format(_sso_session.user_id))
+            environ['idp.user'] = self.userdb.lookup_user(_sso_session.user_id)
+            environ['idp.authn'] = self.get_authn_by_ref(_sso_session.user_authn_ref, _sso_session.user_authn_class_ref)
             if environ['idp.authn'] is None:
                 # This could happen with SSO sessions refering to old authns during
                 # reconfiguration of authns in the AUTHN_BROKER.
                 # XXX remove SSO session?
                 raise eduid_idp.error.ServiceError(logger=self.logger)
+        environ['idp.session'] = _sso_session
         return environ
 
     def _lookup_userdata(self):
@@ -324,36 +326,37 @@ class IdPApplication(object):
         the currently logged in user from the session store.
 
         :return: Data about currently logged in user
-        :rtype: dict | None
+        :rtype: SSOSession | None
         """
-        userdata = None
+        _data = None
         _session_id = eduid_idp.mischttp.read_cookie(self.logger)
         if _session_id:
-            userdata = self.IDP.cache.get_session(_session_id)
-            self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(
-                pprint.pformat(userdata)))
+            _data = self.IDP.cache.get_session(_session_id)
+            self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
             query = eduid_idp.mischttp.parse_query_string()
             if query:
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
-                    userdata = self.IDP.cache.get_session(query['id'])
+                    _data = self.IDP.cache.get_session(query['id'])
                     self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
-                        pprint.pformat(userdata)))
+                        pprint.pformat(_data)))
                 except KeyError:
                     # no 'id', or not found in cache
                     pass
-        if userdata:
-            _age = (int(time.time()) - userdata['authn_timestamp']) / 60
-            if _age > self.config.sso_session_lifetime:
-                self.logger.info("SSO session expired (age {!r} minutes > {!r})".format(
-                    _age, self.config.sso_session_lifetime))
-                return None
-            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-                _age, self.config.sso_session_lifetime))
-        else:
+        if not _data:
             self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
-        return userdata
+            return None
+        _sso = eduid_idp.sso_session.from_dict(_data)
+        self.logger.debug("Re-created SSO session {!r}".format(_sso))
+        _age = (int(time.time()) - _sso.authn_timestamp) / 60
+        if _age > self.config.sso_session_lifetime:
+            self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
+                _age, self.config.sso_session_lifetime))
+            return None
+        self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
+            _age, self.config.sso_session_lifetime))
+        return _sso
 
     def get_authn_by_ref(self, ref, class_ref=None):
         """
