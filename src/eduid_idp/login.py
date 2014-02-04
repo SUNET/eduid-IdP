@@ -401,18 +401,8 @@ class SSO(Service):
         _info = self.unpack_redirect()
         self.logger.debug("Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        _ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
-
-        if self.user and not _ticket.req_info.message.force_authn:
-            self.logger.debug("Continuing with Authn request {!r}".format(_ticket.req_info))
-            return self.perform_login(_ticket)
-
-        if not self.user:
-            self.logger.info("Not authenticated")
-        if _ticket.req_info.message.force_authn:
-            self.logger.info("Forcing authentication for user {!r}".format(self.user))
-
-        return self._not_authn(_ticket, _ticket.req_info.message.requested_authn_context)
+        ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
+        return self._redirect_or_post(ticket)
 
     def post(self):
         """
@@ -424,18 +414,27 @@ class SSO(Service):
         self.logger.info("--- In SSO POST ---")
         _info = self.unpack_either()
 
-        _ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_POST)
+        ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_POST)
+        return self._redirect_or_post(ticket)
 
-        if self.user and not _ticket.req_info.message.force_authn:
-            self.logger.debug("Continuing with posted Authn request {!r}".format(_ticket.req_info))
-            return self.perform_login(_ticket)
+    def _redirect_or_post(self, ticket):
+        """
+        Commmon code for redirect() and post() endpoints.
+
+        :param ticket: SSOLoginData instance
+        :rtype: string
+        """
+        _force_authn = self._should_force_authn(ticket)
+        if self.user and not _force_authn:
+            self.logger.debug("Continuing with Authn request {!r}".format(ticket.req_info))
+            return self.perform_login(ticket)
 
         if not self.user:
             self.logger.info("Not authenticated")
-        if _ticket.req_info.message.force_authn:
+        if _force_authn:
             self.logger.info("Forcing authentication for user {!r}".format(self.user))
 
-        return self._not_authn(_ticket, _ticket.req_info.message.requested_authn_context)
+        return self._not_authn(ticket, ticket.req_info.message.requested_authn_context)
 
     def artifact(self):
         """
@@ -455,6 +454,7 @@ class SSO(Service):
         _ticket = self.IDP.ticket.create_ticket(request, BINDING_HTTP_ARTIFACT)
         # XXX is there a point in using create_login_data and thereby not saving the
         # ticket in self.IDP.ticket for artifact requests?
+        # XXX shouldn't force_authn be checked for artifact?
         return self.perform_login(_ticket)
 
     def _verify_request(self, ticket):
@@ -480,6 +480,15 @@ class SSO(Service):
 
         self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
         return True
+
+    def _should_force_authn(self, ticket):
+        """
+        Has the SP requested a forced authentication for this request?
+
+        :type ticket: SSOLoginData
+        :rtype: bool
+        """
+        return ticket.req_info.message.force_authn
 
     def _not_authn(self, ticket, requested_authn_context):
         """
