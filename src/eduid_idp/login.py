@@ -502,12 +502,24 @@ class SSO(Service):
 
     def _should_force_authn(self, ticket):
         """
-        Has the SP requested a forced authentication for this request?
+        Check if the IdP should force authentication of this request.
+
+        Will check SAML ForceAuthn but avoid endless loops of forced authentications
+        by looking if the SSO session says authentication was actually performed
+        based on this SAML request.
 
         :type ticket: SSOLoginData
         :rtype: bool
         """
-        return ticket.req_info.message.force_authn
+        if ticket.req_info.message.force_authn:
+            if ticket.req_info.message.id != self.sso_session.user_authn_request_id:
+                self.logger.debug("Forcing authentication because of ForceAuthn with "
+                                  "SSO session id {!r} != {!r}".format(
+                                  self.sso_session.user_authn_request_id, ticket.req_info.message.id))
+                return True
+            self.logger.debug("Ignoring ForceAuthn, authn already performed for SAML request {!r}".format(
+                ticket.req_info.message.id))
+        return False
 
     def _not_authn(self, ticket, requested_authn_context):
         """
@@ -708,8 +720,14 @@ def do_verify(idp_app):
             raise eduid_idp.mischttp.Redirect(str(_referer))
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
 
+    # Create SSO session
     idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, user_authn['class_ref']))
-    _sso_session = SSOSession(user.identity['_id'], authn_ref, user_authn['class_ref'])
+    _sso_session = SSOSession(user_id = user.identity['_id'],
+                              authn_ref = authn_ref,
+                              authn_class_ref = user_authn['class_ref'],
+                              authn_request_id = _ticket.req_info.message.id,
+                              )
+
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.

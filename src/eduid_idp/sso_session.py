@@ -61,12 +61,13 @@ class SSOSession(object):
     :type ts: int
     """
 
-    def __init__(self, user_id, authn_ref, authn_class_ref, ts=None):
+    def __init__(self, user_id, authn_ref, authn_class_ref, authn_request_id, ts=None):
         if ts is None:
             ts = int(time.time())
         self._data = {'user_id': user_id,
                       'authn_ref': authn_ref,
                       'authn_class_ref': authn_class_ref,
+                      'authn_request_id': authn_request_id,
                       'authn_timestamp': ts,
                       }
         # Extra information not serialized
@@ -137,6 +138,15 @@ class SSOSession(object):
         return self._data['authn_ref']
 
     @property
+    def user_authn_request_id(self):
+        """
+        Return the ID of the SAML request that caused the creation of the SSO session.
+
+        E.g. u'id-809ecef1cd265efedef7a68708e54b84'
+        """
+        return self._data['authn_request_id']
+
+    @property
     def idp_user(self):
         """
         Get the IdPUser object stored in the SSO session using set_user().
@@ -192,8 +202,9 @@ def from_dict(data):
     :type data: dict
     :rtype: SSOSession
     """
-    return SSOSession(data['user_id'],
-                      data['authn_ref'],
-                      data['authn_class_ref'],
-                      data['authn_timestamp'],
+    return SSOSession(user_id = data['user_id'],
+                      authn_ref = data['authn_ref'],
+                      authn_class_ref = data['authn_class_ref'],
+                      authn_request_id = data['authn_request_id'],
+                      ts = data['authn_timestamp'],
                       )
