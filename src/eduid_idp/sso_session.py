@@ -1,4 +1,3 @@
-#!/usr/bin/python
 #
 # Copyright (c) 2014 NORDUnet A/S
 # All rights reserved.
@@ -37,7 +36,30 @@ import time
 import eduid_idp.idp_user
 import eduid_idp.assurance
 
+
 class SSOSession(object):
+    """
+    Single Sign On sessions are used to remember a previous authenticaction
+    performed, to avoid re-authenticating users for every Service Provider
+    they visit.
+
+    The references to 'authn' here are strictly about what kind of Authn
+    the user has performed. The resulting SAML AuthnContext is a product
+    of this, as well as other policy decisions (such as what ID-proofing
+    has taken place, what AuthnContext the SP requested and so on).
+
+    :param user_id: User id, typically MongoDB _id
+    :param authn_ref: AuthnBroker opaque reference
+    :param authn_class_ref: Authn class reference
+    :param authn_request_id: SAML request id of request that caused authentication
+    :param ts: Authentication timestamp, in UTC
+
+    :type user_id: bson.ObjectId | object
+    :type authn_ref: object
+    :type authn_class_ref: string
+    :type authn_request_id: string
+    :type ts: int
+    """
 
     def __init__(self, user_id, authn_ref, authn_class_ref, ts=None):
         if ts is None:
@@ -69,6 +91,12 @@ class SSOSession(object):
 
     @property
     def authn_timestamp(self):
+        """
+        Return the UTC UNIX timestamp for when the actual authentication took place.
+
+        :return: Authn timestamp
+        :rtype: int
+        """
         return self._data['authn_timestamp']
 
     @property
