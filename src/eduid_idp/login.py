@@ -288,17 +288,17 @@ class SSO(Service):
     """
     Single Sign On service.
 
-    :param environ: environment (see eduid_idp.idp._request_environment())
+    :param session: SSO session
     :param start_response: WSGI-like start_response function pointer
     :param idp_app: IdPApplication instance
 
-    :type environ: dict
+    :type session: SSOSession | None
     :type start_response: function
     :type idp_app: idp.IdPApplication
     """
 
-    def __init__(self, environ, start_response, idp_app):
-        Service.__init__(self, environ, start_response, idp_app)
+    def __init__(self, session, start_response, idp_app):
+        Service.__init__(self, session, start_response, idp_app)
         self.binding = ""
         self.binding_out = None
         self.destination = None
@@ -326,18 +326,22 @@ class SSO(Service):
                 raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(ticket.req_info.message)
         except UnknownPrincipal as excp:
-            self.logger.info("{!s}: Unknown service provider: {!s}".format(self.sso_session.public_id, excp))
+            self.logger.info("{!s}: Unknown service provider: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
         except UnsupportedBinding as excp:
-            self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(self.sso_session.public_id, excp))
+            self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know how to reply to the SP that referred you here",
                                              logger = self.logger)
 
-        self.logger.debug("Identity of user {!s}:\n{!s}".format(self.user, pprint.pformat(self.user.identity)))
+        user = self.sso_session.idp_user
+        self.logger.debug("Identity of user {!s}:\n{!s}".format(user, pprint.pformat(user.identity)))
 
-        #_authn = self.AUTHN_BROKER[self.environ["idp.authn_ref"]]
-        _authn = self.environ["idp.authn"]
+        _authn = self.sso_session.get_authn_context(self.AUTHN_BROKER, logger=self.logger)
         self.logger.debug("User authenticated using Authn {!r}".format(_authn))
+        if not _authn:
+            # This could happen with SSO sessions refering to old authns during
+            # reconfiguration of authns in the AUTHN_BROKER.
+            raise eduid_idp.error.ServiceError('Unknown stored AuthnContext')
 
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
@@ -360,7 +364,7 @@ class SSO(Service):
 
         response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
 
-        if not eduid_idp.assurance.permitted_authn(self.user, response_authn, self.logger):
+        if not eduid_idp.assurance.permitted_authn(user, response_authn, self.logger):
             # XXX should return a login failure SAML response instead of an error in the IdP here.
             # The SP could potentially help the user much better than the IdP here.
             raise eduid_idp.error.Forbidden("Authn not permitted".format())
@@ -371,10 +375,16 @@ class SSO(Service):
         except AttributeError:
             self.logger.debug("Asserting AuthnContext {!r} (none requested)".format(response_authn['class_ref']))
 
-        self.logger.debug("Creating an AuthnResponse, user {!r}, response args {!r}".format(self.user, resp_args))
+        self.logger.debug("Creating an AuthnResponse, user {!r}, response args:\n{!s}".format(
+            user, pprint.pformat(resp_args)))
 
-        attributes = self._make_scoped_eppn(self.user.identity)
-        _resp = self.IDP.create_authn_response(attributes, userid = self.user.username,
+        attributes = self._make_scoped_eppn(user.identity)
+        response_authn['authn_instant'] = self.sso_session.authn_timestamp
+
+        self.logger.debug("Creating an AuthnResponse, create_authn_response authn:\n{!s}".format(
+            pprint.pformat(response_authn)))
+
+        _resp = self.IDP.create_authn_response(attributes, userid = user.username,
                                                authn = response_authn, sign_assertion = True, **resp_args)
 
         # Only perform expensive parse/pretty-print if debugging
@@ -391,7 +401,7 @@ class SSO(Service):
         #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
 
         # INFO-Log the SSO session id and the AL and destination
-        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(self.sso_session.public_id,
+        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
                                                                       response_authn['class_ref'],
                                                                       self.destination))
         return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
@@ -430,14 +440,18 @@ class SSO(Service):
         :rtype: string
         """
         _force_authn = self._should_force_authn(ticket)
-        if self.user and not _force_authn:
+        if self.sso_session and not _force_authn:
+            _ttl = self.config.sso_session_lifetime - self.sso_session.minutes_old
+            self.logger.info("{!s}: proceeding sso_session={!s}, ttl={:}m".format(
+                ticket.key, self.sso_session.public_id, _ttl))
             self.logger.debug("Continuing with Authn request {!r}".format(ticket.req_info))
             return self.perform_login(ticket)
 
-        if not self.user:
-            self.logger.info("{!s}: Not authenticated".format(ticket.key))
+        if not self.sso_session:
+            self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))
         if _force_authn:
-            self.logger.info("{!s}: Forcing authentication".format(self.sso_session.public_id))
+            self.logger.info("{!s}: force_authn sso_session={!s}".format(
+                ticket.key, self.sso_session.public_id))
 
         return self._not_authn(ticket, ticket.req_info.message.requested_authn_context)
 
@@ -597,6 +611,7 @@ class SSO(Service):
                 attributes['eduPersonPrincipalName'] = eppn + '@' + scope
         return attributes
 
+
 # -----------------------------------------------------------------------------
 # === Authentication ====
 # -----------------------------------------------------------------------------
@@ -625,7 +640,7 @@ def verify_username_and_password(dic, idp_app, min_length=0):
     return False
 
 
-def do_verify(environ, idp_app):
+def do_verify(idp_app):
     """
     Perform authentication of user based on user provided credentials.
 
@@ -637,7 +652,6 @@ def do_verify(environ, idp_app):
     It will figure out what authentication level to assert based on the authncontext
     requested, and the actual authentication that succeeded.
 
-    :param environ: environ dict() (see eduid_idp.idp._request_environment())
     :param idp_app: IdPApplication instance
     :return: Does not return
     :raise eduid_idp.mischttp.Redirect: On successful authentication, redirect to redirect_uri.
@@ -656,7 +670,7 @@ def do_verify(environ, idp_app):
     user_authn = None
     authn_ref = query.get('authn_reference')
     if authn_ref:
-        user_authn = idp_app.get_authn_by_ref(authn_ref)
+        user_authn = eduid_idp.assurance.get_authn_context(idp_app.AUTHN_BROKER, authn_ref)
     if not user_authn:
         raise eduid_idp.error.Unauthorized("Bad authentication reference", logger = idp_app.logger)
 
@@ -688,7 +702,7 @@ def do_verify(environ, idp_app):
     if not user:
         _ticket.FailCount += 1
         idp_app.IDP.ticket.store_ticket(_ticket)
-        idp_app.logger.info("Unknown user or wrong password")
+        idp_app.logger.debug("Unknown user or wrong password")
         _referer = cherrypy.request.headers.get('Referer')
         if _referer:
             raise eduid_idp.mischttp.Redirect(str(_referer))
@@ -704,10 +718,12 @@ def do_verify(environ, idp_app):
     eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
 
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
-    idp_app.logger.info("{!s}: sso_session={!s}, authn={!s}".format(query['key'], _sso_session.public_id,
-                                                                    _sso_session.user_authn_class_ref))
+    idp_app.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
+        query['key'], _sso_session.public_id,
+        _sso_session.user_authn_class_ref,
+        _sso_session.user_id))
 
-    # Now that an SSO session has been created, redirect the users browser back to
+    # Now that an SSO session has been crea,ted, redirect the users browser back to
     # the main entry point of the IdP (the 'redirect_uri').
     lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id, query["key"])
     idp_app.logger.debug("Redirect => %s" % lox)

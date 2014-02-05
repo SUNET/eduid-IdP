@@ -246,3 +246,33 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
         logger.error('Id-proofing Authn rules not defined for internal level {!r}'.format(internal_class_ref))
         return False
     return True
+
+
+def get_authn_context(broker, ref, class_ref=None, logger=None):
+    """
+    Look up an authentication context by reference.
+
+    :param broker: pysaml2 AuthnBroker
+    :param ref: AuthnBroker opaque reference
+    :param class_ref: Expected Authn class ref as string
+    :param logger: logging logger
+    :return: authn context or None
+
+    :type broker: AuthnBroker
+    :type ref: object
+    :type class_ref: string | None
+    :rtype: dict | None
+    """
+    try:
+        _authn = broker[ref]
+        if class_ref is not None:
+            if _authn['class_ref'] != class_ref:
+                if logger:
+                    logger.warning("AuthN context returned for ref {!r} class_ref mismatch".format(ref))
+                    logger.debug("Got AuthN context class_ref {!r}, expected {!r}".format(
+                        _authn['class_ref'], class_ref))
+                return False
+        return _authn
+    except KeyError:
+        if logger:
+            logger.warning("No AuthN context found using ref {!r}".format(ref))

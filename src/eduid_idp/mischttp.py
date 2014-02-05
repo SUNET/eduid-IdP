@@ -395,3 +395,15 @@ def get_http_method():
     :rtype: string
     """
     return cherrypy.request.method
+
+
+def get_remote_ip():
+    """
+    Get the remote IP address for this request.
+
+    This function keeps other modules from having to know that CherryPy is used.
+
+    :return: Client IP address
+    :rtype: string
+    """
+    return cherrypy.request.remote.ip

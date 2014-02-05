@@ -184,15 +184,15 @@ class IdPApplication(object):
         path = cherrypy.request.path_info.lstrip('/').split('/')
         self.logger.debug("<application> PATH: %s" % path)
 
-        environ = self._request_environment()
+        session = self._lookup_sso_session()
 
         if path[1] == 'post':
-            return SSO(environ, self._my_start_response, self).post()
+            return SSO(session, self._my_start_response, self).post()
         if path[1] == 'redirect':
-            return SSO(environ, self._my_start_response, self).redirect()
+            return SSO(session, self._my_start_response, self).redirect()
         if path[1] == 'art':
             # seldomly used, but part of standard
-            return SSO(environ, self._my_start_response, self).artifact()
+            return SSO(session, self._my_start_response, self).artifact()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -203,15 +203,15 @@ class IdPApplication(object):
         path = cherrypy.request.path_info.lstrip('/').split('/')
         self.logger.debug("<application> PATH: %s" % path)
 
-        environ = self._request_environment()
+        session = self._lookup_sso_session()
 
         if path[1] == 'post':
-            return SLO(environ, self._my_start_response, self).post()
+            return SLO(session, self._my_start_response, self).post()
         if path[1] == 'redirect':
-            return SLO(environ, self._my_start_response, self).redirect()
+            return SLO(session, self._my_start_response, self).redirect()
         if path[1] == 'soap':
             # SOAP is commonly used for SLO
-            return SLO(environ, self._my_start_response, self).soap()
+            return SLO(session, self._my_start_response, self).soap()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -219,7 +219,7 @@ class IdPApplication(object):
     def verify(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
         self.logger.debug("--- Verify ---")
-        if self._lookup_userdata():
+        if self._lookup_sso_session():
             # If an already logged in user presses 'back' or similar, we can't really expect to
             # manage to log them in again (think OTPs) and just continue 'back' to the SP.
             # However, with forceAuthn, this is exactly what happens so maybe it isn't really
@@ -227,8 +227,7 @@ class IdPApplication(object):
             #raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
             #                                   logger = self.logger)
             self.logger.debug("User is already logged in - verifying credentials again might not work")
-        environ = {}
-        return eduid_idp.login.do_verify(environ, self)
+        return eduid_idp.login.do_verify(idp_app = self)
 
     @cherrypy.expose
     def static(self, *_args, **_kwargs):
@@ -298,31 +297,31 @@ class IdPApplication(object):
         for (k, v) in headers:
             cherrypy.response.headers[k] = v
 
-    def _request_environment(self):
+    def _lookup_sso_session(self):
         """
-        Initialize well-known environment for this request.
+        Locate any existing SSO session for this request.
 
-        :returns: environment data
-        :rtype: dict
+        :returns: SSO session if found (and valid)
+        :rtype: SSOSession | None
         """
-        environ = {'idp.user': None,
-                   }
-        _sso_session = self._lookup_userdata()
-        if _sso_session:
-            self.logger.debug("SSO session for user {!r} found in IdP cache".format(_sso_session.user_id))
-            environ['idp.user'] = self.userdb.lookup_user(_sso_session.user_id)
-            environ['idp.authn'] = self.get_authn_by_ref(_sso_session.user_authn_ref, _sso_session.user_authn_class_ref)
-            if environ['idp.authn'] is None:
-                # This could happen with SSO sessions refering to old authns during
-                # reconfiguration of authns in the AUTHN_BROKER.
-                # XXX remove SSO session?
-                raise eduid_idp.error.ServiceError(logger=self.logger)
-        environ['idp.session'] = _sso_session
-        return environ
+        session = self._lookup_sso_session2()
+        if session:
+            self.logger.debug("SSO session for user {!r} found in IdP cache".format(session.user_id))
+            session.set_user(self.userdb.lookup_user(session.user_id))
+            if not session.idp_user:
+                return None
+            _age = session.minutes_old
+            if _age > self.config.sso_session_lifetime:
+                self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
+                    _age, self.config.sso_session_lifetime))
+                return None
+            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
+                _age, self.config.sso_session_lifetime))
+        return session
 
-    def _lookup_userdata(self):
+    def _lookup_sso_session2(self):
         """
-        See if a valid SSO session exists for this request, and return the data about
+        See if a SSO session exists for this request, and return the data about
         the currently logged in user from the session store.
 
         :return: Data about currently logged in user
@@ -349,35 +348,7 @@ class IdPApplication(object):
             return None
         _sso = eduid_idp.sso_session.from_dict(_data)
         self.logger.debug("Re-created SSO session {!r}".format(_sso))
-        _age = (int(time.time()) - _sso.authn_timestamp) / 60
-        if _age > self.config.sso_session_lifetime:
-            self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
-                _age, self.config.sso_session_lifetime))
-            return None
-        self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-            _age, self.config.sso_session_lifetime))
         return _sso
-
-    def get_authn_by_ref(self, ref, class_ref=None):
-        """
-        Look up an authentication context by reference.
-        :param ref: object
-        :param class_ref: Authn class ref as string
-        :return: authn context or None
-
-        :type class_ref: string
-        :rtype: dict | None
-        """
-        try:
-            _authn = self.AUTHN_BROKER[ref]
-            if class_ref is not None:
-                if _authn['class_ref'] != class_ref:
-                    self.logger.warning("AuthN context returned for ref {!r} class_ref mismatch".format(ref))
-                    self.logger.debug("Got AuthN context class_ref {!r}, expected {!r}".format(
-                        _authn['class_ref'], class_ref))
-            return _authn
-        except KeyError:
-            self.logger.warning("No AuthN context found using ref {!r}".format(ref))
 
     def handle_error(self):
         """

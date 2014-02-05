@@ -34,6 +34,8 @@
 #
 
 import time
+import eduid_idp.idp_user
+import eduid_idp.assurance
 
 class SSOSession(object):
 
@@ -45,6 +47,8 @@ class SSOSession(object):
                       'authn_class_ref': authn_class_ref,
                       'authn_timestamp': ts,
                       }
+        # Extra information not serialized
+        self._idp_user = None
 
     def __repr__(self):
         return '<{cl} instance at {addr}: uid={uid!s}, class={clref!s}, ts={ts!s}>'.format(
@@ -103,6 +107,52 @@ class SSOSession(object):
         E.g. u'eduid.se:level:1:100'
         """
         return self._data['authn_ref']
+
+    @property
+    def idp_user(self):
+        """
+        Get the IdPUser object stored in the SSO session using set_user().
+
+        :rtype: IdPUser
+        """
+        return self._idp_user
+
+    def set_user(self, user):
+        """
+        Store the result of a userdb lookup.
+
+        :param user: User object
+
+        :type user: IdPUser
+        """
+        assert isinstance(user, eduid_idp.idp_user.IdPUser)
+        self._idp_user = user
+
+    def get_authn_context(self, broker, logger=None):
+        """
+        Look up the authentication context for the SSO session.
+
+        :param broker: pysaml2 AuthnBroker
+        :param logger: logging logger
+        :return: authn context or None
+
+        :rtype: dict | None | False
+        """
+        return eduid_idp.assurance.get_authn_context(broker,
+                                                     self.user_authn_ref,
+                                                     class_ref=self.user_authn_class_ref,
+                                                     logger=logger)
+
+    @property
+    def minutes_old(self):
+        """
+        Return the age of this SSO session, in minutes.
+
+        :rtype: int
+        """
+        age = (int(time.time()) - self.authn_timestamp) / 60
+        return age
+
 
 def from_dict(data):
     """
