@@ -284,6 +284,10 @@ class SSOSessionCacheMDB(SSOSessionCache):
             self.connection = conn
         else:
             if 'replicaSet=' in uri:
+                if 'socketTimeoutMS' not in kwargs:
+                    kwargs['socketTimeoutMS'] = 5000
+                if 'connectTimeoutMS' not in kwargs:
+                    kwargs['connectTimeoutMS'] = 5000
                 self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
             else:
                 self.connection = pymongo.MongoClient(uri, **kwargs)
