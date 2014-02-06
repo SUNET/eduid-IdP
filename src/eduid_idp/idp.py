@@ -150,6 +150,10 @@ class IdPApplication(object):
         self.response_status = None
         self.start_response = None
 
+        # Connecting to MongoDB can take some time if the replica set is not fully working.
+        # Log both 'starting' and 'started' messages.
+        self.logger.info("eduid-IdP server starting")
+
         old_path = sys.path
         cfgdir = os.path.dirname(config.pysaml2_config)
         cfgfile = config.pysaml2_config
@@ -176,6 +180,14 @@ class IdPApplication(object):
         cherrypy.config.update({'request.error_response': self.handle_error,
                                 'error_page.default': self.error_page_default,
                                 })
+        listen_str = 'http://'
+        if self.config.server_key:
+            listen_str = 'https://'
+        if ':' in self.config.listen_addr:  # IPv6
+            listen_str += '[' + self.config.listen_addr + ']:' + str(self.config.listen_port)
+        else:  # IPv4
+            listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
+        self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
