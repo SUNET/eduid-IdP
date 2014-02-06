@@ -320,7 +320,71 @@ class SSO(Service):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        self.logger.debug("perform_login :\n{!s}".format(str(ticket)))
+        resp_args = self._validate_login_request(ticket)
+
+        user = self.sso_session.idp_user
+
+        response_authn = self._get_login_response_authn(ticket, user)
+
+        attributes = self._make_scoped_eppn(user.identity)
+
+        # Only perform expensive parse/pretty-print if debugging
+        if self.config.debug:
+            self.logger.debug("Creating an AuthnResponse: user {!r}, attributes {!r}, "
+                              "response args:\n{!s}\nauthn:\n{!s}".format(
+                              user, attributes,
+                              pprint.pformat(resp_args),
+                              pprint.pformat(response_authn)))
+
+        saml_response = self.IDP.create_authn_response(attributes, userid = user.username,
+                                                       authn = response_authn, sign_assertion = True,
+                                                       **resp_args)
+
+        # Only perform expensive parse/pretty-print if debugging
+        if self.config.debug:
+            # saml_response is a compact XML document as string. For debugging, it is very
+            # useful to get that pretty-printed in the logfile directly, so parse the XML
+            # string to an etree again and then pretty-print format the etree into a new string.
+            xmlstr = eduid_idp.util.maybe_xml_to_string(saml_response)
+            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(xmlstr))
+
+        # Create the Javascript self-posting form that will take the user back to the SP
+        # with a SAMLResponse
+        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
+            self.binding_out, self.destination, ticket.RelayState))
+        http_args = self.IDP.apply_binding(self.binding_out, str(saml_response), self.destination,
+                                           ticket.RelayState, response = True)
+        #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
+
+        # INFO-Log the SSO session id and the AL and destination
+        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
+                                                                      response_authn['class_ref'],
+                                                                      self.destination))
+        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+
+    def _validate_login_request(self, ticket):
+        """
+        Validate the validity of the SAML request we are going to answer with
+        an assertion.
+
+        Checks that the SP is known through metadata.
+
+        Figures out how to respond to this request. Return a dictionary like
+
+          {'destination': 'https://sp.example.org/saml2/acs/',
+           'name_id_policy': <saml2.samlp.NameIDPolicy object>,
+           'sp_entity_id': 'https://sp.example.org/saml2/metadata/',
+           'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+           'in_response_to': 'id-4c45b079f571c57aef34aaaaac4295c9'
+           }
+
+        :param ticket: State for this request
+        :return: pysaml2 response creation data
+
+        :type ticket: SSOLoginData
+        :rtype: dict
+        """
+        self.logger.debug("Validate login request :\n{!s}".format(str(ticket)))
         try:
             if not self._verify_request(ticket):
                 raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
@@ -332,10 +396,55 @@ class SSO(Service):
             self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know how to reply to the SP that referred you here",
                                              logger = self.logger)
+        return resp_args
 
-        user = self.sso_session.idp_user
-        self.logger.debug("Identity of user {!s}:\n{!s}".format(user, pprint.pformat(user.identity)))
+    def _verify_request(self, ticket):
+        """
+        Verify that a login request looks OK to this IdP, and figure out
+        the outgoing binding and destination to use later.
 
+        :param ticket: SSOLoginData instance
+        :return: True on success
+        Status is True if query is OK, and Response is either a Response() or None
+        if Status is True.
+
+        :type ticket: SSOLoginData
+        :rtype: bool
+        """
+        assert isinstance(ticket, SSOLoginData)
+        self.logger.debug("verify_request acting on previously parsed ticket.req_info {!s}".format(ticket.req_info))
+
+        self.logger.debug("AuthnRequest {!r}".format(ticket.req_info.message))
+
+        self.binding_out, self.destination = self.IDP.pick_binding("assertion_consumer_service",
+                                                                   entity_id = ticket.req_info.message.issuer.text)
+
+        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
+        return True
+
+    def _get_login_response_authn(self, ticket, user):
+        """
+        Figure out what AuthnContext to assert in the SAML response.
+
+        The 'highest' Assurance-Level (AL) asserted is basically min(ID-proofing-AL, Authentication-AL).
+
+        What AuthnContext is asserted is also heavily influenced by what the SP requested.
+
+        Returns a pysaml2-style dictionary like
+
+            {'authn_auth': u'https://idp.example.org/idp.xml',
+             'authn_instant': 1391678156,
+             'class_ref': 'http://www.swamid.se/policy/assurance/al1'
+             }
+
+        :param ticket: State for this request
+        :param user: The user for whom the assertion will be made
+        :return: Authn information (pysaml2 style)
+
+        :type ticket: SSOLoginData
+        :type user: IdPUser
+        :rtype: dict
+        """
         _authn = self.sso_session.get_authn_context(self.AUTHN_BROKER, logger=self.logger)
         self.logger.debug("User authenticated using Authn {!r}".format(_authn))
         if not _authn:
@@ -375,36 +484,9 @@ class SSO(Service):
         except AttributeError:
             self.logger.debug("Asserting AuthnContext {!r} (none requested)".format(response_authn['class_ref']))
 
-        self.logger.debug("Creating an AuthnResponse, user {!r}, response args:\n{!s}".format(
-            user, pprint.pformat(resp_args)))
-
-        attributes = self._make_scoped_eppn(user.identity)
         response_authn['authn_instant'] = self.sso_session.authn_timestamp
 
-        self.logger.debug("Creating an AuthnResponse, create_authn_response authn:\n{!s}".format(
-            pprint.pformat(response_authn)))
-
-        _resp = self.IDP.create_authn_response(attributes, userid = user.username,
-                                               authn = response_authn, sign_assertion = True, **resp_args)
-
-        # Only perform expensive parse/pretty-print if debugging
-        if self.config.debug:
-            xmlstr = eduid_idp.util.maybe_xml_to_string(_resp)
-            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(xmlstr))
-
-        # Create the Javascript self-posting form that will take the user back to the SP
-        # with a SAMLResponse
-        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
-            self.binding_out, self.destination, ticket.RelayState))
-        http_args = self.IDP.apply_binding(self.binding_out, str(_resp), self.destination,
-                                           ticket.RelayState, response = True)
-        #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
-
-        # INFO-Log the SSO session id and the AL and destination
-        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
-                                                                      response_authn['class_ref'],
-                                                                      self.destination))
-        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+        return response_authn
 
     def redirect(self):
         """ This is the HTTP-redirect endpoint.
@@ -476,30 +558,6 @@ class SSO(Service):
         # XXX shouldn't force_authn be checked for artifact?
         return self.perform_login(_ticket)
 
-    def _verify_request(self, ticket):
-        """
-        Verify that a login request looks OK to this IdP, and figure out
-        the outgoing binding and destination to use later.
-
-        :param ticket: SSOLoginData instance
-        :return: True on success
-        Status is True if query is OK, and Response is either a Response() or None
-        if Status is True.
-
-        :type ticket: SSOLoginData
-        :rtype: bool
-        """
-        assert isinstance(ticket, SSOLoginData)
-        self.logger.debug("verify_request acting on previously parsed ticket.req_info {!s}".format(ticket.req_info))
-
-        self.logger.debug("AuthnRequest {!r}".format(ticket.req_info.message))
-
-        self.binding_out, self.destination = self.IDP.pick_binding("assertion_consumer_service",
-                                                                   entity_id = ticket.req_info.message.issuer.text)
-
-        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
-        return True
-
     def _should_force_authn(self, ticket):
         """
         Check if the IdP should force authentication of this request.
@@ -547,11 +605,11 @@ class SSO(Service):
             auth_levels = [reference for (method, reference) in auth_info]
             self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
 
-            return self.show_login_page(ticket, auth_levels, redirect_uri)
+            return self._show_login_page(ticket, auth_levels, redirect_uri)
 
         raise eduid_idp.error.Unauthorized("No usable authentication method", logger = self.logger)
 
-    def show_login_page(self, ticket, auth_levels, redirect_uri):
+    def _show_login_page(self, ticket, auth_levels, redirect_uri):
         """
         Display the login form for all authentication methods.
 
