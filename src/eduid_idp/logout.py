@@ -12,10 +12,12 @@
 Code handling Single Log Out requests.
 """
 import pprint
+from hashlib import sha1
 
-from eduid_idp.service import Service
-import eduid_idp.mischttp
 import eduid_idp.util
+import eduid_idp.mischttp
+import eduid_idp.sso_session
+from eduid_idp.service import Service
 
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
@@ -78,12 +80,12 @@ class SLO(Service):
         :type binding: string
         :rtype: string
         """
-        self.logger.info("--- Single Log Out Service ---")
-
+        self.logger.debug("--- Single Log Out Service ---")
         if not info:
             raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
 
         request = info["SAMLRequest"]
+        req_key = _get_request_key(request)
 
         try:
             req_info = self.IDP.parse_logout_request(request, binding)
@@ -107,6 +109,7 @@ class SLO(Service):
 
         _name_id = req_info.message.name_id
         _session_id = eduid_idp.mischttp.read_cookie(self.logger)
+        _username = None
         if _session_id:
             # If the binding is REDIRECT, we can get the SSO session to log out from the
             # client idpauthn cookie
@@ -119,39 +122,62 @@ class SLO(Service):
             self.logger.debug("Logout message name_id: {!r} found username {!r}".format(
                 _name_id, _username))
             session_ids = self.IDP.cache.get_sessions_for_user(_username)
-            if not session_ids:
-                self.logger.error("Could not find any SSO sessions for username {!r}".format(_username))
-        if not self._logout_session_ids(session_ids):
-            return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
 
-        status_code = self._logout_name_id(_name_id)
-        self.logger.debug("Logout of NameID {!r} result : {!r}".format(_name_id, status_code))
+        self.logger.debug("Logout resources: name_id {!r} username {!r}, session_ids {!r}".format(
+            _name_id, _username, session_ids))
+
+        if session_ids:
+            status_code = self._logout_session_ids(session_ids, req_key)
+        else:
+            status_code = self._logout_name_id(_name_id, req_key)
+
+        self.logger.debug("Logout of sessions {!r} / NameID {!r} result : {!r}".format(
+            session_ids, _name_id, status_code))
+        self.logger.info("{!s}: logout status={!r}".format(req_key, status_code))
         return self._logout_response(req_info, status_code)
 
-    def _logout_session_ids(self, session_ids):
+    def _logout_session_ids(self, session_ids, req_key):
         """
         :param session_ids: List of db keys in SSO session database
-        :return: True on success (at least one session was removed)
+        :param req_key: Logging id of request
+        :return: SAML StatusCode
+        :rtype: string
         """
+        fail = 0
         for this in session_ids:
-            self.logger.info("Logging out SSO session with key: {!s}".format(this))
-            if not self.IDP.cache.remove_session(this):
-                return False
-        if session_ids:
-            return True
+            self.logger.debug("Logging out SSO session with key: {!s}".format(this))
+            try:
+                _data = self.IDP.cache.get_session(this)
+                _sso = eduid_idp.sso_session.from_dict(_data)
+                res = self.IDP.cache.remove_session(this)
+                self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
+                    req_key, _sso.public_id, _sso.minutes_old, bool(res)))
+            except KeyError:
+                self.logger.info("{!s}: logout sso_key={!r}, result=not_found".format(req_key, this))
+                res = 0
+            if not res:
+                fail += 1
+        if fail:
+            if fail == len(session_ids):
+                return saml2.samlp.STATUS_RESPONDER
+            return saml2.samlp.STATUS_PARTIAL_LOGOUT
+        return saml2.samlp.STATUS_SUCCESS
 
-    def _logout_name_id(self, name_id):
+    def _logout_name_id(self, name_id, req_key):
         """
         :param name_id: NameID from LogoutRequest
-        :return: SAML StatusCode (string)
+        :param req_key: Logging id of request
+        :return: SAML StatusCode
+        :rtype: string
         """
         if not name_id:
-            self.logger.error("No NameID provided for logout")
+            self.logger.debug("No NameID provided for logout")
             return saml2.samlp.STATUS_UNKNOWN_PRINCIPAL
         try:
             # remove the authentication
             # XXX would be useful if remove_authn_statements() returned how many statements it actually removed
             self.IDP.session_db.remove_authn_statements(name_id)
+            self.logger.info("{!r}: logout name_id={!r}".format(req_key, name_id))
         except KeyError as exc:
             self.logger.error("ServiceError removing authn : %s" % exc)
             raise eduid_idp.error.ServiceError(logger = self.logger)
@@ -171,8 +197,9 @@ class SLO(Service):
         :type sign_response: bool
         :rtype: string
         """
-        self.logger.info("LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(), req_info.sender(),
-                                                                           status_code))
+        self.logger.debug("LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(),
+                                                                            req_info.sender(),
+                                                                            status_code))
         if req_info.binding != BINDING_SOAP:
             bindings = [BINDING_HTTP_REDIRECT, BINDING_HTTP_POST]
             binding, destination = self.IDP.pick_binding("single_logout_service", bindings,
@@ -210,3 +237,16 @@ class SLO(Service):
             self.logger.debug("Creating response with binding {!r] instead of {!r} used before".format(
                 bindings[0], req_info.binding))
         return eduid_idp.mischttp.create_html_response(bindings[0], ht_args, self.start_response, self.logger)
+
+
+def _get_request_key(request):
+    """
+    Generate a unique identifier for this request looking like the ticket.key in login.
+
+    :param request: SAMLRequest as string
+    :return: unique id
+
+    :type request: string
+    :rtype: string
+    """
+    return sha1(request).hexdigest()
