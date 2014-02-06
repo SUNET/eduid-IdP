@@ -219,7 +219,7 @@ class SLO(Service):
                                                    issuer = issuer)
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
-            xmlstr = eduid_idp.util.maybe_xml_to_string(response)
+            xmlstr = eduid_idp.util.maybe_xml_to_string(response, logger=self.logger)
             self.logger.debug("Logout SAMLResponse :\n\n{!s}\n\n".format(xmlstr))
 
         ht_args = self.IDP.apply_binding(bindings[0], str(response), destination, req_info.relay_state,

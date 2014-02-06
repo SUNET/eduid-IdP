@@ -34,7 +34,7 @@
 #
 
 
-def maybe_xml_to_string(message):
+def maybe_xml_to_string(message, logger=None):
     """
     Try to parse message as an XML string, and then return it pretty-printed.
 
@@ -43,6 +43,7 @@ def maybe_xml_to_string(message):
     This is used to (debug-)log SAML requests/responses in a readable way.
 
     :param message: XML string typically
+    :param logger: logging logger
     :return: something ready for logging
     :rtype: string
     """
@@ -51,5 +52,7 @@ def maybe_xml_to_string(message):
         parser = etree.XMLParser(remove_blank_text=True)
         xml = etree.XML(str(message), parser)
         return etree.tostring(xml, pretty_print=True)
-    except Exception:
+    except Exception as exc:
+        if logger is not None:
+            logger.debug("Could not parse message as XML: {!r}".format(exc))
         return str(message)
