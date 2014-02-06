@@ -129,15 +129,18 @@ class SLO(Service):
         if session_ids:
             status_code = self._logout_session_ids(session_ids, req_key)
         else:
+            # No specific SSO session(s) were found, we have no choice but to logout ALL
+            # the sessions for this NameID.
             status_code = self._logout_name_id(_name_id, req_key)
 
         self.logger.debug("Logout of sessions {!r} / NameID {!r} result : {!r}".format(
             session_ids, _name_id, status_code))
-        self.logger.info("{!s}: logout status={!r}".format(req_key, status_code))
-        return self._logout_response(req_info, status_code)
+        return self._logout_response(req_info, status_code, req_key)
 
     def _logout_session_ids(self, session_ids, req_key):
         """
+        Terminate one or more specific SSO sessions.
+
         :param session_ids: List of db keys in SSO session database
         :param req_key: Logging id of request
         :return: SAML StatusCode
@@ -165,6 +168,12 @@ class SLO(Service):
 
     def _logout_name_id(self, name_id, req_key):
         """
+        Terminate ALL SSO sessions found using this NameID.
+
+        This is not as nice as _logout_session_ids(), as it would log a user
+        out of sessions across multiple devices - probably not the expected thing
+        to happen from a user perspective when clicking Logout on their phone.
+
         :param name_id: NameID from LogoutRequest
         :param req_key: Logging id of request
         :return: SAML StatusCode
@@ -177,23 +186,25 @@ class SLO(Service):
             # remove the authentication
             # XXX would be useful if remove_authn_statements() returned how many statements it actually removed
             self.IDP.session_db.remove_authn_statements(name_id)
-            self.logger.info("{!r}: logout name_id={!r}".format(req_key, name_id))
+            self.logger.info("{!s}: logout name_id={!r}".format(req_key, name_id))
         except KeyError as exc:
             self.logger.error("ServiceError removing authn : %s" % exc)
             raise eduid_idp.error.ServiceError(logger = self.logger)
         return saml2.samlp.STATUS_SUCCESS
 
-    def _logout_response(self, req_info, status_code, sign_response=True):
+    def _logout_response(self, req_info, status_code, req_key, sign_response=True):
         """
         Create logout response.
 
         :param req_info: Logout request
         :param status_code: logout result (e.g. 'urn:oasis:names:tc:SAML:2.0:status:Success')
+        :param req_key: SAML request id
         :param sign_response: cryptographically sign response or not
         :return: HTML response
 
         :type req_info: saml2.request.LogoutRequest
         :type status_code: string
+        :type req_key: string
         :type sign_response: bool
         :rtype: string
         """
@@ -224,11 +235,13 @@ class SLO(Service):
 
         ht_args = self.IDP.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
                                          response = True)
-
-        self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
+        #self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 
         # Delete the SSO session cookie in the browser
         eduid_idp.mischttp.delete_cookie("idpauthn", self.logger)
+
+        # INFO-Log the SAML request ID, result of logout and destination
+        self.logger.info("{!s}: logout status={!r}, dst={!s}".format(req_key, status_code, destination))
 
         # XXX old code checked 'if req_info.binding == BINDING_HTTP_REDIRECT:', but it looks like
         # it would be more correct to look at bindings[0] here, since `bindings' is what was used
