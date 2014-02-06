@@ -117,6 +117,16 @@ def get_post():
     return cherrypy.request.body_params
 
 
+def get_request_header():
+    """
+    Return the HTML request headers..
+
+    :return: headers
+
+    :rtype: dict
+    """
+    return cherrypy.request.headers
+
 def get_request_body():
     """
     Return the request body from a HTML POST request.
@@ -128,7 +138,6 @@ def get_request_body():
     length = cherrypy.request.headers['Content-Length']
     raw_body = cherrypy.request.body.read(int(length))
     return raw_body
-
 
 def static_filename(config, path):
     """

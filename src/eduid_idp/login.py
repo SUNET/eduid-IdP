@@ -13,7 +13,6 @@ Code handling Single Sign On logins.
 """
 
 import pprint
-import cherrypy
 
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
@@ -687,29 +686,6 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def verify_username_and_password(dic, idp_app, min_length=0):
-    """
-    :param dic: dict() with POST parameters
-    :param idp_app: IdPApplication instance
-    :param min_length: Minimum required length of password
-
-    :return: IdPUser instance or False
-
-    :type dic: dict
-    :type idp_app: idp.IdPApplication
-    :rtype: IdPUser | False
-    """
-    username = dic["username"]
-    password = dic["password"]
-
-    user = idp_app.userdb.verify_username_and_password(username, password)
-    if user:
-        if len(password) >= min_length:
-            return user
-        idp_app.logger.debug("User {!r} authenticated, but denied by password length constraints".format(user))
-    return False
-
-
 def do_verify(idp_app):
     """
     Perform authentication of user based on user provided credentials.
@@ -725,6 +701,8 @@ def do_verify(idp_app):
     :param idp_app: IdPApplication instance
     :return: Does not return
     :raise eduid_idp.mischttp.Redirect: On successful authentication, redirect to redirect_uri.
+
+    :type idp_app: idp.IdPApplication
     """
     query = eduid_idp.mischttp.get_post()
     # extract password to keep it away from as much code as possible
@@ -747,33 +725,17 @@ def do_verify(idp_app):
     idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(
         user_authn['class_ref'], authn_ref))
 
-    try:
-        login_data = {'username': query.get('username'),
-                      'password': password,
-                      }
-        if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
-            user = verify_username_and_password(login_data, idp_app)
-        elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            user = verify_username_and_password(login_data, idp_app, min_length=12)
-        else:
-            del login_data  # keep out of any exception logs
-            del password    # keep out of any exception logs
-            idp_app.logger.info("Authentication for class {!r} not implemented".format(user_authn['class_ref']))
-            raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
-                user_authn['class_ref'], logger=idp_app.logger))
-    except Exception:
-        idp_app.logger.error("Failed authenticating user", exc_info=1, extra={'stack': True,
-                                                                              'request': cherrypy.request,
-                                                                              })
-        user = None
-
+    login_data = {'username': query.get('username'),
+                  'password': password,
+                  }
     del password  # keep out of any exception logs
+    user = idp_app.authn.get_authn_user(login_data, user_authn, idp_app)
 
     if not user:
         _ticket.FailCount += 1
         idp_app.IDP.ticket.store_ticket(_ticket)
         idp_app.logger.debug("Unknown user or wrong password")
-        _referer = cherrypy.request.headers.get('Referer')
+        _referer = eduid_idp.mischttp.get_request_header().get('Referer')
         if _referer:
             raise eduid_idp.mischttp.Redirect(str(_referer))
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)

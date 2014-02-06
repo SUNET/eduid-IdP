@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S
+# Copyright (c) 2013, 2014 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -36,9 +36,6 @@
 User and user database module.
 """
 
-import pprint
-
-import vccs_client
 from eduid_am.celery import celery, get_attribute_manager
 
 
@@ -121,19 +118,14 @@ class IdPUserDb(object):
     :param logger: logging logger
     :param config: IdP config
     :param backend: User database
-    :param auth_client: VCCS authentication client
 
     :type logger: logging.Logger
     :type config: eduid_idp.config.IdPConfig
-    :type auth_client: vccs_client.VCCSClient
     """
 
-    def __init__(self, logger, config, backend = None, auth_client = None):
+    def __init__(self, logger, config, backend = None):
         self.logger = logger
         self.config = config
-        self.auth_client = auth_client
-        if auth_client is None:
-            self.auth_client = vccs_client.VCCSClient()
         self.backend = backend
         if backend is None:
             if config.userdb_mongo_uri and config.userdb_mongo_database:
@@ -141,55 +133,6 @@ class IdPUserDb(object):
                             }
                 celery.conf.update(settings)
             self.backend = get_attribute_manager(celery)
-
-    def verify_username_and_password(self, username, password):
-        """
-        Attempt to verify that a password is valid for a specific user.
-
-        Currently, the naive approach of looping through all the users password credentials
-        is taken. This is bad because the more passwords a user has, the more likely an
-        online attacker is to guess any one of them.
-        :param username: identifier given by user, probably an e-mail address or eppn
-        :param password: password given by user
-        :return: IdPUser on successful authentication
-
-        :type username: string
-        :type password: string
-        :rtype: IdPUser | None
-        """
-        user = self.lookup_user(username)
-        if not user:
-            self.logger.info("Unknown user : {!r}".format(username))
-            # XXX we effectively disclose there was no such user by the quick
-            # response in this case. Maybe send bogus auth request to backends?
-            return None
-        self.logger.debug("Found user {!r}".format(user))
-        self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
-        # XXX for now, try the password sequentially against all the users password credentials
-        for cred in user.passwords:
-            try:
-                factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
-            except ValueError as exc:
-                self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred['id'], exc))
-                continue
-            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
-                username, str(cred['id']), factor))
-            # Old credentials were created using the username (user['mail']) of the user
-            # instead of the user['_id']. Try both during a transition period.
-            user_ids = [str(user.identity['_id']), user.identity['mail']]
-            if cred.get('user_id_hint') is not None:
-                user_ids.insert(0, cred.get('user_id_hint'))
-            for user_id in user_ids:
-                try:
-                    if self.auth_client.authenticate(user_id, [factor]):
-                        self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
-                        return user
-                except vccs_client.VCCSClientHTTPError as exc:
-                    if exc.http_code == 500:
-                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
-                        continue
-        self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
-        return None
 
     def lookup_user(self, username):
         """

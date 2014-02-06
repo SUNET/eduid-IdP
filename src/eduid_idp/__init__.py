@@ -49,4 +49,5 @@ from . import idp_conf
 from . import assurance
 from . import thirdparty
 from . import sso_session
+from . import authn
 from . import util

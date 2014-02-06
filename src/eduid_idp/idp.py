@@ -73,12 +73,10 @@ General user<->IdP interaction flow :
 
 import os
 import sys
-import time
 import pprint
 import logging
 import argparse
 import threading
-import sso_session
 
 import cherrypy
 import simplejson
@@ -86,6 +84,8 @@ import simplejson
 import logging.handlers
 
 import eduid_idp
+import eduid_idp.authn
+import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 
@@ -176,6 +176,7 @@ class IdPApplication(object):
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
+        self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.userdb)
 
         cherrypy.config.update({'request.error_response': self.handle_error,
                                 'error_page.default': self.error_page_default,

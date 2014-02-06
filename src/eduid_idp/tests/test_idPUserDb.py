@@ -104,8 +104,9 @@ class TestIdPUserDb(TestCase):
     def setUp(self):
         config = None
         #noinspection PyTypeChecker
-        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, backend = FakeUserDb(),
-                                                       auth_client = FakeAuthClient())
+        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, backend = FakeUserDb())
+        self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.idp_userdb,
+                                              auth_client = FakeAuthClient())
 
     def test_lookup_user(self):
         _this = self.idp_userdb.lookup_user('test@example.com')
@@ -116,10 +117,16 @@ class TestIdPUserDb(TestCase):
         self.assertEqual(_this._data.get('mail'), 'test2@example.com')
 
     def test_verify_username_and_password(self):
-        self.assertTrue(self.idp_userdb.verify_username_and_password('test@example.com', 'foo'))
-        self.assertTrue(self.idp_userdb.verify_username_and_password('test@example.com', 'bar'))
-        self.assertTrue(self.idp_userdb.verify_username_and_password('test2@example.com', 'baz'))
-        self.assertTrue(self.idp_userdb.verify_username_and_password('test2@eduid.se', 'baz'))
+        self.assertTrue(self._test_authn('test@example.com', 'foo'))
+        self.assertTrue(self._test_authn('test@example.com', 'bar'))
+        self.assertTrue(self._test_authn('test2@example.com', 'baz'))
+        self.assertTrue(self._test_authn('test2@eduid.se', 'baz'))
 
-        self.assertFalse(self.idp_userdb.verify_username_and_password('test@example.com', 'baz'))
-        self.assertFalse(self.idp_userdb.verify_username_and_password('test@example.com', 'rAnDoM'))
+        self.assertFalse(self._test_authn('test@example.com', 'baz'))
+        self.assertFalse(self._test_authn('test@example.com', 'rAnDoM'))
+
+    def _test_authn(self, username, password):
+        data = {'username': username,
+                'password': password,
+                }
+        return self.authn.verify_username_and_password(data,)
