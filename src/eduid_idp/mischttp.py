@@ -24,7 +24,6 @@ from urlparse import parse_qs
 
 import eduid_idp
 
-from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_HTTP_REDIRECT
 
 
@@ -53,7 +52,7 @@ def create_html_response(binding, http_args, start_response, logger):
     :type logger: logging.Logger
     :rtype: string
     """
-    if binding == BINDING_HTTP_ARTIFACT or binding == BINDING_HTTP_REDIRECT:
+    if binding == BINDING_HTTP_REDIRECT:
         # XXX This URL extraction code is untested in practice, but it appears
         # the should be HTTP headers in http_args['headers']
         urls = [v for (k, v) in http_args['headers'] if k == 'Location']

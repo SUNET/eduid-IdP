@@ -6,7 +6,6 @@ Example configuration for eduid-IdP.
 """
 
 from saml2 import BINDING_HTTP_REDIRECT
-from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_SOAP
 from saml2.saml import NAME_FORMAT_URI
@@ -52,7 +51,6 @@ CONFIG = {
                 "single_sign_on_service": [
                     ("%s/sso/redirect" % BASE, BINDING_HTTP_REDIRECT),
                     ("%s/sso/post" % BASE, BINDING_HTTP_POST),
-                    ("%s/sso/art" % BASE, BINDING_HTTP_ARTIFACT),
                     ("%s/sso/ecp" % BASE, BINDING_SOAP)
                 ],
                 "single_logout_service": [

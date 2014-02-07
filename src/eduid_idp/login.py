@@ -25,7 +25,6 @@ from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
 from saml2.sigver import verify_redirect_signature
 
-from saml2 import BINDING_HTTP_ARTIFACT
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 
@@ -537,27 +536,6 @@ class SSO(Service):
                 ticket.key, self.sso_session.public_id))
 
         return self._not_authn(ticket, ticket.req_info.message.requested_authn_context)
-
-    def artifact(self):
-        """
-        The HTTP-Artifact endpoint
-
-        :return: HTTP response
-        :raise eduid_idp.error.BadRequest:
-
-        :rtype: string
-        """
-        # Can be either by HTTP_Redirect or HTTP_POST
-        info = self.unpack_either()
-        if not info:
-            raise eduid_idp.error.BadRequest('Missing query', logger = self.logger)
-        # exchange artifact for request
-        request = self.IDP.artifact2message(info["SAMLart"], "spsso")
-        _ticket = self.IDP.ticket.create_ticket(request, BINDING_HTTP_ARTIFACT)
-        # XXX is there a point in using create_login_data and thereby not saving the
-        # ticket in self.IDP.ticket for artifact requests?
-        # XXX shouldn't force_authn be checked for artifact?
-        return self.perform_login(_ticket)
 
     def _should_force_authn(self, ticket):
         """

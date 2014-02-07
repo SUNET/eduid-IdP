@@ -236,9 +236,6 @@ class IdPApplication(object):
             return SSO(session, self._my_start_response, self).post()
         if path[1] == 'redirect':
             return SSO(session, self._my_start_response, self).redirect()
-        if path[1] == 'art':
-            # seldomly used, but part of standard
-            return SSO(session, self._my_start_response, self).artifact()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
