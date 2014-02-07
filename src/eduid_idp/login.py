@@ -329,9 +329,10 @@ class SSO(Service):
 
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
-            self.logger.debug("Creating an AuthnResponse: user {!r}, attributes {!r}, "
-                              "response args:\n{!s}\nauthn:\n{!s}".format(
-                              user, attributes,
+            self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
+                              "Response args:\n{!s},\n\nAuthn:\n{!s}\n".format(
+                              user,
+                              pprint.pformat(attributes),
                               pprint.pformat(resp_args),
                               pprint.pformat(response_authn)))
 
