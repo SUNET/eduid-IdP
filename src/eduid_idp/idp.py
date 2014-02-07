@@ -12,63 +12,96 @@
 """
 eduID IdP application
 
+Stored state :
 
-General user<->IdP interaction flow :
+  1) State regarding the SAMLRequest currently being processed is stored in
+     eduid_idp.login.SSOLoginData() objects. These are by tradition called
+     'tickets', and are currently stored in memory of the IdP instance
+     processing a request.
 
+  2) Single Sign On sessions are stored in eduid_idp.sso_session.SSOSession
+     objects. A unique reference to the SSOSession is sent to the user in a
+     browser cookie. The user will generally not have to authenticate again
+     as long as the cookie is sent from the users browser and the SSOSession
+     hasn't expired. These objects should be stored in MongoDB, accessible
+     to all IdP instances in a cluster.
+
+
+General non-authenticated user<->IdP interaction flow :
 
   1) User visits protected page at SP, which redirects user to
      URL /sso/redirect?SAMLRequest=base64-AuthnRequest
 
   2) URL /sso/redirect is handled by SSO.redirect()
 
-     SSO.redirect() creates SHA-1 of SAML AuthnRequest and uses this as key to store
-     some info in a cache called IDP.ticket. The information stored includes all the
-     URI parameters.
+     SSO.redirect() creates an SSOLoginData() object and stores it in the
+     IDP.ticket cache. The information stored includes the parsed SAMLRequest
+     and the RelayState, if any.
 
-     The key is passed to the login form HTML template as {{key}}.
+     No existing SSOSession() is found, so the user is required to authenticate.
 
-     A reference to the authn context is generated (by pysaml2 authn_context code)
-     and passed to the template as {{authn_reference}}.
+     A unique reference to the SSOLoginData() is passed to the login form
+     HTML template as {{key}}.
 
-     The current URL is included in the HTML form as {{redirect_uri}}.
+     A reference to the requested authn context is generated (by pysaml2
+     authn_context code) and passed to the template as {{authn_reference}}.
+     This is to allow the login.html page to render an appropriate form to
+     authenticate the user commensurately.
 
-  3) User fills out login form an POSTs it to URL /verify
+     The URL of the redirection service is included in the HTML form as
+     {{redirect_uri}}. XXX this should maybe go into the SSOLoginData instead.
 
-  4) URL /verify is handled by do_verify()
+     The place that will verify the submitted credentials (/verify) is
+     communicated to the login-page as {{action}}.
+
+  3) User fills out login form and POSTs it to URL {{action}} (/verify).
+
+  4) {{action}} URL /verify is handled by do_verify()
 
      do_verify() tries to authenticate user based on filled out HTML form contents.
 
-     If successful, a random user identifier (UUID) is created and a mapping between
-     the random uid and the real authenticated users username is stored in the
-     IDP.cache.
+     If successful, an SSOSession() is created and stored in IDP.cache. This
+     SSO session object contains information about what type of authentication
+     was performed, the authn_instant (time of authentication) etc. and will later
+     be used to automatically log the user in, as long as the SSO session hasn't
+     expired, the SP doesn't require re-authentication (using SAML ForceAuthn),
+     the SP doesn't require an incompatible AuthnContext etcetera.
 
-     The random user identifier (UUID) is stored in a browser cookie called `idpauthn'.
+     The ID (an UUID) of the SSO session is stored in a browser cookie called `idpauthn'.
 
-     The user is HTTP redirected back to the URL of step 2 through the `redirect_uri'
-     HTML parameter (included in the HTML form by step 2). The random user identifier
-     is passed as URL parameter `id', and the `key' from step 2 is passed as URL
-     parameter `key'.
+     The user is HTTP redirected back to the URL of step 2 through the {{redirect_uri}}
+     HTML parameter (included in the HTML form by step 2). The unique reference to the
+     SSOLoginData() object is passed using the URL parameter `key', instead of passing
+     the SAMLRequest URL parameter. This avoids having to parse the SAMLRequest again,
+     and also provides the IdP with the possibility to store information about the
+     'login event' somewhere where a malicious user cannot manipulate it.
 
   5) URL /sso/redirect (re-visited) is handled by SSO.redirect()
 
-     Since the query string includes a `key' that can be used to look up info from
-     IDP.ticket this time, processing is continued in SSO.do() (via SSO.operation()).
-     The info in IDP.ticket is pruned first.
+     The users browser this time prevents an `idpauthn' cookie refering to an
+     existing (and valid) SSOSession.
+
+     If the `key' URL parameter is present, it is used to locate the SSOLoginData()
+     object.
+
+     If the SAML request includes a ForceAuthn request from the relying party (SP),
+     the SSO session is ignored and step 2 above (more or less) is invoked instead.
+
+     SSO().perform_login() is called to figure out what attributes to release to
+     this relying party (SP), as well as what AuthnContext should be used based
+     on what the SP requested, and the level of the authentiocation performed when
+     the effective SSOSession() was created..
+
+     At the end of perform_login(), the actual SAML assertion is created and put
+     in a SAMLResponse.
 
      SSO.do() gets the original URI parameters from step 2 that were stored in
      IDP.ticket, and rounds up identity information for the user.
 
-     SSO.do() effectively uses IdPApplication.application() to determine which
-     user is logged in. This will be either from the idpauthn cookie being set,
-     and containing a random user identifier (UUID) that can be looked up in
-     IDP.cache to get a real username, or from IDP.cache using the `id' URI
-     parameter.
 
-     An AuthnResponse is created using pysaml2 create_authn_response(), and this
-     is where the `authn_reference' from step 2 seems to come into play. The authn
-     reference is used to locate the correct authn instance (the same one used
-     in step 2) with the AUTHN_BROKER.
-
+When the user proceeds to log in to other relying partys (SPs), the IdP will find
+the SSO session using the `idpauthn' cookie sent by the users browser and only step
+5 from above will be executed.
 """
 
 import os
