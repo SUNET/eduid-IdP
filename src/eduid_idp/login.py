@@ -209,6 +209,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                                              logger = self.logger, extra = {'info': info, 'binding': binding})
 
         # lookup
+        self.logger.debug("Lookup SSOLoginData (ticket) using key {!r}".format(_key))
         _ticket = self.get(_key)
 
         if _ticket is None:
@@ -753,8 +754,9 @@ def do_verify(idp_app):
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
     _session_id = idp_app.IDP.cache.add_session(user.identity['_id'], _sso_session.to_dict())
-    idp_app.logger.debug("Registered {!r} under {!r} in IdP SSO sessions".format(_sso_session, _session_id))
     eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
+    # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
+    del _session_id
 
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
     idp_app.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
@@ -762,9 +764,10 @@ def do_verify(idp_app):
         _sso_session.user_authn_class_ref,
         _sso_session.user_id))
 
-    # Now that an SSO session has been crea,ted, redirect the users browser back to
-    # the main entry point of the IdP (the 'redirect_uri').
-    lox = "%s?id=%s&key=%s" % (query["redirect_uri"], _session_id, query["key"])
+    # Now that an SSO session has been created, redirect the users browser back to
+    # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'
+    # is passed as an URL parameter instead of the SAMLRequest.
+    lox = query["redirect_uri"] + '?key=' + query['key']
     idp_app.logger.debug("Redirect => %s" % lox)
     raise eduid_idp.mischttp.Redirect(lox)
 
