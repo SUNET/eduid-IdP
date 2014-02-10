@@ -38,22 +38,49 @@ such as rate limiting.
 """
 
 import pprint
+import pymongo
+import datetime
 import vccs_client
 
 import eduid_idp.assurance
 
 
 class IdPAuthn(object):
+    """
 
-    def __init__(self, logger, config, userdb, auth_client=None):
+    :param logger: logging logger
+    :param config: IdP configuration data
+
+    :type logger: logging.Logger
+    :type config: IdPConfig
+    """
+
+    def __init__(self, logger, config, userdb, auth_client=None, authn_store=None):
         self.logger = logger
         self.config = config
         self.userdb = userdb
         self.auth_client = auth_client
         if self.auth_client is None:
             self.auth_client = vccs_client.VCCSClient()
+        self.authn_store = authn_store
+        if self.authn_store is None:
+            self.authn_store = AuthnInfoStoreMDB(uri = self.config.authn_info_mongo_uri,
+                                                 logger = logger)
 
     def get_authn_user(self, login_data, user_authn, idp_app):
+        """
+        Authenticate someone and, if successful, return the IdPUser object.
+
+        :param login_data: Login credentials (dict with 'username' and 'password')
+        :param user_authn: Information about the authentication attempted
+        :param idp_app: IdP application object
+        :return: User, if authenticated
+
+        :type login_data: dict
+        :type: user_authn: dict
+        :type idp_app: idp.IdPApplication
+        :rtype: IdPUser | None
+        """
         user = None
         try:
             if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
@@ -62,7 +89,8 @@ class IdPAuthn(object):
                 user = self.verify_username_and_password(login_data, min_length=12)
             else:
                 del login_data['password']  # keep out of any exception logs
-                idp_app.self.logger.info("Authentication for class {!r} not implemented".format(user_authn['class_ref']))
+                idp_app.self.logger.info("Authentication for class {!r} not implemented".format(
+                    user_authn['class_ref']))
                 raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
                     user_authn['class_ref'], logger=self.logger))
         except Exception:
@@ -130,10 +158,140 @@ class IdPAuthn(object):
                 try:
                     if self.auth_client.authenticate(user_id, [factor]):
                         self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                        self.log_authn(user, success=[cred['id']], failure=[])
                         return user
                 except vccs_client.VCCSClientHTTPError as exc:
                     if exc.http_code == 500:
                         self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
                         continue
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
+        self.log_authn(user, success=[], failure=[cred['id'] for cred in user.passwords])
+        return None
+
+    def log_authn(self, user, success, failure):
+        """
+        Log user authn success as well as failures.
+
+        :param user: User
+        :param success: List of successfully authenticated credentials
+        :param failure: List of failed credentials
+
+        :type user: IdPUser
+        :type success: [bson.ObjectId()]
+        :type failure: [bson.ObjectId()]
+        :rtype: None
+        """
+        if not self.authn_store:  # requires optional configuration
+            return None
+        if success:
+            self.authn_store.credential_success(success)
+        if success or failure:
+            self.authn_store.update_user(user.identity['_id'], success, failure)
+        return None
+
+
+class AuthnInfoStore(object):
+    """
+    Abstract AuthnInfoStore.
+    """
+    def __init__(self, logger):
+        self.logger = logger
+
+
+class AuthnInfoStoreMDB(AuthnInfoStore):
+    """
+    This is a MongoDB version of AuthnInfoStore().
+    """
+
+    def __init__(self, uri, logger, conn = None, db_name = 'eduid_idp',
+                 collection_name = 'authn_info',
+                 **kwargs):
+        AuthnInfoStore.__init__(self, logger)
+
+        if conn is not None:
+            self.connection = conn
+        else:
+            if 'replicaSet=' in uri:
+                if 'socketTimeoutMS' not in kwargs:
+                    kwargs['socketTimeoutMS'] = 5000
+                if 'connectTimeoutMS' not in kwargs:
+                    kwargs['connectTimeoutMS'] = 5000
+                self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
+            else:
+                self.connection = pymongo.MongoClient(uri, **kwargs)
+        self.db = self.connection[db_name]
+        self.collection = self.db[collection_name]
+
+    def credential_success(self, cred_ids, ts=None):
+        """
+        Kantara AL2_CM_CSM#050 requires that any credential that is not used for
+        a period of 18 months is disabled (taken to mean revoked).
+
+        Therefor we need to log all successful authentications and have a cron
+        job handling the revoking of unused ccredentials.
+
+        :param cred_ids: List of Credential ID
+        :param ts: Optional timestamp
+        :return: None
+
+        :type ts: datetime.datetime()
+        :type cred_ids: [bson.ObjectId]
+        """
+        if ts is None:
+            ts = datetime.datetime.utcnow()
+        # Update all existing entrys in one go would've been nice, but pymongo does not
+        # return meaningful data for multi=True, so it is not possible to figure out
+        # which entrys were actually updated :(
+        for this in cred_ids:
+            self.collection.save(
+                {
+                    '_id': this,
+                    'success_ts': ts,
+                },
+            )
+        return None
+
+    def update_user(self, user_id, success, failure, ts=None):
+        """
+        Log authentication result data for this user.
+
+        The fail_count.month is logged to be able to lock users out after too
+        many failed authentication attempts in a month (yet unspecific Kantara
+        requirement).
+
+        The success_count.month is logged for symetry.
+
+        The last_credential_ids are logged so that the IdP can sort
+        the list of credentials giving preference to these the next
+        time, to not load down the authentication backends with
+        authentication requests for credentials the user might not
+        be using (as often).
+
+        :param user_id: User identifier
+        :param success: List of Credential Ids successfully authenticated
+        :param failure: List of Credential Ids for which authentication failed
+        :param ts: Optional timestamp
+        :return: None
+
+        :type user_id: bson.ObjectId
+        :type success: [bson.ObjectId]
+        :type failure: [bson.ObjectId]
+        :type ts: datetime.datetime()
+        """
+        if ts is None:
+            ts = datetime.datetime.utcnow()
+        this_month = (ts.year * 100) + ts.month  # format year-month as integer (e.g. 201402)
+        self.collection.find_and_modify(
+            query = {
+                '_id': user_id,
+            }, update = {
+                '$set': {
+                    'success_ts': ts,
+                    'last_credential_ids': success,
+                },
+                '$inc': {
+                    'fail_count.' + str(this_month): len(failure),
+                    'success_count.' + str(this_month): len(success)
+                },
+            }, upsert = True, new = True, multi = False)
         return None

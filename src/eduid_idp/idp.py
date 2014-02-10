@@ -195,6 +195,11 @@ class IdPApplication(object):
             sys.path = [cfgdir] + sys.path
             cfgfile = os.path.basename(config.pysaml2_config)
         _session_ttl = (self.config.sso_session_lifetime + 1) * 60
+        if config.authn_info_mongo_uri:
+            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(self.config.authn_info_mongo_uri,
+                                                                   logger)
+        else:
+            self.authn_info_db = None
         if self.config.sso_session_mongo_uri:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               logger, _session_ttl)

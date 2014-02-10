@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S
+# Copyright (c) 2013, 2014 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -65,6 +65,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_language': 'en',
                     'base_url': None,
                     'default_eppn_scope': None,
+                    'authn_info_mongo_uri': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -336,3 +337,13 @@ class IdPConfig(object):
         attributes found on users in the userdb.
         """
         return self.config.get(self.section, 'default_eppn_scope')
+
+    @property
+    def authn_info_mongo_uri(self):
+        """
+        Authn info (failed logins etc.) MongoDB connection URI (string).
+        See MongoDB documentation for details.
+
+        If not set, Kantara authn logs will not be maintained.
+        """
+        return self.config.get(self.section, 'authn_info_mongo_uri')
