@@ -66,6 +66,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'base_url': None,
                     'default_eppn_scope': None,
                     'authn_info_mongo_uri': None,
+                    'max_auhtn_failures_per_month': '100',  # Kantara future monthly authn limit
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -347,3 +348,12 @@ class IdPConfig(object):
         If not set, Kantara authn logs will not be maintained.
         """
         return self.config.get(self.section, 'authn_info_mongo_uri')
+
+    @property
+    def max_auhtn_failures_per_month(self):
+        """
+        Disallow login for a user after N failures in a given month.
+
+        This is said to be an imminent Kantara requirement.
+        """
+        return self.config.getint(self.section, 'max_auhtn_failures_per_month')

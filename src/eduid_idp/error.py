@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 NORDUnet A/S
+# Copyright (c) 2013, 2014 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -51,7 +51,7 @@ class HTTPError(cherrypy.HTTPError):
                 pass
             if extra is None:
                 extra = {}
-            if status not in [404, 440]:
+            if status not in [404, 429, 440]:
                 logger.error("HTTP error {!s} {!s} (at {!r})".format(status, message, caller), extra=extra)
             else:
                 logger.debug("HTTP error {!s} {!s} (at {!r})".format(status, message, caller), extra=extra)
@@ -73,6 +73,10 @@ class Forbidden(HTTPError):
 class NotFound(HTTPError):
     def __init__(self, message=None, logger=None, extra=None):
         HTTPError.__init__(self, status=404, message=message, logger=logger, extra=extra)
+
+class TooManyRequests(HTTPError):
+    def __init__(self, message=None, logger=None, extra=None):
+        HTTPError.__init__(self, status=429, message=message, logger=logger, extra=extra)
 
 class LoginTimeout(HTTPError):
     def __init__(self, message=None, logger=None, extra=None):

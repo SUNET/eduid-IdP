@@ -43,6 +43,7 @@ import datetime
 import vccs_client
 
 import eduid_idp.assurance
+import eduid_idp.error
 
 
 class IdPAuthn(object):
@@ -81,20 +82,16 @@ class IdPAuthn(object):
         :type idp_app: idp.IdPApplication
         :rtype: IdPUser | None
         """
-        user = None
-        try:
-            if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
-                user = self.verify_username_and_password(login_data)
-            elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-                user = self.verify_username_and_password(login_data, min_length=12)
-            else:
-                del login_data['password']  # keep out of any exception logs
-                idp_app.self.logger.info("Authentication for class {!r} not implemented".format(
-                    user_authn['class_ref']))
-                raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
-                    user_authn['class_ref'], logger=self.logger))
-        except Exception:
-            self.logger.error("Failed authenticating user", exc_info=1, extra={'stack': True})
+        if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
+            user = self.verify_username_and_password(login_data)
+        elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
+            user = self.verify_username_and_password(login_data, min_length=12)
+        else:
+            del login_data['password']  # keep out of any exception logs
+            idp_app.self.logger.info("Authentication for class {!r} not implemented".format(
+                user_authn['class_ref']))
+            raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
+                user_authn['class_ref'], logger=self.logger))
         return user
 
     def verify_username_and_password(self, data, min_length=0):
@@ -140,8 +137,43 @@ class IdPAuthn(object):
             return None
         self.logger.debug("Found user {!r}".format(user))
         self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
-        # XXX for now, try the password sequentially against all the users password credentials
-        for cred in user.passwords:
+
+        authn_info = self.authn_store.get_user_authn_info(user)
+        if authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month:
+            self.logger.debug("User AuthN failures this month {!r} > {!r}".format(
+                authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month))
+            raise eduid_idp.error.TooManyRequests("Too Many Requests")
+
+        # Optimize list of credentials to try based on which credentials the
+        # user used in the last successful authentication. This optimization
+        # is based on plain assumption, no measurements whatsoever.
+        last_creds = authn_info.last_used_credentials()
+        creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
+        if creds != last_creds:
+            self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
+                [x['id'] for x in user.passwords],
+                [x['id'] for x in creds],
+                last_creds))
+
+        return self._authn_passwords(user, username, password, creds)
+
+    def _authn_passwords(self, user, username, password, credentials):
+        """
+        Perform the final actual authentication of a user based on a list of (password) credentials.
+
+        :param user: User object
+        :param username: Username provided
+        :param password: Password provided
+        :param credentials: Authn credentials to try
+        :return: User | None
+
+        :type user: IdPUser
+        :type username: string
+        :type password: string
+        :type credentials: [dict()]
+        :rtype: IdPUser | None
+        """
+        for cred in credentials:
             try:
                 factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
             except ValueError as exc:
@@ -259,7 +291,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         many failed authentication attempts in a month (yet unspecific Kantara
         requirement).
 
-        The success_count.month is logged for symetry.
+        The success_count.month is logged for symmetry.
 
         The last_credential_ids are logged so that the IdP can sort
         the list of credentials giving preference to these the next
@@ -295,3 +327,52 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
                 },
             }, upsert = True, new = True, multi = False)
         return None
+
+    def get_user_authn_info(self, user):
+        """
+        Load stored Authn information for user.
+
+        :param user: User object
+
+        :type user: IdPUser
+        :rtype: UserAuthnInfo
+        """
+        data = self.collection.find({'_id': user.identity['_id']})[0]
+        if not data:
+            data = {}
+        return UserAuthnInfo(data)
+
+
+class UserAuthnInfo(object):
+    """
+    Interpret data loaded from the AuthnInfoStore.
+    """
+
+    def __init__(self, data):
+        self._data = data
+
+    def failures_this_month(self, ts=None):
+        """
+        Return the number of failed login attempts for a user in a certain month.
+
+        :param ts: Optional timestamp
+
+        :return: Number of failed attempts
+
+        :type ts: datetime.datetime
+        :rtype: int
+        """
+        if ts is None:
+            ts = datetime.datetime.utcnow()
+        this_month = (ts.year * 100) + ts.month  # format year-month as integer (e.g. 201402)
+        return self._data.get('fail_count', {}).get(str(this_month), 0)
+
+    def last_used_credentials(self):
+        """
+        Get the credential IDs used in the last successful authentication for this user.
+
+        :return: List of IDs
+
+        :rtype: [bson.ObjectId]
+        """
+        return self._data.get('last_credential_ids', [])
