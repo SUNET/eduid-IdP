@@ -53,7 +53,7 @@ class IdPAuthn(object):
     :param config: IdP configuration data
 
     :type logger: logging.Logger
-    :type config: IdPConfig
+    :type config: eduid_idp.config.IdPConfig
     """
 
     def __init__(self, logger, config, userdb, auth_client=None, authn_store=None):
@@ -65,8 +65,11 @@ class IdPAuthn(object):
             self.auth_client = vccs_client.VCCSClient()
         self.authn_store = authn_store
         if self.authn_store is None:
-            self.authn_store = AuthnInfoStoreMDB(uri = self.config.authn_info_mongo_uri,
-                                                 logger = logger)
+            authn_info_uri = self.config.authn_info_mongo_uri
+            if authn_info_uri:
+                self.authn_store = AuthnInfoStoreMDB(uri = authn_info_uri, logger = logger)
+            else:
+                self.authn_store = None
 
     def get_authn_user(self, login_data, user_authn, idp_app):
         """
@@ -138,22 +141,26 @@ class IdPAuthn(object):
         self.logger.debug("Found user {!r}".format(user))
         self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
 
-        authn_info = self.authn_store.get_user_authn_info(user)
-        if authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month:
-            self.logger.debug("User AuthN failures this month {!r} > {!r}".format(
-                authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month))
-            raise eduid_idp.error.TooManyRequests("Too Many Requests")
+        if self.authn_store:  # requires optional configuration
+            authn_info = self.authn_store.get_user_authn_info(user)
+            if authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month:
+                self.logger.debug("User AuthN failures this month {!r} > {!r}".format(
+                    authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month))
+                raise eduid_idp.error.TooManyRequests("Too Many Requests")
 
         # Optimize list of credentials to try based on which credentials the
         # user used in the last successful authentication. This optimization
         # is based on plain assumption, no measurements whatsoever.
-        last_creds = authn_info.last_used_credentials()
-        creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
-        if creds != last_creds:
-            self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
-                [x['id'] for x in user.passwords],
-                [x['id'] for x in creds],
-                last_creds))
+        if self.authn_store:
+            last_creds = authn_info.last_used_credentials()
+            creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
+            if creds != last_creds:
+                self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
+                    [x['id'] for x in user.passwords],
+                    [x['id'] for x in creds],
+                    last_creds))
+        else:
+            creds = user.passwords
 
         return self._authn_passwords(user, username, password, creds)
 
