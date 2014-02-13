@@ -344,10 +344,10 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         :type user: IdPUser
         :rtype: UserAuthnInfo
         """
-        data = self.collection.find({'_id': user.identity['_id']})[0]
-        if not data:
-            data = {}
-        return UserAuthnInfo(data)
+        data = self.collection.find({'_id': user.identity['_id']})
+        if not data.count():
+            return UserAuthnInfo({})
+        return UserAuthnInfo(data[0])
 
 
 class UserAuthnInfo(object):
