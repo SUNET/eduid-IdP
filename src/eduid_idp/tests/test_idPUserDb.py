@@ -100,9 +100,13 @@ class FakeAuthClient(object):
         return False
 
 
+class FakeConfig(object):
+    authn_info_mongo_uri = None
+
+
 class TestIdPUserDb(TestCase):
     def setUp(self):
-        config = None
+        config = FakeConfig()
         #noinspection PyTypeChecker
         self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, backend = FakeUserDb())
         self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.idp_userdb,
