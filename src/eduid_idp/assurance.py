@@ -186,6 +186,7 @@ def response_authn(req_authn_ctx, actual_authn, auth_levels, logger, response_co
     lowered = actual_authn['class_ref'] not in auth_levels
     if lowered or req_class_ref is None:
         if req_class_ref is not None:
+            # XXX should return a login failure SAML response here
             logger.debug('Lowered authentication detected, {!r} required {!r}, got {!r}'.format(
                 req_class_ref, auth_levels, actual_authn['class_ref']))
         logger.debug('Response Authn: Asserting AuthnContext {!r} based on authentication level ({!r})'.format(

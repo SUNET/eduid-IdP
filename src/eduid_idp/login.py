@@ -24,6 +24,7 @@ from saml2.request import AuthnRequest
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
 from saml2.sigver import verify_redirect_signature
+from saml2.authn_context import requested_authn_context
 
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
@@ -454,7 +455,7 @@ class SSO(Service):
 
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
-        req_authn_context = ticket.req_info.message.requested_authn_context
+        req_authn_context = self._get_requested_authn_context(ticket)
 
         authn_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_context, self.logger)
         auth_info = self.AUTHN_BROKER.pick(authn_ctx)
@@ -487,6 +488,29 @@ class SSO(Service):
         response_authn['authn_instant'] = self.sso_session.authn_timestamp
 
         return response_authn
+
+    def _get_requested_authn_context(self, ticket):
+        """
+        Check if this SP has explicit Authn preferences in the metadata (some SPs are not
+        capable of conveying this preference in the RequestedAuthnContext)
+
+        :param ticket: State for this request
+        :return: Requested Authn Context
+
+        :type ticket: SSOLoginData
+        :rtype: RequestedAuthnContext
+        """
+        req_authn_context = ticket.req_info.message.requested_authn_context
+        attributes = self.IDP.metadata.entity_attributes(ticket.req_info.message.issuer.text)
+        if "http://www.swamid.se/assurance-requirement" in attributes:
+            # XXX don't just pick the first one from the list - choose the most applicable one somehow.
+            new_authn = attributes["http://www.swamid.se/assurance-requirement"][0]
+            self.logger.debug("Entity {!r} has AuthnCtx preferences in metadata. Overriding {!r} -> {!r}".format(
+                ticket.req_info.message.issuer.text,
+                req_authn_context.authn_context_class_ref[0].text,
+                new_authn))
+            req_authn_context = requested_authn_context(new_authn)
+        return req_authn_context
 
     def redirect(self):
         """ This is the HTTP-redirect endpoint.
@@ -535,7 +559,8 @@ class SSO(Service):
             self.logger.info("{!s}: force_authn sso_session={!s}".format(
                 ticket.key, self.sso_session.public_id))
 
-        return self._not_authn(ticket, ticket.req_info.message.requested_authn_context)
+        req_authn_context = self._get_requested_authn_context(ticket)
+        return self._not_authn(ticket, req_authn_context)
 
     def _should_force_authn(self, ticket):
         """
