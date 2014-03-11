@@ -558,7 +558,7 @@ class SSO(Service):
 
         if not self.sso_session:
             self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))
-        if _force_authn:
+        if _force_authn and self.sso_session:
             self.logger.info("{!s}: force_authn sso_session={!s}".format(
                 ticket.key, self.sso_session.public_id))
 
