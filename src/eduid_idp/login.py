@@ -506,7 +506,7 @@ class SSO(Service):
             # XXX don't just pick the first one from the list - choose the most applicable one somehow.
             new_authn = attributes["http://www.swamid.se/assurance-requirement"][0]
             requested = None
-            if req_authn_context.authn_context_class_ref:
+            if req_authn_context and req_authn_context.authn_context_class_ref:
                 requested = req_authn_context.authn_context_class_ref[0].text
             self.logger.debug("Entity {!r} has AuthnCtx preferences in metadata. Overriding {!r} -> {!r}".format(
                 ticket.req_info.message.issuer.text,
