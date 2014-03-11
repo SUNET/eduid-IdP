@@ -212,9 +212,9 @@ class TestResponse_authn(TestCase):
             'authn_auth': 'me'
         }
         auth_levels = [EDUID_INTERNAL_2_NAME, EDUID_INTERNAL_3_NAME]
-        response_ctx = eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
-                                                          response_contexts=self._response_translation)
-        self.assertEqual(response_ctx['class_ref'], TEST_AL1)
+        with self.assertRaises(eduid_idp.error.Forbidden):
+            eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
+                                               response_contexts=self._response_translation)
 
     def test_response_authn_AL3_1(self):
         """

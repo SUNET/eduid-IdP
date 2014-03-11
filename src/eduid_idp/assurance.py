@@ -183,12 +183,13 @@ def response_authn(req_authn_ctx, actual_authn, auth_levels, logger, response_co
     except AttributeError:
         req_class_ref = None
 
-    lowered = actual_authn['class_ref'] not in auth_levels
-    if lowered or req_class_ref is None:
-        if req_class_ref is not None:
-            # XXX should return a login failure SAML response here
-            logger.debug('Lowered authentication detected, {!r} required {!r}, got {!r}'.format(
-                req_class_ref, auth_levels, actual_authn['class_ref']))
+    if actual_authn['class_ref'] not in auth_levels:
+        logger.debug('Lowered authentication detected, {!r} required {!r}, got {!r}'.format(
+            req_class_ref, auth_levels, actual_authn['class_ref']))
+        # XXX should return a login failure SAML response here
+        raise eduid_idp.error.Forbidden("Authn not permitted".format())
+
+    if req_class_ref is None:
         logger.debug('Response Authn: Asserting AuthnContext {!r} based on authentication level ({!r})'.format(
             res['class_ref'], actual_authn['class_ref']))
         return res
