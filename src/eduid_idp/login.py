@@ -577,6 +577,9 @@ class SSO(Service):
         :rtype: bool
         """
         if ticket.req_info.message.force_authn:
+            if not self.sso_session:
+                self.logger.debug("Force authn without session - ignoring")
+                return True
             if ticket.req_info.message.id != self.sso_session.user_authn_request_id:
                 self.logger.debug("Forcing authentication because of ForceAuthn with "
                                   "SSO session id {!r} != {!r}".format(
