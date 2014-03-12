@@ -258,6 +258,11 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
                 self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
             else:
                 self.connection = pymongo.MongoClient(uri, **kwargs)
+
+        self.parsed_uri = pymongo.uri_parser.parse_uri(uri)
+        if self.parsed_uri.get("database", None):
+            db_name = self.parsed_uri.get("database")
+
         self.db = self.connection[db_name]
         self.collection = self.db[collection_name]
 
