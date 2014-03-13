@@ -14,8 +14,8 @@ install_requires = [
     'pysaml2 == 1.2.0beta2',
     'python-memcached == 1.53',
     'cherrypy == 3.2.4',
-    'vccs_client == 0.4.0',
-    'eduid_am == 0.2',
+    'vccs_client == 0.4.1',
+    'eduid_am == 0.3.0',
 ]
 
 testing_extras = [
