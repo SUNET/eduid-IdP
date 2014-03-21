@@ -7,7 +7,7 @@ from distutils import versionpredicate
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.2'
+version = '0.3.0'
 
 install_requires = [
     'pymongo == 2.5.1',
@@ -15,7 +15,7 @@ install_requires = [
     'python-memcached == 1.53',
     'cherrypy == 3.2.4',
     'vccs_client == 0.4.1',
-    'eduid_am == 0.3.0',
+    'eduid_am == 0.4.0',
 ]
 
 testing_extras = [
