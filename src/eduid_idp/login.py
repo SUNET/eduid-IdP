@@ -501,7 +501,10 @@ class SSO(Service):
         :rtype: RequestedAuthnContext
         """
         req_authn_context = ticket.req_info.message.requested_authn_context
-        attributes = self.IDP.metadata.entity_attributes(ticket.req_info.message.issuer.text)
+        try:
+            attributes = self.IDP.metadata.entity_attributes(ticket.req_info.message.issuer.text)
+        except KeyError:
+            attributes = []
         if "http://www.swamid.se/assurance-requirement" in attributes:
             # XXX don't just pick the first one from the list - choose the most applicable one somehow.
             new_authn = attributes["http://www.swamid.se/assurance-requirement"][0]
