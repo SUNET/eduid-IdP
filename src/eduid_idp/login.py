@@ -213,11 +213,15 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         _ticket = self.get(_key)
 
         if _ticket is None:
-            self.logger.debug("Key {!r} not found in IDP.ticket".format(_key))
+            self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self))
             if "key" in info:
-                raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
-                                                   logger = self.logger, extra = {'info': info, 'binding': binding})
-
+                #raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
+                #                                   logger = self.logger, extra = {'info': info, 'binding': binding})
+                # This error could perhaps be handled better, but the LoginTimeout error message
+                # is not the right one for a number of scenarios where this problem has been
+                # observed so we'll go with ServiceError for now and try to diagnose it properly.
+                raise eduid_idp.error.ServiceError("Login state not found, please re-initiate login",
+                                                   logger = self.logger)
             # cache miss, parse SAMLRequest
             _ticket = self.create_ticket(info, binding, key=_key)
             self.store_ticket(_ticket)
