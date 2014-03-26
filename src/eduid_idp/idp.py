@@ -324,6 +324,17 @@ class IdPApplication(object):
 
         return "{}\n".format(simplejson.dumps(response))
 
+    @cherrypy.expose
+    def test500(self):
+        """
+        Show the same error page that will be shown on most server errors.
+        For testing the error message.
+
+        :raise eduid_idp.error.ServiceError: always
+        """
+        self.logger.debug("Testing 500 Server Internal Error")
+        raise eduid_idp.error.ServiceError("Testing 500 error message", logger=None)
+
     def _my_start_response(self, status, headers):
         """
         The IdP used to be a WSGI application, and this function is a remaining trace of that.
@@ -484,6 +495,7 @@ class IdPApplication(object):
         try:
             res = res.decode('utf-8')
         except UnicodeDecodeError:
+            self.logger.debug("Got UTF-8 decode error")
             pass
 
         if status_code not in [404, 440]:
