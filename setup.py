@@ -7,11 +7,11 @@ from distutils import versionpredicate
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.3.6dev'
+version = '0.3.6'
 
 install_requires = [
     'pymongo == 2.6.3',
-    'pysaml2 == 1.2.0beta3dev',
+    'pysaml2 == 1.2.0beta3',
     'python-memcached == 1.53',
     'cherrypy == 3.2.4',
     'vccs_client == 0.4.1',
