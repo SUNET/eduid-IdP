@@ -67,6 +67,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_eppn_scope': None,
                     'authn_info_mongo_uri': None,
                     'max_auhtn_failures_per_month': '100',  # Kantara future monthly authn limit
+                    'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -357,3 +358,14 @@ class IdPConfig(object):
         This is said to be an imminent Kantara requirement.
         """
         return self.config.getint(self.section, 'max_auhtn_failures_per_month')
+
+    @property
+    def login_state_ttl(self):
+        """
+        Lifetime of state kept in IdP login phase.
+
+        This is the time, in minutes, a user has to complete the login phase.
+        After this time, login cannot complete because the SAMLRequest, RelayState
+        and possibly other needed information will be forgotten.
+        """
+        return self.config.getint(self.section, 'login_state_ttl')

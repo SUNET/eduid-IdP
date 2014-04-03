@@ -208,7 +208,8 @@ class IdPApplication(object):
         self.IDP = server.Server(cfgfile, cache = _SSOSessions)
         # restore path
         sys.path = old_path
-        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, 5 * 60,
+        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
+        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, _login_state_ttl,
                                                             self.config, threading.Lock())
 
         _my_id = self.IDP.config.entityid
