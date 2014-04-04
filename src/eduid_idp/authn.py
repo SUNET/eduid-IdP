@@ -71,18 +71,16 @@ class IdPAuthn(object):
             else:
                 self.authn_store = None
 
-    def get_authn_user(self, login_data, user_authn, idp_app):
+    def get_authn_user(self, login_data, user_authn):
         """
         Authenticate someone and, if successful, return the IdPUser object.
 
         :param login_data: Login credentials (dict with 'username' and 'password')
         :param user_authn: Information about the authentication attempted
-        :param idp_app: IdP application object
         :return: User, if authenticated
 
         :type login_data: dict
         :type: user_authn: dict
-        :type idp_app: idp.IdPApplication
         :rtype: IdPUser | None
         """
         if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
@@ -91,7 +89,7 @@ class IdPAuthn(object):
             user = self.verify_username_and_password(login_data, min_length=12)
         else:
             del login_data['password']  # keep out of any exception logs
-            idp_app.self.logger.info("Authentication for class {!r} not implemented".format(
+            self.logger.info("Authentication for class {!r} not implemented".format(
                 user_authn['class_ref']))
             raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
                 user_authn['class_ref'], logger=self.logger))
@@ -148,10 +146,9 @@ class IdPAuthn(object):
                     authn_info.failures_this_month() > self.config.max_auhtn_failures_per_month))
                 raise eduid_idp.error.TooManyRequests("Too Many Requests")
 
-        # Optimize list of credentials to try based on which credentials the
-        # user used in the last successful authentication. This optimization
-        # is based on plain assumption, no measurements whatsoever.
-        if self.authn_store:
+            # Optimize list of credentials to try based on which credentials the
+            # user used in the last successful authentication. This optimization
+            # is based on plain assumption, no measurements whatsoever.
             last_creds = authn_info.last_used_credentials()
             creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
             if creds != last_creds:

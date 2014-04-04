@@ -43,6 +43,7 @@ import pkg_resources
 
 import eduid_idp
 
+
 class TestCredStore(unittest.TestCase):
 
     def setUp(self):

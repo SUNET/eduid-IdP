@@ -773,7 +773,7 @@ def do_verify(idp_app):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    user = idp_app.authn.get_authn_user(login_data, user_authn, idp_app)
+    user = idp_app.authn.get_authn_user(login_data, user_authn)
 
     if not user:
         _ticket.FailCount += 1
