@@ -41,18 +41,23 @@ class SSOLoginData(object):
 
     :type key: string
     :type req_info: AuthnRequest
+    :type data: dict
+    :type binding: string
     """
     def __init__(self, key, req_info, data, binding):
         self._key = key
         self._req_info = req_info
-        self._data = data
+        self._SAMLRequest = data['SAMLRequest']
+        self._RelayState = data.get('RelayState', '')
         self._FailCount = 0
         self._binding = binding
 
     def __str__(self):
         return pprint.pformat({'key': self._key,
                                'req_info': self._req_info,
-                               'data[:48]': str(self._data)[:48],
+                               'SAMLRequest length': len(self._SAMLRequest),
+                               'RelayState': self._RelayState,
+                               'binding': self._binding,
                                'FailCount': self._FailCount,
                                })
 
@@ -72,7 +77,7 @@ class SSOLoginData(object):
 
         :rtype : string
         """
-        return self._data['SAMLRequest']
+        return self._SAMLRequest
 
     @property
     def req_info(self):
@@ -91,7 +96,7 @@ class SSOLoginData(object):
 
         :rtype: string
         """
-        return self._data.get('RelayState', '')
+        return self._RelayState
 
     @property
     def FailCount(self):
@@ -122,7 +127,6 @@ class SSOLoginData(object):
         :rtype: string
         """
         return self._binding
-
 
 
 class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
