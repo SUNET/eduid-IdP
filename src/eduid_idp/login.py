@@ -42,11 +42,12 @@ class SSOLoginData(object):
     :type key: string
     :type req_info: AuthnRequest
     """
-    def __init__(self, key, req_info, data):
+    def __init__(self, key, req_info, data, binding):
         self._key = key
         self._req_info = req_info
         self._data = data
         self._FailCount = 0
+        self._binding = binding
 
     def __str__(self):
         return pprint.pformat({'key': self._key,
@@ -113,6 +114,16 @@ class SSOLoginData(object):
         assert isinstance(value, int)
         self._FailCount = value
 
+    @property
+    def binding(self):
+        """
+        binding this request was received with
+
+        :rtype: string
+        """
+        return self._binding
+
+
 
 class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
     """
@@ -178,7 +189,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         req_info = self._parse_SAMLRequest(data, binding)
         if not key:
             key = self.key(data["SAMLRequest"])
-        ticket = SSOLoginData(key, req_info, data)
+        ticket = SSOLoginData(key, req_info, data, binding)
         self.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
         return ticket
 
@@ -223,6 +234,8 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                 raise eduid_idp.error.ServiceError("Login state not found, please re-initiate login",
                                                    logger = self.logger)
             # cache miss, parse SAMLRequest
+            if binding is None and 'binding' in info:
+                binding = info['binding']
             _ticket = self.create_ticket(info, binding, key=_key)
             self.store_ticket(_ticket)
         else:
@@ -657,8 +670,10 @@ class SSO(Service):
             "failcount": ticket.FailCount,
             "signup_link": self.config.signup_link,
             "password_reset_link": self.config.password_reset_link,
+            # SAMLRequest, RelayState and binding are used to re-create the ticket state if not found using `key'
             "SAMLRequest": ticket.SAMLRequest,
             "RelayState": ticket.RelayState,
+            "binding": ticket.binding,
         }
 
         # Set alert msg if FailCount is greater than zero
