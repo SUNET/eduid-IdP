@@ -214,7 +214,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
 
         if _ticket is None:
             self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self))
-            if "key" in info:
+            if "key" in info and not "SAMLRequest" in info:
                 #raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
                 #                                   logger = self.logger, extra = {'info': info, 'binding': binding})
                 # This error could perhaps be handled better, but the LoginTimeout error message
@@ -634,10 +634,12 @@ class SSO(Service):
         requested AuthnContext and local configuration, and then calls this method
         to render the login page for this method.
 
-        :param ticket: SSOLoginData instance
+        :param ticket: Login session state (not SSO session state)
         :param auth_levels: list of strings with auth level names that would be valid for this request
         :param redirect_uri: string with URL to proceed to after authentication
         :return: HTTP response
+
+        :type ticket: SSOLoginData
 
         :rtype: string
         """
@@ -655,6 +657,8 @@ class SSO(Service):
             "failcount": ticket.FailCount,
             "signup_link": self.config.signup_link,
             "password_reset_link": self.config.password_reset_link,
+            "SAMLRequest": ticket.SAMLRequest,
+            "RelayState": ticket.RelayState,
         }
 
         # Set alert msg if FailCount is greater than zero
