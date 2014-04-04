@@ -724,7 +724,7 @@ def do_verify(idp_app):
     """
     query = eduid_idp.mischttp.get_post()
     # extract password to keep it away from as much code as possible
-    password = query['password']
+    password = query.get('password')
     del query['password']
     _loggable = query.copy()
     if password:
@@ -743,7 +743,10 @@ def do_verify(idp_app):
     idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(
         user_authn['class_ref'], authn_ref))
 
-    login_data = {'username': query.get('username'),
+    if not password or not 'username' in query:
+        raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
+
+    login_data = {'username': query['username'],
                   'password': password,
                   }
     del password  # keep out of any exception logs
