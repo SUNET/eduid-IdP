@@ -41,12 +41,12 @@ import eduid_idp
 class TestSSOLoginData(TestCase):
 
     def test_FailCount(self):
-        ticket = eduid_idp.login.SSOLoginData('key', 'req_info', 'data')
+        ticket = eduid_idp.login.SSOLoginData('key', 'req_info', 'data', 'binding')
         ticket.FailCount = 9
         self.assertEqual(ticket.FailCount, 9)
 
     def test_SAMLRequest(self):
         data = {'SAMLRequest': 4711,
                 }
-        ticket = eduid_idp.login.SSOLoginData('key', 'req_info', data)
+        ticket = eduid_idp.login.SSOLoginData('key', 'req_info', data, 'binding')
         self.assertEqual(ticket.SAMLRequest, 4711)
