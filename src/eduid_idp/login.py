@@ -284,7 +284,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                         verified_ok = True
                         break
                 if not verified_ok:
-                    _key = self.key(_req_info["SAMLRequest"])
+                    _key = self.key(info["SAMLRequest"])
                     self.logger.info("{!s}: SAML request signature verification failure".format(_key))
                     raise eduid_idp.error.BadRequest("SAML request signature verification failure",
                                                      logger = self.logger)
