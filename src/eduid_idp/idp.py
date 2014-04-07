@@ -541,7 +541,7 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     if config.raven_dsn:
         if raven and SentryHandler:
             logger.debug("Setting up Raven exception logging")
-            client = raven.Client(config.raven_dsn, timeout=10)
+            client = raven.Client(config.raven_dsn, timeout=10, auto_log_stacks=True)
             handler = SentryHandler(client, level=logging.ERROR)
             if not raven.conf.setup_logging(handler):
                 logger.warning("Failed setting up Raven/Sentry logging")
