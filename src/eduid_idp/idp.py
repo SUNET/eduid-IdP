@@ -417,7 +417,7 @@ class IdPApplication(object):
         post-mortem analysis in Sentry as easy as possible.
         """
         cherrypy.response.status = 500
-        cherrypy.response.body = self._render_error_page('500', 'Server Internal Error')
+        cherrypy.response.body = self._render_error_page('500', 'Server Internal Error', decode_utf8=False)
 
     def error_page_default(self, status, message, traceback, version):
         """
@@ -452,7 +452,7 @@ class IdPApplication(object):
         self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
         return self._render_error_page(status, message, traceback)
 
-    def _render_error_page(self, status, reason, traceback=None, filename='error.html'):
+    def _render_error_page(self, status, reason, traceback=None, filename='error.html', decode_utf8=True):
         # Look for error page in user preferred language
         """
         Render localized error page `error.html' or a default string based one if
@@ -491,12 +491,13 @@ class IdPApplication(object):
         }
         res = res.format(**argv)
 
-        # Some of the error pages will be in UTF-8
-        try:
-            res = res.decode('utf-8')
-        except UnicodeDecodeError:
-            self.logger.debug("Got UTF-8 decode error")
-            pass
+        # When called from handle_error, the result should be UTF-8. When called from
+        # error_page_default, the result should NOT be UTF-8. My head hurts.
+        if decode_utf8:
+            try:
+                res = res.decode('utf-8')
+            except UnicodeDecodeError:
+                pass
 
         if status_code not in [404, 440]:
             self.logger.error("Error in IdP application",
