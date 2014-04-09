@@ -333,7 +333,7 @@ class IdPApplication(object):
         :raise eduid_idp.error.ServiceError: always
         """
         self.logger.debug("Testing 500 Server Internal Error")
-        raise eduid_idp.error.ServiceError("Testing 500 error message", logger=None)
+        raise AssertionError('Testing 500 Server Internal Error')
 
     def _my_start_response(self, status, headers):
         """
