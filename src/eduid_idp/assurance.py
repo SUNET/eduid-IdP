@@ -130,16 +130,8 @@ def canonical_req_authn_context(req_authn_ctx, logger, contexts=_context_to_inte
         class_ref = req_authn_ctx.authn_context_class_ref[0].text
     except AttributeError:
         class_ref = None
-    if class_ref is None or class_ref not in contexts:
-        if 'undefined' not in contexts:
-            logger.debug("Can't canonicalize unknown AuthnContext : {!r}".format(class_ref))
-            return None
-        new_ctx = contexts['undefined']
-        logger.debug('Using default AuthnContext {!r}, {!r} not in contexts:\n{!s}'.format(
-            new_ctx.authn_context_class_ref.text, class_ref, pprint.pformat(contexts)
-        ))
-    else:
-        new_ctx = contexts[class_ref]
+
+    new_ctx = _canonical_ctx(class_ref, contexts, logger)
 
     # turn AuthnContext() into RequestedAuthnContext()
     new_class_ref = new_ctx.authn_context_class_ref.text
@@ -232,7 +224,7 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
     :type contexts: dict
     :rtype: bool
     """
-    internal_class_ref = contexts[authn['class_ref']]
+    internal_class_ref = _canonical_ctx(authn['class_ref'], contexts, logger)
     if internal_class_ref == EDUID_INTERNAL_2:
         if 'norEduPersonNIN' in user.identity:
             if len(user.identity['norEduPersonNIN']) and isinstance(user.identity['norEduPersonNIN'][0], basestring):
@@ -248,6 +240,32 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
         logger.error('Id-proofing Authn rules not defined for internal level {!r}'.format(internal_class_ref))
         return False
     return True
+
+def _canonical_ctx(class_ref, contexts, logger):
+    """
+    Return canonical context given a class_ref (string).
+
+    :param class_ref: String, e.g. 'http://www.swamid.se/policy/assurance/al1' or None
+    :param contexts: Dict with contexts
+    :param logger: logging logger
+    :return: AuthnContext from `contexts'
+
+    :type class_ref: string or None
+    :type logger: logging.Logger
+    :type contexts: dict
+    :rtype: saml2.samlp.AuthnContext
+    """
+    if class_ref is None or class_ref not in contexts:
+        if 'undefined' not in contexts:
+            logger.warning("Can't canonicalize unknown AuthnContext: {!r}".format(class_ref))
+            return None
+        new_ctx = contexts['undefined']
+        logger.debug('Using default AuthnContext {!r}, {!r} not in contexts:\n{!s}'.format(
+            new_ctx.authn_context_class_ref.text, class_ref, pprint.pformat(contexts)
+        ))
+    else:
+        new_ctx = contexts[class_ref]
+    return new_ctx
 
 
 def get_authn_context(broker, ref, class_ref=None, logger=None):
