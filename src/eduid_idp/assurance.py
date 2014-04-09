@@ -132,6 +132,8 @@ def canonical_req_authn_context(req_authn_ctx, logger, contexts=_context_to_inte
         class_ref = None
 
     new_ctx = _canonical_ctx(class_ref, contexts, logger)
+    if new_ctx is None:
+        return None
 
     # turn AuthnContext() into RequestedAuthnContext()
     new_class_ref = new_ctx.authn_context_class_ref.text
