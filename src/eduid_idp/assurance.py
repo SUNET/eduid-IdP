@@ -176,19 +176,19 @@ def response_authn(req_authn_ctx, actual_authn, auth_levels, logger, response_co
         req_class_ref = None
 
     if actual_authn['class_ref'] not in auth_levels:
-        logger.debug('Lowered authentication detected, {!r} required {!r}, got {!r}'.format(
+        logger.warning('Too weak authentication detected, {!r} required {!r}, got {!r}'.format(
             req_class_ref, auth_levels, actual_authn['class_ref']))
         # XXX should return a login failure SAML response here
         raise eduid_idp.error.Forbidden("Authn not permitted".format())
 
     if req_class_ref is None:
-        logger.debug('Response Authn: Asserting AuthnContext {!r} based on authentication level ({!r})'.format(
+        logger.debug('Response Authn: Returning AuthnContext {!r} based on authentication level ({!r})'.format(
             res['class_ref'], actual_authn['class_ref']))
         return res
 
     if req_class_ref not in response_contexts:
         res['class_ref'] = req_class_ref
-        logger.debug('Response Authn: Asserting requested AuthnContext {!r} (no translation available)'.format(
+        logger.debug('Response Authn: Returning requested AuthnContext {!r} (no translation available)'.format(
             res['class_ref']))
         return res
 
@@ -229,6 +229,7 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
         if 'norEduPersonNIN' in user.identity:
             if len(user.identity['norEduPersonNIN']) and isinstance(user.identity['norEduPersonNIN'][0], basestring):
                 logger.debug('Asserting AL2 based on norEduPersonNIN attribute')
+                return True
             else:
                 logger.info('NOT asserting AL2 for invalid norEduPersonNIN {!r}'.format(
                     user.identity['norEduPersonNIN']))
@@ -236,10 +237,11 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
         else:
             logger.debug('NOT asserting AL2 - no norEduPersonNIN')
             raise eduid_idp.error.Forbidden("The SP requires AuthnContext {!r} (AL2)".format(authn['class_ref']))
-    elif internal_class_ref != EDUID_INTERNAL_1:
-        logger.error('Id-proofing Authn rules not defined for internal level {!r}'.format(internal_class_ref))
-        return False
-    return True
+    elif internal_class_ref == EDUID_INTERNAL_1:
+        return True
+    logger.error('Id-proofing Authn rules not defined for internal level {!r}'.format(internal_class_ref))
+    return False
+
 
 def _canonical_ctx(class_ref, contexts, logger):
     """
