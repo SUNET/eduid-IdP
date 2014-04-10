@@ -504,11 +504,11 @@ class IdPApplication(object):
 
         if status_code not in [404, 440]:
             self.logger.error("Error in IdP application",
-                              exc_info = 1, extra={'stack': True,
-                                                   'request': cherrypy.request,
-                                                   'traceback': traceback,
-                                                   'status': status,
-                                                   'reason': reason,
+                              exc_info = 1, extra={'data': {'request': cherrypy.request,
+                                                            'traceback': traceback,
+                                                            'status': status,
+                                                            'reason': reason,
+                                                            },
                                                    })
         return res
 
@@ -556,7 +556,7 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     if config.raven_dsn:
         if raven and SentryHandler:
             logger.debug("Setting up Raven exception logging")
-            client = raven.Client(config.raven_dsn, timeout=10, auto_log_stacks=True)
+            client = raven.Client(config.raven_dsn, timeout=10)
             handler = SentryHandler(client, level=logging.ERROR)
             if not raven.conf.setup_logging(handler):
                 logger.warning("Failed setting up Raven/Sentry logging")
