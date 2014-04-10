@@ -325,6 +325,17 @@ class IdPApplication(object):
 
         return "{}\n".format(simplejson.dumps(response))
 
+    @cherrypy.expose
+    def test500(self):
+        """
+        Show the same error page that will be shown on most server errors.
+        For testing the error message.
+
+        :raise AssertionError: always
+        """
+        self.logger.debug("Testing 500 Server Internal Error")
+        raise AssertionError('Testing 500 Server Internal Error')
+
     def _my_start_response(self, status, headers):
         """
         The IdP used to be a WSGI application, and this function is a remaining trace of that.
@@ -406,6 +417,7 @@ class IdPApplication(object):
         Display a 'fail whale' page (error.html), and log the error in a way that makes
         post-mortem analysis in Sentry as easy as possible.
         """
+        self.logger.debug("handle_error() invoked")
         cherrypy.response.status = 500
         cherrypy.response.body = self._render_error_page('500', 'Server Internal Error')
 
@@ -427,20 +439,29 @@ class IdPApplication(object):
         :type version: string
         :rtype: string
         """
-        path = cherrypy.request.path_info.lstrip('/')
+        self.logger.debug("error_page_default() invoked, status={!r}, message={!r}".format(status, message))
         status_code = 'unknown'
         try:
             status_code = int(status.split()[0])
         except (ValueError, AttributeError, IndexError):
             pass
-        if status_code == 403:
-            return self._render_error_page(status, message, traceback, filename='forbidden.html')
-        if status_code == 429:
-            return self._render_error_page(status, message, traceback, filename='toomany.html')
-        if status_code == 440:
-            return self._render_error_page(status, message, traceback, filename='session_timeout.html')
-        self.logger.debug("FAIL ({!r}) PATH : {!r}".format(status, path))
-        return self._render_error_page(status, message, traceback)
+
+        pages = {403: 'forbidden.html',
+                 429: 'toomany.html',
+                 440: 'session_timeout.html',
+                 }
+        if status_code in pages:
+            res = self._render_error_page(status, message, traceback, filename=pages[status_code])
+        else:
+            res = self._render_error_page(status, message, traceback)
+
+        # CherryPy will call res.encode('utf-8') so we need to decode() it first. My head hurts.
+        try:
+            return res.decode('utf-8')
+        except UnicodeDecodeError:
+            pass
+
+        return res
 
     def _render_error_page(self, status, reason, traceback=None, filename='error.html'):
         # Look for error page in user preferred language
@@ -480,12 +501,6 @@ class IdPApplication(object):
             'dashboard_link': self.config.dashboard_link,
         }
         res = res.format(**argv)
-
-        # Some of the error pages will be in UTF-8
-        try:
-            res = res.decode('utf-8')
-        except UnicodeDecodeError:
-            pass
 
         if status_code not in [404, 440]:
             self.logger.error("Error in IdP application",
