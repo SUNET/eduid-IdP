@@ -30,6 +30,14 @@ from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 
 
+class MustAuthenticate(Exception):
+    """
+    This exception is raised in special circumstances when the IdP decides
+    that a user really must authenticate again, even though an SSO session
+    exists.
+    """
+
+
 class SSOLoginData(object):
     """
     Class to hold data about an ongoing login process - i.e. data relating to a
@@ -493,7 +501,12 @@ class SSO(Service):
             auth_levels = sorted(levels_dict.keys())
             self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
 
-        response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
+        try:
+            response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
+        except eduid_idp.error.Forbidden:
+            # The level of authentication was not sufficient for the requested AuthnContext.
+            self.logger.debug("Requesting user re-authentication")
+            raise MustAuthenticate()
 
         if not eduid_idp.assurance.permitted_authn(user, response_authn, self.logger):
             # XXX should return a login failure SAML response instead of an error in the IdP here.
@@ -578,11 +591,14 @@ class SSO(Service):
             self.logger.info("{!s}: proceeding sso_session={!s}, ttl={:}m".format(
                 ticket.key, self.sso_session.public_id, _ttl))
             self.logger.debug("Continuing with Authn request {!r}".format(ticket.req_info))
-            return self.perform_login(ticket)
+            try:
+                return self.perform_login(ticket)
+            except MustAuthenticate:
+                _force_authn = True
 
         if not self.sso_session:
             self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))
-        if _force_authn and self.sso_session:
+        elif _force_authn:
             self.logger.info("{!s}: force_authn sso_session={!s}".format(
                 ticket.key, self.sso_session.public_id))
 
