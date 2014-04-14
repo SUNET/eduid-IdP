@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (c) 2013 NORDUnet A/S
+# Copyright (c) 2013, 2014 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -245,3 +245,73 @@ class TestResponse_authn(TestCase):
         response_ctx = eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
                                                           response_contexts=self._response_translation)
         self.assertEqual(response_ctx['class_ref'], TEST_AL3)
+
+    # ------------------------------------------------------------------------
+
+    # test some error handling
+
+    def test_response_authn_error_1(self):
+        """
+        Test SP asking for PASSWORD, authn at AL2 (non-existant).
+        Expect AL2.
+        """
+        req_authn_ctx = requested_authn_context(PASSWORD)
+        actual_authn = {
+            'class_ref': EDUID_INTERNAL_2_NAME,
+            'authn_auth': 'me'
+        }
+        _response_contexts = {
+            EDUID_INTERNAL_1_NAME: TEST_AL1,
+            EDUID_INTERNAL_2_NAME: TEST_AL2,
+            PASSWORD: {
+                EDUID_INTERNAL_1_NAME: TEST_AL1,
+            },
+        }
+
+        auth_levels = [EDUID_INTERNAL_1_NAME, EDUID_INTERNAL_2_NAME, EDUID_INTERNAL_3_NAME]
+        response_ctx = eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
+                                                          response_contexts=_response_contexts)
+        self.assertEqual(TEST_AL2, response_ctx['class_ref'])
+
+    def test_response_authn_error_2(self):
+        """
+        Test SP asking for AL2, authn at AL2 (non-existant).
+        Expect AL2.
+        """
+        req_authn_ctx = requested_authn_context(EDUID_INTERNAL_2_NAME)
+        actual_authn = {
+            'class_ref': EDUID_INTERNAL_2_NAME,
+            'authn_auth': 'me'
+        }
+        _response_contexts = {}
+
+        auth_levels = [EDUID_INTERNAL_1_NAME]
+        with self.assertRaises(eduid_idp.error.ServiceError):
+            eduid_idp.assurance.response_authn(req_authn_ctx, actual_authn, auth_levels, self.logger,
+                                               response_contexts=_response_contexts)
+
+
+class TestGet_authn_context(TestCase):
+    def setUp(self):
+        self.logger = logging.getLogger()
+        self.broker = eduid_idp.assurance.init_AuthnBroker('https://unittest.example.com/idp.xml')
+
+    def test_1(self):
+        """ Test normal case. """
+        res = eduid_idp.assurance.get_authn_context(self.broker,
+                                                    EDUID_INTERNAL_1_NAME + ':100',
+                                                    class_ref=None, logger=None)
+        self.assertEqual(EDUID_INTERNAL_1_NAME, res['class_ref'])
+
+    def test_2(self):
+        """ Test unexpected result. """
+        res = eduid_idp.assurance.get_authn_context(self.broker,
+                                                    EDUID_INTERNAL_1_NAME + ':100',
+                                                    class_ref=EDUID_INTERNAL_1_NAME + ':200',
+                                                    logger=self.logger)
+        self.assertEqual(False, res)
+
+    def test_3(self):
+        """ Test not found. """
+        res = eduid_idp.assurance.get_authn_context(self.broker, 'unknown', logger=self.logger)
+        self.assertEqual(None, res)

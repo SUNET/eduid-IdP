@@ -485,6 +485,8 @@ class SSO(Service):
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
         req_authn_context = self._get_requested_authn_context(ticket)
+
+        # XXX loop though the list of all authn_context_class_ref!
         auth_levels = self._get_acceptable_auth_levels(req_authn_context)
         try:
             response_authn = eduid_idp.assurance.response_authn(req_authn_context, session_authn, auth_levels,
@@ -514,7 +516,7 @@ class SSO(Service):
 
     def _get_acceptable_auth_levels(self, req_authn_context):
         """
-        Use the AUTHN_BROKER to decide what authenticatiion levels are acceptable given a
+        Use the AUTHN_BROKER to decide what authentication levels are acceptable given a
         RequestedAuthnContext.
 
         The return value is a list of our `internal' levels, e.g.
