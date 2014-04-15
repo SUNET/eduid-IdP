@@ -33,8 +33,8 @@ from saml2 import BINDING_HTTP_POST
 class MustAuthenticate(Exception):
     """
     This exception is raised in special circumstances when the IdP decides
-    that a user really must authenticate again, even though an SSO session
-    exists.
+    that a user really must authenticate again, even though there exist an
+    SSO session.
     """
 
 
@@ -475,9 +475,9 @@ class SSO(Service):
         :type user: IdPUser
         :rtype: dict
         """
-        _authn = self.sso_session.get_authn_context(self.AUTHN_BROKER, logger=self.logger)
-        self.logger.debug("User authenticated using Authn {!r}".format(_authn))
-        if not _authn:
+        session_authn = self.sso_session.get_authn_context(self.AUTHN_BROKER, logger=self.logger)
+        self.logger.debug("User authenticated using Authn {!r}".format(session_authn))
+        if not session_authn:
             # This could happen with SSO sessions refering to old authns during
             # reconfiguration of authns in the AUTHN_BROKER.
             raise eduid_idp.error.ServiceError('Unknown stored AuthnContext')
@@ -486,28 +486,19 @@ class SSO(Service):
         # and the authentication performed
         req_authn_context = self._get_requested_authn_context(ticket)
 
-        authn_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_context, self.logger)
-        auth_info = self.AUTHN_BROKER.pick(authn_ctx)
-
-        auth_levels = []
-        if authn_ctx and len(auth_info):
-            # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
-            # filter out the `reference' values (canonical class_ref strings)
-            levels_dict = {}
-            # Turn references (e.g. 'eduid:level:1:100') into base levels (e.g. 'eduid:level:1')
-            for (method, reference) in auth_info:
-                this = self.AUTHN_BROKER[reference]
-                levels_dict[this['class_ref']] = 1
-            auth_levels = sorted(levels_dict.keys())
-            self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
-
+        # XXX loop though the list of all authn_context_class_ref!
+        auth_levels = self._get_acceptable_auth_levels(req_authn_context)
         try:
-            response_authn = eduid_idp.assurance.response_authn(req_authn_context, _authn, auth_levels, self.logger)
+            response_authn = eduid_idp.assurance.response_authn(req_authn_context, session_authn, auth_levels,
+                                                                self.logger)
         except eduid_idp.error.Forbidden:
             # The level of authentication was not sufficient for the requested AuthnContext.
-            self.logger.debug("Requesting user re-authentication")
             raise MustAuthenticate()
 
+        self.logger.debug("Response Authn: {!r}".format(response_authn))
+
+        # Apply application logic to determine if this IdP is willing to assert the response_authn
+        # AuthnContext for this particular user.
         if not eduid_idp.assurance.permitted_authn(user, response_authn, self.logger):
             # XXX should return a login failure SAML response instead of an error in the IdP here.
             # The SP could potentially help the user much better than the IdP here.
@@ -522,6 +513,41 @@ class SSO(Service):
         response_authn['authn_instant'] = self.sso_session.authn_timestamp
 
         return response_authn
+
+    def _get_acceptable_auth_levels(self, req_authn_context):
+        """
+        Use the AUTHN_BROKER to decide what authentication levels are acceptable given a
+        RequestedAuthnContext.
+
+        The return value is a list of our `internal' levels, e.g.
+
+            ['eduid.se:level:1', 'eduid.se:level:2', 'eduid.se:level:3']
+               if 'http://www.swamid.se/policy/assurance/al1' is requested
+
+            ['eduid.se:level:2', 'eduid.se:level:3']
+               if 'http://www.swamid.se/policy/assurance/al2' is requested
+
+        :param req_authn_context: Requested Authn Context
+        :return: List with names of acceptable authn levels
+
+        :type req_authn_context: saml2.samlp.RequestedAuthnContext
+        :rtype: [string]
+        """
+        authn_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_context, self.logger)
+        auth_info = self.AUTHN_BROKER.pick(authn_ctx)
+        auth_levels = []
+        if authn_ctx and len(auth_info):
+            # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
+            # filter out the `reference' values (canonical class_ref strings)
+            levels_dict = {}
+            # Turn references (e.g. 'eduid:level:1:100') into base levels (e.g. 'eduid:level:1')
+            for (method, reference) in auth_info:
+                this = self.AUTHN_BROKER[reference]
+                levels_dict[this['class_ref']] = 1
+            auth_levels = sorted(levels_dict.keys())
+        self.logger.debug("Acceptable Authn levels considering requested AuthnContext "
+                          "(picked by AuthnBroker): {!r}".format(auth_levels))
+        return auth_levels
 
     def _get_requested_authn_context(self, ticket):
         """
