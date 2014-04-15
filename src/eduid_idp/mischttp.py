@@ -135,7 +135,7 @@ def get_request_body():
 
     :rtype: string
     """
-    length = cherrypy.request.headers['Content-Length']
+    length = cherrypy.request.headers.get('Content-Length', 0)
     raw_body = cherrypy.request.body.read(int(length))
     return raw_body
 
