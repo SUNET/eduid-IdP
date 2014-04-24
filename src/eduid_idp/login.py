@@ -274,6 +274,11 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         """
         #self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
         _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], binding)
+        if not _req_info:
+            # Either there was no request, or pysaml2 found it to be unacceptable.
+            # For example, the IssueInstant might have been out of bounds.
+            self.logger.debug("No valid SAMLRequest returned by pysaml2")
+            raise eduid_idp.error.BadRequest("No valid SAMLRequest found", logger = self.logger)
         assert isinstance(_req_info, AuthnRequest)
 
         # Only perform expensive parse/pretty-print if debugging
