@@ -292,6 +292,22 @@ class IdPApplication(object):
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
+    def help(self):
+        """
+        Render localized help page `help.html' or a default string based one if
+        that page is not found in the configured content packages.
+
+        :return: HTML
+
+        :rtype: unicode
+        """
+        res = eduid_idp.mischttp.localized_resource(
+            self._my_start_response, 'help.html', self.config, logger=self.logger)
+        if not res:
+            # default error message
+            res = "<html><body>Sorry, help is not available in your language.</body></html>"
+        return res
+
     @cherrypy.expose
     def status(self, request=None):
         """
@@ -335,6 +351,55 @@ class IdPApplication(object):
         """
         self.logger.debug("Testing 500 Server Internal Error")
         raise AssertionError('Testing 500 Server Internal Error')
+
+    def _render_error_page(self, status, reason, traceback=None, filename='error.html'):
+        # Look for error page in user preferred language
+        """
+        Render localized error page `error.html' or a default string based one if
+        that page is not found in the configured content packages.
+
+        :param status: HTML error code
+        :param reason: HTML error message
+        :param traceback: traceback of error
+        :return: HTML
+
+        :type status: string
+        :type reason: string
+        :type traceback: string
+        :rtype: unicode
+        """
+        res = eduid_idp.mischttp.localized_resource(
+            self._my_start_response, filename, self.config, logger=self.logger, status=status)
+        if not res:
+            # default error message
+            res = "<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
+                status=status, reason=reason)
+
+        status_code = 'unknown'
+        try:
+            status_code = int(status.split()[0])
+        except (ValueError, AttributeError, IndexError):
+            pass
+
+        # apply simplistic HTML formatting to template in 'res'
+        argv = {
+            'error_status': str(status),
+            'error_code': str(status_code),
+            'error_reason': str(reason),
+            'error_traceback': str(traceback),
+            'dashboard_link': self.config.dashboard_link,
+        }
+        res = res.format(**argv)
+
+        if status_code not in [404, 440]:
+            self.logger.error("Error in IdP application",
+                              exc_info = 1, extra={'data': {'request': cherrypy.request,
+                                                            'traceback': traceback,
+                                                            'status': status,
+                                                            'reason': reason,
+                                                            },
+                                                   })
+        return res
 
     def _my_start_response(self, status, headers):
         """
