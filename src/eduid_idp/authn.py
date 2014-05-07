@@ -107,12 +107,14 @@ class IdPAuthn(object):
         """
         username = data['username']
         password = data['password']
+        del data  # keep sensitive data out of Sentry logs
 
         user = self._verify_username_and_password2(username, password)
         if user:
             if len(password) >= min_length:
                 return user
-            self.logger.debug("User {!r} authenticated, but denied by password length constraints".format(user))
+            self.logger.debug("User {!r} authenticated, but denied by password length constraints ({!r})".format(
+                user, min_length))
         return False
 
     def _verify_username_and_password2(self, username, password):
