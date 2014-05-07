@@ -317,7 +317,7 @@ class IdPApplication(object):
 
         response = {'status': 'FAIL'}
 
-        user = self.authn.verify_username_and_password(parsed, self)
+        user = self.authn.verify_username_and_password(parsed)
         if user:
             response = {'status': 'OK',
                         'testuser_name': user.identity.get('displayName'),
