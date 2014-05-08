@@ -304,7 +304,11 @@ class IdPApplication(object):
         """
         self.logger.debug("Status request")
 
-        parsed = simplejson.loads(request)
+        try:
+            parsed = simplejson.loads(request)
+        except simplejson.JSONDecodeError:
+            raise eduid_idp.error.BadRequest(logger = self.logger)
+
         if 'username' not in parsed or 'password' not in parsed:
             raise eduid_idp.error.BadRequest(logger = self.logger)
 
