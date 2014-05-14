@@ -370,11 +370,11 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     languages = eduid_idp.mischttp.parse_accept_lang_header(cherrypy.request.headers.get('Accept-Language', ''))
     if logger:
         logger.debug("Client language preferences: {!r}".format(languages))
+    languages = [lang for (lang, q_val) in languages[:50]]  # cap somewhere to prevent DoS
+    if not config.default_language in languages and config.default_language:
+        languages.append(config.default_language)
 
     if languages:
-        languages = [lang for (lang, q_val) in languages[:50]]  # cap somewhere to prevent DoS
-        if not config.default_language in languages:
-            languages.append(config.default_language)
         logger.debug("Languages list : {!r}".format(languages))
         for lang in languages:
             if _LANGUAGE_RE.match(lang):
@@ -391,6 +391,8 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
 
     # default language file
     static_fn = eduid_idp.mischttp.static_filename(config, filename)
+    logger.debug("Looking for {!r} at default location (static_dir {!r}): {!r}".format(
+        filename, config.static_dir, static_fn))
     if not static_fn:
         logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
         return None
