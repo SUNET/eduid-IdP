@@ -291,7 +291,7 @@ class IdPConfig(object):
             return self._parsed_status_test_usernames
         value = self.config.get(self.section, 'status_test_usernames')
         res = [x.strip() for x in value.split(',')]
-        self._parsed_content_packages = res
+        self._parsed_status_test_usernames = res
         return res
 
     @property
