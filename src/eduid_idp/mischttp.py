@@ -136,6 +136,9 @@ def get_request_body():
     :rtype: string
     """
     length = cherrypy.request.headers.get('Content-Length', 0)
+    if not length:
+        # CherryPy 3.2.4 seems to not like length 0 in the read() below
+        return ''
     raw_body = cherrypy.request.body.read(int(length))
     return raw_body
 
