@@ -360,7 +360,8 @@ class SSO(Service):
 
         response_authn = self._get_login_response_authn(ticket, user)
 
-        attributes = self._make_scoped_eppn(user.identity)
+        attributes1 = self._make_scoped_eppn(user.identity)
+        attributes = self._add_scoped_affiliation(attributes1)
 
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
@@ -748,7 +749,7 @@ class SSO(Service):
 
     def _make_scoped_eppn(self, attributes):
         """
-        Add scope to unscopged eduPersonPrincipalName attributes before relasing them.
+        Add scope to unscoped eduPersonPrincipalName attributes before relasing them.
 
         What scope to add, if any, is currently controlled by the configuration parameter
         `default_eppn_scope'.
@@ -766,6 +767,24 @@ class SSO(Service):
             scope = self.config.default_eppn_scope
             if scope:
                 attributes['eduPersonPrincipalName'] = eppn + '@' + scope
+        return attributes
+
+    def _add_scoped_affiliation(self, attributes):
+        """
+        Add eduPersonScopedAffiliation if configured, and not already present.
+
+        This default affiliation is currently controlled by the configuration parameter
+        `default_scoped_affiliation'.
+
+        :param attributes: Attributes of a user
+        :return: New attributes
+
+        :type attributes: dict
+        :rtype: dict
+        """
+        epsa = 'eduPersonScopedAffiliation'
+        if epsa not in attributes and self.config.default_scoped_affiliation:
+            attributes[epsa] = self.config.default_scoped_affiliation
         return attributes
 
 
