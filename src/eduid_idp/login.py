@@ -12,7 +12,12 @@
 Code handling Single Sign On logins.
 """
 
+
+import time
 import pprint
+
+import hmac
+from hashlib import sha256
 
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
@@ -395,7 +400,38 @@ class SSO(Service):
         self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
                                                                       response_authn['class_ref'],
                                                                       self.destination))
+        if self.config.fticks_secret_key:
+            self._fticks_log(relying_party = self.destination,
+                             authn_method = response_authn['class_ref'],
+                             user_id = user.identity['_id'],
+                             )
+
         return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+
+    def _fticks_log(self, relying_party, authn_method, user_id):
+        """
+        Perform SAML F-TICKS logging, for statistics in the SWAMID federation.
+
+        :param relying_party: The entity id of the relying party (SP).
+        :param authn_method: The URN of the authentication method used.
+        :param user_id: Unique user id.
+
+        :type relying_party: string
+        :type authn_method: string
+        :type user_id: string
+        :return: None
+        """
+        # Default format string:
+        #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
+        _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        _anon_userid = hmac.new(self.config.fticks_secret_key, msg=user_id, digestmod=sha256).digest()
+        msg = self.config.fticks_format_string.format(ts=_timestamp,
+                                                      rp=relying_party,
+                                                      ap=self.IDP.config.entityid,
+                                                      pn=_anon_userid,
+                                                      am=authn_method,
+                                                      )
+        self.logger.info(msg)
 
     def _validate_login_request(self, ticket):
         """
