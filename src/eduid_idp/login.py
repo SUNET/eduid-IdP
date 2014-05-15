@@ -290,7 +290,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
             _certs = self.IDP.metadata.certs(issuer, "any", "signing")
-            if self.config.verify_request_signatures:
+            if self.IDP.config.verify_request_signatures:
                 verified_ok = False
                 for cert in _certs:
                     if verify_redirect_signature(info, cert):
