@@ -552,10 +552,13 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         file_h = logging.handlers.RotatingFileHandler(config.logfile, maxBytes=10 * 1024 * 1024)
         file_h.setFormatter(formatter)
         logger.addHandler(file_h)
-    if config.syslog:
-        syslog_h = logging.handlers.SysLogHandler()
-        formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
+    if config.syslog_socket:
+        syslog_h = logging.handlers.SysLogHandler(config.syslog_socket)
+        formatter = logging.Formatter('%(name)s: %(message)s')
         syslog_h.setFormatter(formatter)
+        syslog_h.setLevel(logging.INFO)
+        if config.syslog_debug:
+            syslog_h.setLevel(logging.DEBUG)
         logger.addHandler(syslog_h)
     if config.raven_dsn:
         if raven and SentryHandler:

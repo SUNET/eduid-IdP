@@ -39,13 +39,16 @@ import os
 import ConfigParser
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
+                    'syslog_debug': '0',              # '1' for True, '0' for False
                     'num_threads': '8',
                     'logdir': None,
                     'logfile': None,
-                    'syslog': '1',  # '1' for on, '0' for off
+                    'syslog_socket': None,            # syslog socket to log to (/dev/log maybe)
                     'listen_addr': '0.0.0.0',
                     'listen_port': '8088',
                     'pysaml2_config': 'idp_conf.py',  # path prepended in IdPConfig.__init__()
+                    'fticks_secret_key': None,
+                    'fticks_format_string': 'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
                     'static_dir': None,
                     'ssl_adapter': 'builtin',  # one of cherrypy.wsgiserver.ssl_adapters
                     'server_cert': None,  # SSL cert filename
@@ -129,12 +132,14 @@ class IdPConfig(object):
         return res
 
     @property
-    def syslog(self):
+    def syslog_socket(self):
         """
-        Log to syslog or not.
+        Syslog socket to log to (string). Something like '/dev/log' maybe.
         """
-        res = self.config.get(self.section, 'syslog')
-        return bool(int(res))
+        res = self.config.get(self.section, 'syslog_socket')
+        if not res:
+            res = None
+        return res
 
     @property
     def debug(self):
@@ -142,6 +147,13 @@ class IdPConfig(object):
         Set to True to log debug messages (boolean).
         """
         return self.config.getboolean(self.section, 'debug')
+
+    @property
+    def syslog_debug(self):
+        """
+        Set to True to log debug messages to syslog (also requires syslog_socket) (boolean).
+        """
+        return self.config.getboolean(self.section, 'syslog_debug')
 
     @property
     def listen_addr(self):
@@ -163,6 +175,21 @@ class IdPConfig(object):
         pysaml2 configuration file. Separate config file with SAML related parameters.
         """
         return self.config.get(self.section, 'pysaml2_config')
+
+    @property
+    def fticks_secret_key(self):
+        """
+        SAML F-TICKS user anonymization key. If this is set, the IdP will log FTICKS data
+        on every login.
+        """
+        return self.config.get(self.section, 'fticks_secret_key')
+
+    @property
+    def fticks_format_string(self):
+        """
+        Get SAML F-TICKS format string.
+        """
+        return self.config.get(self.section, 'fticks_format_string')
 
     @property
     def static_dir(self):
