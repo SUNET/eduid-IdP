@@ -71,6 +71,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'authn_info_mongo_uri': None,
                     'max_auhtn_failures_per_month': '100',  # Kantara future monthly authn limit
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
+                    'default_scoped_affiliation': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -396,3 +397,11 @@ class IdPConfig(object):
         and possibly other needed information will be forgotten.
         """
         return self.config.getint(self.section, 'login_state_ttl')
+
+    @property
+    def default_scoped_affiliation(self):
+        """
+        Add a default eduPersonScopedAffiliation if none is returned from the
+        attribute manager.
+        """
+        return self.config.get(self.section, 'default_scoped_affiliation')

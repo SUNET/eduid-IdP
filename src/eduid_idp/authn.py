@@ -153,7 +153,7 @@ class IdPAuthn(object):
             # is based on plain assumption, no measurements whatsoever.
             last_creds = authn_info.last_used_credentials()
             creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
-            if creds != last_creds:
+            if creds != user.passwords:
                 self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
                     [x['id'] for x in user.passwords],
                     [x['id'] for x in creds],
