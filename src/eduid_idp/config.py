@@ -39,10 +39,11 @@ import os
 import ConfigParser
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
+                    'syslog_debug': False,
                     'num_threads': '8',
                     'logdir': None,
                     'logfile': None,
-                    'syslog': '1',  # '1' for on, '0' for off
+                    'syslog_socket': None,            # syslog socket to log to (/dev/log maybe)
                     'listen_addr': '0.0.0.0',
                     'listen_port': '8088',
                     'pysaml2_config': 'idp_conf.py',  # path prepended in IdPConfig.__init__()
@@ -131,12 +132,14 @@ class IdPConfig(object):
         return res
 
     @property
-    def syslog(self):
+    def syslog_socket(self):
         """
-        Log to syslog or not.
+        Syslog socket to log to (string). Something like '/dev/syslog' maybe.
         """
-        res = self.config.get(self.section, 'syslog')
-        return bool(int(res))
+        res = self.config.get(self.section, 'syslog_socket')
+        if not res:
+            res = None
+        return res
 
     @property
     def debug(self):
@@ -144,6 +147,13 @@ class IdPConfig(object):
         Set to True to log debug messages (boolean).
         """
         return self.config.getboolean(self.section, 'debug')
+
+    @property
+    def syslog_debug(self):
+        """
+        Set to True to log debug messages to syslog (also requires syslog_socket) (boolean).
+        """
+        return self.config.getboolean(self.section, 'syslog_debug')
 
     @property
     def listen_addr(self):
