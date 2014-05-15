@@ -39,7 +39,7 @@ import os
 import ConfigParser
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
-                    'syslog_debug': False,
+                    'syslog_debug': '0',              # '1' for True, '0' for False
                     'num_threads': '8',
                     'logdir': None,
                     'logfile': None,
@@ -185,7 +185,7 @@ class IdPConfig(object):
         return self.config.get(self.section, 'fticks_secret_key')
 
     @property
-    def fticks_format(self):
+    def fticks_format_string(self):
         """
         Get SAML F-TICKS format string.
         """

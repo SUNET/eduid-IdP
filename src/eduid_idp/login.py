@@ -403,7 +403,7 @@ class SSO(Service):
         if self.config.fticks_secret_key:
             self._fticks_log(relying_party = self.destination,
                              authn_method = response_authn['class_ref'],
-                             user_id = user.identity['_id'],
+                             user_id = str(user.identity['_id']),
                              )
 
         return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
@@ -424,7 +424,7 @@ class SSO(Service):
         # Default format string:
         #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
         _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        _anon_userid = hmac.new(self.config.fticks_secret_key, msg=user_id, digestmod=sha256).digest()
+        _anon_userid = hmac.new(self.config.fticks_secret_key, msg=user_id, digestmod=sha256).digest().encode('hex')
         msg = self.config.fticks_format_string.format(ts=_timestamp,
                                                       rp=relying_party,
                                                       ap=self.IDP.config.entityid,
