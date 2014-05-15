@@ -402,7 +402,7 @@ class SSO(Service):
                                                                       response_authn['class_ref'],
                                                                       self.destination))
         if self.config.fticks_secret_key:
-            self._fticks_log(relying_party = self.destination,
+            self._fticks_log(relying_party = resp_args.get('sp_entity_id', self.destination),
                              authn_method = response_authn['class_ref'],
                              user_id = str(user.identity['_id']),
                              )
