@@ -554,7 +554,7 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
         logger.addHandler(file_h)
     if config.syslog_socket:
         syslog_h = logging.handlers.SysLogHandler(config.syslog_socket)
-        formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
+        formatter = logging.Formatter('%(name)s: %(message)s')
         syslog_h.setFormatter(formatter)
         syslog_h.setLevel(logging.INFO)
         if config.syslog_debug:
