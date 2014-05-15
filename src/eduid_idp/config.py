@@ -134,7 +134,7 @@ class IdPConfig(object):
     @property
     def syslog_socket(self):
         """
-        Syslog socket to log to (string). Something like '/dev/syslog' maybe.
+        Syslog socket to log to (string). Something like '/dev/log' maybe.
         """
         res = self.config.get(self.section, 'syslog_socket')
         if not res:
