@@ -850,9 +850,9 @@ def do_verify(idp_app):
     query = eduid_idp.mischttp.get_post()
     # extract password to keep it away from as much code as possible
     password = query.get('password')
-    del query['password']
     _loggable = query.copy()
     if password:
+        del query['password']
         _loggable['password'] = '<redacted>'
     idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
