@@ -194,7 +194,7 @@ class IdPApplication(object):
             # add directory part to sys.path, since pysaml2 'import's it's config
             sys.path = [cfgdir] + sys.path
             cfgfile = os.path.basename(config.pysaml2_config)
-        _session_ttl = (self.config.sso_session_lifetime + 1) * 60
+        _session_ttl = self.config.sso_session_lifetime * 60
         if config.authn_info_mongo_uri:
             self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(self.config.authn_info_mongo_uri,
                                                                    logger)

@@ -898,7 +898,7 @@ def do_verify(idp_app):
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
     _session_id = idp_app.IDP.cache.add_session(user.identity['_id'], _sso_session.to_dict())
-    eduid_idp.mischttp.set_cookie("idpauthn", idp_app.config.sso_session_lifetime, "/", idp_app.logger, _session_id)
+    eduid_idp.mischttp.set_cookie("idpauthn", "/", idp_app.logger, _session_id)
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id
 

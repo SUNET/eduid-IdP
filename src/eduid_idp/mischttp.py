@@ -271,17 +271,16 @@ def delete_cookie(name, logger):
     :rtype: bool
     """
     logger.debug("Delete cookie: {!s}".format(name))
-    return set_cookie(name, 0, '/', logger)
+    return set_cookie(name, '/', logger)
 
 
-def set_cookie(name, expire, path, logger, value=''):
+def set_cookie(name, path, logger, value=''):
     """
     Ask browser to store a cookie.
 
     Since eduID.se is HTTPS only, the cookie parameter `Secure' is set.
 
     :param name: Cookie identifier (string)
-    :param expire: Number of minutes before this cookie goes stale
     :param path: The path specification for the cookie
     :param logger: logging instance
     :param value: The value to assign to the cookie
@@ -289,7 +288,6 @@ def set_cookie(name, expire, path, logger, value=''):
     :return: True on success
 
     :type name: string
-    :type expire: int
     :type path: string
     :type logger: logging.Logger
     :type value: string
@@ -298,10 +296,9 @@ def set_cookie(name, expire, path, logger, value=''):
     cookie = cherrypy.response.cookie
     cookie[name] = base64.b64encode(str(value))
     cookie[name]['path'] = path
-    cookie[name]['max-age'] = expire * 60
     cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
 
-    logger.debug("Set cookie (expires {!r} minutes) : {!s}".format(expire, cookie))
+    logger.debug("Set cookie : {!s}".format(cookie))
     return True
 
 
