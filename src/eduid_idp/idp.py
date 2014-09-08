@@ -450,7 +450,8 @@ class IdPApplication(object):
         except (ValueError, AttributeError, IndexError):
             pass
 
-        pages = {403: 'forbidden.html',
+        pages = {401: 'unauthorized.html',
+                 403: 'forbidden.html',
                  429: 'toomany.html',
                  440: 'session_timeout.html',
                  }
