@@ -871,7 +871,7 @@ def do_verify(idp_app):
     if not password or not 'username' in query:
         raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
 
-    login_data = {'username': query['username'],
+    login_data = {'username': query['username'].strip(),
                   'password': password,
                   }
     del password  # keep out of any exception logs
