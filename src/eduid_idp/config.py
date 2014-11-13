@@ -69,7 +69,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'base_url': None,
                     'default_eppn_scope': None,
                     'authn_info_mongo_uri': None,
-                    'max_auhtn_failures_per_month': '100',  # Kantara future monthly authn limit
+                    'max_authn_failures_per_month': '100',  # Kantara future monthly authn limit
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
                     }
