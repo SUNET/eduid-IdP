@@ -291,11 +291,16 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
             xmlstr = eduid_idp.util.maybe_xml_to_string(_req_info.message)
             self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n\n{!s}\n\n".format(
                 _req_info.message, xmlstr))
+        try:
+            # XXX Temporary debug logging clause. This whole try/except can be removed in the next release.
+            self.logger.debug("Verify request signatures: {!r}".format(self.config.verify_request_signatures))
+        except AttributeError:
+            self.logger.debug("FAILED logging verify request signatures")
 
         if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
             _certs = self.IDP.metadata.certs(issuer, "any", "signing")
-            if self.IDP.config.verify_request_signatures:
+            if self.config.verify_request_signatures:
                 verified_ok = False
                 for cert in _certs:
                     if verify_redirect_signature(info, cert):
