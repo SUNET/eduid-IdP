@@ -91,7 +91,7 @@ class FakeAuthClient(object):
                    'salt': _f.salt,
                    'hash': _f.hash,
         }
-        for field in ['mail', 'eduPersonPrincipalName']:
+        for field in ['_id', 'eduPersonPrincipalName']:
             _user = self.userdb.get_user_by_field(field, username)
             if _user:
                 for _cred in _user['passwords']:
