@@ -187,21 +187,16 @@ class IdPAuthn(object):
                 continue
             self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
                 username, str(cred['id']), factor))
-            # Old credentials were created using the username (user['mail']) of the user
-            # instead of the user['_id']. Try both during a transition period.
-            user_ids = [str(user.identity['_id']), user.identity['mail']]
-            if cred.get('user_id_hint') is not None:
-                user_ids.insert(0, cred.get('user_id_hint'))
-            for user_id in user_ids:
-                try:
-                    if self.auth_client.authenticate(user_id, [factor]):
-                        self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
-                        self.log_authn(user, success=[cred['id']], failure=[])
-                        return user
-                except vccs_client.VCCSClientHTTPError as exc:
-                    if exc.http_code == 500:
-                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
-                        continue
+            user_id = str(user.identity['_id'])
+            try:
+                if self.auth_client.authenticate(user_id, [factor]):
+                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                    self.log_authn(user, success=[cred['id']], failure=[])
+                    return user
+            except vccs_client.VCCSClientHTTPError as exc:
+                if exc.http_code == 500:
+                    self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
+                    continue
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         self.log_authn(user, success=[], failure=[cred['id'] for cred in user.passwords])
         return None
