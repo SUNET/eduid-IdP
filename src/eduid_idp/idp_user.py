@@ -108,8 +108,15 @@ class IdPUser(object):
         """
         Return the password credentials for this user.
         This is a list of dicts with "salt" and "id" keys.
+
+        If a user is halfway into the signup process, an account exists but
+        has no passwords. Return empty list in that case.
+
+        :return: User password credentials
+
+        :rtype: [dict]
         """
-        return self._data['passwords']
+        return self._data.get('passwords', [])
 
 
 class IdPUserDb(object):
