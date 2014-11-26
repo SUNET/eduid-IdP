@@ -83,10 +83,9 @@ class IdPAuthn(object):
         :type: user_authn: dict
         :rtype: IdPUser | None
         """
-        if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME:
+        if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME or \
+                user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
             user = self.verify_username_and_password(login_data)
-        elif user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            user = self.verify_username_and_password(login_data, min_length=12)
         else:
             del login_data['password']  # keep out of any exception logs
             self.logger.info("Authentication for class {!r} not implemented".format(
