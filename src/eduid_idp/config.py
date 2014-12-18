@@ -69,7 +69,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'base_url': None,
                     'default_eppn_scope': None,
                     'authn_info_mongo_uri': None,
-                    'max_authn_failures_per_month': '100',  # Kantara future monthly authn limit
+                    'max_authn_failures_per_month': '50',  # Kantara 30-day bad authn limit is 100
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
                     }
@@ -379,13 +379,13 @@ class IdPConfig(object):
         return self.config.get(self.section, 'authn_info_mongo_uri')
 
     @property
-    def max_auhtn_failures_per_month(self):
+    def max_authn_failures_per_month(self):
         """
         Disallow login for a user after N failures in a given month.
 
         This is said to be an imminent Kantara requirement.
         """
-        return self.config.getint(self.section, 'max_auhtn_failures_per_month')
+        return self.config.getint(self.section, 'max_authn_failures_per_month')
 
     @property
     def login_state_ttl(self):
