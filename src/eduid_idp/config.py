@@ -72,6 +72,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'max_authn_failures_per_month': '50',  # Kantara 30-day bad authn limit is 100
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
+                    'vccs_url': 'http://localhost:8550/',    # VCCS backend URL
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -405,3 +406,12 @@ class IdPConfig(object):
         attribute manager.
         """
         return self.config.get(self.section, 'default_scoped_affiliation')
+
+    @property
+    def vccs_url(self):
+        """
+        URL to use with VCCS client. BCP is to have an nginx or similar on
+        localhost that will proxy requests to a currently available backend
+        using TLS.
+        """
+        return self.config.get(self.section, 'vccs_url')

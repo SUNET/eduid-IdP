@@ -62,7 +62,7 @@ class IdPAuthn(object):
         self.userdb = userdb
         self.auth_client = auth_client
         if self.auth_client is None:
-            self.auth_client = vccs_client.VCCSClient()
+            self.auth_client = vccs_client.VCCSClient(base_url = config.vccs_url)
         self.authn_store = authn_store
         if self.authn_store is None:
             authn_info_uri = self.config.authn_info_mongo_uri
