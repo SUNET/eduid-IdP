@@ -238,7 +238,7 @@ class SLO(Service):
         #self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 
         # Delete the SSO session cookie in the browser
-        eduid_idp.mischttp.delete_cookie("idpauthn", self.logger)
+        eduid_idp.mischttp.delete_cookie('idpauthn', self.logger, self.config)
 
         # INFO-Log the SAML request ID, result of logout and destination
         self.logger.info("{!s}: logout status={!r}, dst={!s}".format(req_key, status_code, destination))

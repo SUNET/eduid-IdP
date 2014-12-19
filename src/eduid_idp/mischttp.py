@@ -87,6 +87,8 @@ def geturl(config, query = True, path = True):
     :param config: IdP config
     :param query: Is QUERY_STRING included in URI (default: True)
     :param path: Is path included in URI (default: True)
+
+    :type config: eduid_idp.config.IdPConfig
     """
     url = [config.base_url]
     if not url[0]:
@@ -151,7 +153,7 @@ def static_filename(config, path):
     :param path: URL part to check
     :return: False, None or filename as string
 
-    :type config: config.IdPConfig
+    :type config: eduid_idp.config.IdPConfig
     :type path: string
     :rtype: False | None | string
     """
@@ -258,23 +260,25 @@ def read_cookie(logger):
     return None
 
 
-def delete_cookie(name, logger):
+def delete_cookie(name, logger, config):
     """
     Ask browser to delete a cookie.
 
     :param name: cookie name as string
-    :param logger: logging logger
+    :param logger: logging instance
+    :param config: IdPConfig instance
     :return: True on success
 
     :type name: string
     :type logger: logging.Logger
+    :type config: eduid_idp.config.IdPConfig
     :rtype: bool
     """
     logger.debug("Delete cookie: {!s}".format(name))
-    return set_cookie(name, '/', logger)
+    return set_cookie(name, '/', logger, config)
 
 
-def set_cookie(name, path, logger, value=''):
+def set_cookie(name, path, logger, config, value=''):
     """
     Ask browser to store a cookie.
 
@@ -283,6 +287,7 @@ def set_cookie(name, path, logger, value=''):
     :param name: Cookie identifier (string)
     :param path: The path specification for the cookie
     :param logger: logging instance
+    :param config: IdPConfig instance
     :param value: The value to assign to the cookie
 
     :return: True on success
@@ -290,14 +295,15 @@ def set_cookie(name, path, logger, value=''):
     :type name: string
     :type path: string
     :type logger: logging.Logger
+    :type config: eduid_idp.config.IdPConfig
     :type value: string
     :rtype: bool
     """
     cookie = cherrypy.response.cookie
     cookie[name] = base64.b64encode(str(value))
     cookie[name]['path'] = path
-    cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
-
+    if not config.insecure_cookies:
+        cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
     logger.debug("Set cookie : {!s}".format(cookie))
     return True
 
@@ -353,7 +359,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
 
     :type start_response: function
     :type filename: string
-    :type config: config.IdPConfig
+    :type config: eduid_idp.config.IdPConfig
     :type logger: logging.Logger
     :type status: string
     :rtype: string

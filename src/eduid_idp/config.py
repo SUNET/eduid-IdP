@@ -73,6 +73,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',    # VCCS backend URL
+                    'insecure_cookies': 0,                     # Set to 1 to not set HTTP Cookie 'secure' flag
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -415,3 +416,10 @@ class IdPConfig(object):
         using TLS.
         """
         return self.config.get(self.section, 'vccs_url')
+
+    @property
+    def insecure_cookies(self):
+        """
+        Set to True to NOT set HTTP Cookie 'secure' flag (boolean).
+        """
+        return self.config.getboolean(self.section, 'insecure_cookies')
