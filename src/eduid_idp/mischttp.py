@@ -223,6 +223,9 @@ def get_content_type(filename):
              'txt': 'text/plain',
              'xml': 'text/xml',
              'svg': 'image/svg+xml',
+             'woff': 'application/font-woff',
+             'eot': 'application/vnd.ms-fontobject',
+             'ttf': 'application/x-font-ttf',
              }
     ext = filename.rsplit('.', 1)[-1]
     if ext not in types:
