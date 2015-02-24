@@ -73,7 +73,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',    # VCCS backend URL
-                    'insecure_cookies': 0,                     # Set to 1 to not set HTTP Cookie 'secure' flag
+                    'insecure_cookies': '0',                     # Set to 1 to not set HTTP Cookie 'secure' flag
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
