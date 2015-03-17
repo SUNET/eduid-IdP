@@ -215,8 +215,11 @@ class IdPApplication(object):
         if config.actions_mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
             self.actions_db = eduid_idp.idp_actions.ActionsDB(logger,
                     db_uri=config.actions_mongo_uri)
+            self.logger.info("eduid-IdP configured to redirect users with pending actions")
         else:
             self.actions_db = None
+            self.logger.info("There are missing configuration parameters to configure "
+                             "eduid-IdP to redirect users with pending actions")
 
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
