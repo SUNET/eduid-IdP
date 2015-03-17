@@ -74,6 +74,9 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',    # VCCS backend URL
                     'insecure_cookies': 0,                     # Set to 1 to not set HTTP Cookie 'secure' flag
+                    'actions_mongo_uri': None,
+                    'actions_auth_shared_secret': 'abcdef',
+                    'actions_app_uri': 'http://actions.example.com/',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -423,3 +426,26 @@ class IdPConfig(object):
         Set to True to NOT set HTTP Cookie 'secure' flag (boolean).
         """
         return self.config.getboolean(self.section, 'insecure_cookies')
+
+    @property
+    def actions_mongo_uri(self):
+        """
+        Actions info. MongoDB connection URI (string).
+        See MongoDB documentation for details.
+        """
+        return self.config.get(self.section, 'actions_mongo_uri')
+
+    @property
+    def actions_auth_shared_secret(self):
+        """
+        Secret shared with the actions app to convince it
+        that the redirected user is authenticated.
+        """
+        return self.config.get(self.section, 'actions_auth_shared_secret')
+
+    @property
+    def actions_app_uri(self):
+        """
+        URI of the actions app.
+        """
+        return self.config.get(self.section, 'actions_app_uri')

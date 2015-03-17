@@ -12,7 +12,7 @@
 Code handling Single Sign On logins.
 """
 
-
+import os
 import time
 import pprint
 
@@ -912,6 +912,35 @@ def do_verify(idp_app):
         query['key'], _sso_session.public_id,
         _sso_session.user_authn_class_ref,
         _sso_session.user_id))
+
+    # XXX Get an (actions) session identifier specific for this request
+    # XXX (perhaps a hash of the sso session id?)
+    # XXX and add request specific actions to the actions db with that session id
+
+    # Check for pending actions and redirect to the actions app in case there are.
+    if idp_app.actions_db is not None and idp_app.actions_db.pending_actions():
+        idp_app.logger.info("There are pending actions for userid {0}".format(user.get_id())
+        # create auth token for actions app
+        eppn = user.identity.get('eduPersonPrincipalName')
+        secret = idp_app.config.actions_auth_shared_secret
+        timestamp = '{:x}'.format(int(time.time()))
+        nonce = os.urandom(16).encode('hex')
+        auth_token = eduid_idp.util.generate_auth_token(secret,
+                                                        eppn,
+                                                        nonce,
+                                                        timestamp)
+        actions_uri = idp_config.actions_app_uri
+        idp_app.logger.info("Redirecting user {0} to actions app at {1}".format(user.get_id(),
+                                                                             actions_uri)
+
+        # XXX add the (actions) session identifier to the uri
+        uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}'.format(actions_uri,
+                                                            user.get_id(),
+                                                            auth_token,
+                                                            nonce,
+                                                            timestamp)
+        raise eduid_idp.mischttp.Redirect(uri)
+
 
     # Now that an SSO session has been created, redirect the users browser back to
     # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'

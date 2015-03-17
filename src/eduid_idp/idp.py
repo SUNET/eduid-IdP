@@ -119,6 +119,7 @@ import logging.handlers
 import eduid_idp
 import eduid_idp.authn
 import eduid_idp.sso_session
+import eduid_idp.idp_actions
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 
@@ -211,6 +212,11 @@ class IdPApplication(object):
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
         self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, _login_state_ttl,
                                                             self.config, threading.Lock())
+        if config.actions_mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
+            self.actions_db = eduid_idp.idp_actions.ActionsDB(logger,
+                    db_uri=config.actions_mongo_uri)
+        else:
+            self.actions_db = None
 
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)

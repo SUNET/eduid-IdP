@@ -81,6 +81,16 @@ class IdPUser(object):
                 username=self._username,
                 ))
 
+    def get_id(self):
+        """
+        Get the _id of the user in the db.
+
+        :return: User id
+
+        :rtype: str
+        """
+        return str(self._data.get('_id'))
+
     @property
     def identity(self):
         """
