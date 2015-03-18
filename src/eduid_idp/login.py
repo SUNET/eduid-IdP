@@ -21,6 +21,7 @@ from hashlib import sha256
 
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
+from eduid_idp.idp_actions import SpecialActions
 import eduid_idp.util
 import eduid_idp.mischttp
 
@@ -913,9 +914,8 @@ def do_verify(idp_app):
         _sso_session.user_authn_class_ref,
         _sso_session.user_id))
 
-    # XXX Get an (actions) session identifier specific for this request
-    # XXX (perhaps a hash of the sso session id?)
-    # XXX and add request specific actions to the actions db with that session id
+    actions_session = os.urandom(16).encode('hex')
+    SpecialActions(_sso_session, actions_session).add_actions()
 
     # Check for pending actions and redirect to the actions app in case there are.
     if idp_app.actions_db is not None and idp_app.actions_db.pending_actions():
@@ -933,12 +933,12 @@ def do_verify(idp_app):
         idp_app.logger.info("Redirecting user {0} to actions app at {1}".format(user.get_id(),
                                                                              actions_uri)
 
-        # XXX add the (actions) session identifier to the uri
-        uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}'.format(actions_uri,
-                                                            user.get_id(),
-                                                            auth_token,
-                                                            nonce,
-                                                            timestamp)
+        uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}&session={5}'.format(actions_uri,
+                                                                             user.get_id(),
+                                                                             auth_token,
+                                                                             nonce,
+                                                                             timestamp,
+                                                                             actions_session)
         raise eduid_idp.mischttp.Redirect(uri)
 
 

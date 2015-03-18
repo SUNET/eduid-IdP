@@ -115,3 +115,33 @@ class ActionsDB(object):
             query['session'] = {'$or': [{'$exists': False}, session]}
         actions = self.get_database().find(query)
         return actions.count() > 0
+
+
+class SpecialActions(object):
+    '''
+    class that holds methods that add pending actions to the
+    eduid_actions db.
+    Each method can examine self.sso_session to decide whether
+    to add new actions.
+    The names of these methods have to start with 'action_'
+    '''
+
+    def __init__(self, sso_session, actions_session):
+        '''
+        :param sso_session: the SSO session
+        :type sso_session: eduid_idp.sso_session.SSOSession
+        :param actions_session: an identifier for this session,
+                                that will be sent to the actions app
+        :type actions_session: str
+        '''
+        self.sso_session = sso_session
+        self.actions_session = actions_session
+
+    def add_actions(self):
+        '''
+        Iterate over the methods is this class that start with 'action_',
+        and call them.
+        '''
+        for name, method in self.__class__.__dict__.items():
+            if callable(method) and name.startswith('action_'):
+                method(self)
