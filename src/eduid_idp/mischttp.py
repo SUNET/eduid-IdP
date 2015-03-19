@@ -169,24 +169,27 @@ def static_filename(config, path):
         return None
 
 
-def static_file(start_response, filename, fp=None, status=None):
+def static_file(start_response, filename, logger, fp=None, status=None):
     """
     Serve a static file, 'known' to exist.
 
     :param start_response: WSGI-like start_response function
     :param filename: OS path to the files whose content should be served
+    :param logger: Logging logger
     :param fp: optional file-like object implementing read()
     :param status: optional HTML result data ('404 Not Found' for example)
     :return: file content
 
     :type start_response: function
     :type filename: string
+    :type logger: logging.Logger
     :type fp: File
     :type status: string
     :rtype: string
     """
     content_type = get_content_type(filename)
     if not content_type:
+        logger.error("Could not determine content type for static file {!r}".format(filename))
         raise eduid_idp.error.NotFound()
 
     if not status:
@@ -200,6 +203,9 @@ def static_file(start_response, filename, fp=None, status=None):
         raise eduid_idp.error.NotFound()
     finally:
         fp.close()
+
+    logger.debug("Serving {!s}, status={!r} content-type {!s}, length={!r}".format(
+        filename, status, content_type, len(text)))
 
     start_response(status, [('Content-Type', content_type)])
     return text
@@ -391,7 +397,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
                             package, lang, langfile))
                     try:
                         res = pkg_resources.resource_stream(package, langfile)
-                        return eduid_idp.mischttp.static_file(start_response, langfile, fp=res, status=status)
+                        return eduid_idp.mischttp.static_file(start_response, langfile, logger, fp=res, status=status)
                     except IOError:
                         pass
 
@@ -403,7 +409,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
         logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
         return None
     logger.debug('Using default file for {!r}: {!r}'.format(filename, static_fn))
-    return eduid_idp.mischttp.static_file(start_response, static_fn, status=status)
+    return eduid_idp.mischttp.static_file(start_response, static_fn, logger, status=status)
 
 
 def get_http_method():
