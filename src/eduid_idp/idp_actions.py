@@ -33,7 +33,11 @@
 #
 
 
+import os
+import time
 import pymongo
+
+import eduid_idp.util
 
 
 DEFAULT_MONGODB_HOST = 'localhost'
@@ -117,6 +121,49 @@ class ActionsDB(object):
         return actions.count() > 0
 
 
+def check_for_pending_actions(idp_app, user, ticket):
+    '''
+    Check whether there are any pending actions for the current user,
+    and if there are, redirect to the actions app.
+    The redirection is performed by raising a eduid_idp.mischttp.Redirect.
+
+    :param idp_app: IdP application instance
+    :type idp_app: eduid_idp.idp.IdPApplication
+    :param user: the authenticating user
+    :type user: eduid_idp.idp_user.IdPUser
+    :param ticket: SSOLoginData instance
+    :type ticket: SSOLoginData
+
+    :rtype: None
+    '''
+
+    actions_session = ticket.key
+    SpecialActions(ticket).add_actions()
+
+    # Check for pending actions and redirect to the actions app
+    # in case there are.
+    if idp_app.actions_db is not None and idp_app.actions_db.pending_actions():
+        idp_app.logger.info("There are pending actions for userid {0}".format(
+            user.get_id()))
+        # create auth token for actions app
+        eppn = user.identity.get('eduPersonPrincipalName')
+        secret = idp_app.config.actions_auth_shared_secret
+        timestamp = '{:x}'.format(int(time.time()))
+        nonce = os.urandom(16).encode('hex')
+        auth_token = eduid_idp.util.generate_auth_token(secret,
+                                                        eppn,
+                                                        nonce,
+                                                        timestamp)
+        actions_uri = idp_app.config.actions_app_uri
+        idp_app.logger.info("Redirecting userid {0} to actions app {1}".format(
+            user.get_id(), actions_uri))
+
+        uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}&session={5}'.format(
+                actions_uri, user.get_id(), auth_token,
+                nonce, timestamp, actions_session)
+        raise eduid_idp.mischttp.Redirect(uri)
+
+
 class SpecialActions(object):
     '''
     class that holds methods that add pending actions to the
@@ -126,16 +173,12 @@ class SpecialActions(object):
     The names of these methods have to start with 'action_'
     '''
 
-    def __init__(self, sso_session, actions_session):
+    def __init__(self, ticket):
         '''
-        :param sso_session: the SSO session
-        :type sso_session: eduid_idp.sso_session.SSOSession
-        :param actions_session: an identifier for this session,
-                                that will be sent to the actions app
-        :type actions_session: str
+        :param ticket: the SSO login data
+        :type ticket: eduid_idp.login.SSOLoginData
         '''
-        self.sso_session = sso_session
-        self.actions_session = actions_session
+        self.ticket = ticket
 
     def add_actions(self):
         '''

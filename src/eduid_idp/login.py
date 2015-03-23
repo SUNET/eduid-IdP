@@ -21,7 +21,7 @@ from hashlib import sha256
 
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
-from eduid_idp.idp_actions import SpecialActions
+from eduid_idp.idp_actions import check_for_pending_actions
 import eduid_idp.util
 import eduid_idp.mischttp
 
@@ -347,6 +347,7 @@ class SSO(Service):
         self.binding = ""
         self.binding_out = None
         self.destination = None
+        self._idp_app = idp_app
 
     def perform_login(self, ticket):
         """
@@ -368,6 +369,8 @@ class SSO(Service):
         resp_args = self._validate_login_request(ticket)
 
         user = self.sso_session.idp_user
+
+        check_for_pending_actions(self._idp_app, user, ticket)
 
         response_authn = self._get_login_response_authn(ticket, user)
 
@@ -913,34 +916,6 @@ def do_verify(idp_app):
         query['key'], _sso_session.public_id,
         _sso_session.user_authn_class_ref,
         _sso_session.user_id))
-
-    actions_session = os.urandom(16).encode('hex')
-    SpecialActions(_sso_session, actions_session).add_actions()
-
-    # Check for pending actions and redirect to the actions app in case there are.
-    if idp_app.actions_db is not None and idp_app.actions_db.pending_actions():
-        idp_app.logger.info("There are pending actions for userid {0}".format(user.get_id())
-        # create auth token for actions app
-        eppn = user.identity.get('eduPersonPrincipalName')
-        secret = idp_app.config.actions_auth_shared_secret
-        timestamp = '{:x}'.format(int(time.time()))
-        nonce = os.urandom(16).encode('hex')
-        auth_token = eduid_idp.util.generate_auth_token(secret,
-                                                        eppn,
-                                                        nonce,
-                                                        timestamp)
-        actions_uri = idp_config.actions_app_uri
-        idp_app.logger.info("Redirecting user {0} to actions app at {1}".format(user.get_id(),
-                                                                             actions_uri)
-
-        uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}&session={5}'.format(actions_uri,
-                                                                             user.get_id(),
-                                                                             auth_token,
-                                                                             nonce,
-                                                                             timestamp,
-                                                                             actions_session)
-        raise eduid_idp.mischttp.Redirect(uri)
-
 
     # Now that an SSO session has been created, redirect the users browser back to
     # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'

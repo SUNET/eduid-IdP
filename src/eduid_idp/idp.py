@@ -78,7 +78,7 @@ General non-authenticated user<->IdP interaction flow :
 
   5) URL /sso/redirect (re-visited) is handled by SSO.redirect()
 
-     The users browser this time prevents an `idpauthn' cookie refering to an
+     The users browser this time presents an `idpauthn' cookie refering to an
      existing (and valid) SSOSession.
 
      If the `key' URL parameter is present, it is used to locate the SSOLoginData()
