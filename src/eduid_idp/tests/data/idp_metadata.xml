@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns0:EntityDescriptor xmlns:ns0="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:ns1="urn:mace:shibboleth:metadata:1.0" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" entityID="https://unittest-idp.example.edu/idp.xml">
+  <ns0:IDPSSODescriptor WantAuthnRequestsSigned="false" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <ns0:Extensions>
+      <ns1:Scope regexp="false">local.eduid.se</ns1:Scope>
+    </ns0:Extensions>
+    <ns0:KeyDescriptor use="encryption">
+      <ns2:KeyInfo>
+        <ns2:X509Data>
+          <ns2:X509Certificate>MIIDuTCCAnGgAwIBAgIEVJF9FDANBgkqhkiG9w0BAQsFADA7MQswCQYDVQQGEwJT
+RTEeMBwGA1UEChMVRURVSUQgTE9DQUwgREVWRUxPUEVSMQwwCgYDVQQDEwNpZHAw
+HhcNMTQxMjE3MTI1NDQ1WhcNMjQxMjE0MTI1NDUwWjA7MQswCQYDVQQGEwJTRTEe
+MBwGA1UEChMVRURVSUQgTE9DQUwgREVWRUxPUEVSMQwwCgYDVQQDEwNpZHAwggFS
+MA0GCSqGSIb3DQEBAQUAA4IBPwAwggE6AoIBMQDINGoxHZHVYZRfKh/Jka7KvYhv
++XMfCAP081+rfPyzs8mlBO4XuQMLlBclL4e16HmB6kEXKSdCjAAJ+bjPQO840oKr
+eyeCK3C9aJfhS10JTKc1gBC3laXGchEts4QtDDPTUEdSsw1JmnJSQJbF16FAeD1n
+hHKQdeDIdgrDlezE6XbwaKgnXRbeE/oG56vGWOT+qgL0LoaT8tb3dJGYXVJM+lEH
+hcaFYHm49ejUW9yEq9ieLKDmgQotpA/9NtcTBHTnAF3dX2x7OdEnzNc3IvPYDmTa
+1SeDdMab8roVnx2IZBGtraSGyHfJSbZMO+J0YLDQ13jDPJgNN6lXlFC6Z5RUyxm7
+UADnMeMIx/j+vrUc7vNTIJy4u39agxRzMZ4M6BBjh6gd4zC5x+5WSK5wYZuxAgMB
+AAGjZTBjMAwGA1UdEwEB/wQCMAAwDgYDVR0RBAcwBYIDaWRwMBMGA1UdJQQMMAoG
+CCsGAQUFBwMBMA8GA1UdDwEB/wQFAwMHIAAwHQYDVR0OBBYEFApyi9vyZjFUT/R5
+pljFFTL5eqQfMA0GCSqGSIb3DQEBCwUAA4IBMQClJfUirEl9qEMwntrkiVkGVg0M
+Eq8+nXcMhxbNR1T3U59FOomfAn7c2LjkLmVrq5w0K8iwG/GVe9UubrYs7u9/BWN5
+hy8LlLv63g2h1vtBQ9Lg5paHtFeIWV96+zWFRvCZ7qiZ4G80aTe2dSizDE0fzF63
+eehyIwuNbILJKvx1DT0nAPd6qm1GvzxQTC21InGyKwDWyBrE8Z9/5iMvOrAnMWwa
+UbbIDqfAlgWWxZCFmRDoxVkTaZFCUKkV11iYBdI4bVOVNHv/qQjXHZPl7v5/DWcK
+jx3X6rm4QeeNnHM8z9hLRrwmezWUpaCjLOmvw4lNSePbcwGPmjQe2g3JYhnlx5aO
+8poVOhEPcJNLpeJsUhp1RKGDy1kuKdG5n4TmMNJwtx+p8JGJEOVg2i8gIhrz
+</ns2:X509Certificate>
+        </ns2:X509Data>
+      </ns2:KeyInfo>
+    </ns0:KeyDescriptor>
+    <ns0:KeyDescriptor use="signing">
+      <ns2:KeyInfo>
+        <ns2:X509Data>
+          <ns2:X509Certificate>MIIDuTCCAnGgAwIBAgIEVJF9FDANBgkqhkiG9w0BAQsFADA7MQswCQYDVQQGEwJT
+RTEeMBwGA1UEChMVRURVSUQgTE9DQUwgREVWRUxPUEVSMQwwCgYDVQQDEwNpZHAw
+HhcNMTQxMjE3MTI1NDQ1WhcNMjQxMjE0MTI1NDUwWjA7MQswCQYDVQQGEwJTRTEe
+MBwGA1UEChMVRURVSUQgTE9DQUwgREVWRUxPUEVSMQwwCgYDVQQDEwNpZHAwggFS
+MA0GCSqGSIb3DQEBAQUAA4IBPwAwggE6AoIBMQDINGoxHZHVYZRfKh/Jka7KvYhv
++XMfCAP081+rfPyzs8mlBO4XuQMLlBclL4e16HmB6kEXKSdCjAAJ+bjPQO840oKr
+eyeCK3C9aJfhS10JTKc1gBC3laXGchEts4QtDDPTUEdSsw1JmnJSQJbF16FAeD1n
+hHKQdeDIdgrDlezE6XbwaKgnXRbeE/oG56vGWOT+qgL0LoaT8tb3dJGYXVJM+lEH
+hcaFYHm49ejUW9yEq9ieLKDmgQotpA/9NtcTBHTnAF3dX2x7OdEnzNc3IvPYDmTa
+1SeDdMab8roVnx2IZBGtraSGyHfJSbZMO+J0YLDQ13jDPJgNN6lXlFC6Z5RUyxm7
+UADnMeMIx/j+vrUc7vNTIJy4u39agxRzMZ4M6BBjh6gd4zC5x+5WSK5wYZuxAgMB
+AAGjZTBjMAwGA1UdEwEB/wQCMAAwDgYDVR0RBAcwBYIDaWRwMBMGA1UdJQQMMAoG
+CCsGAQUFBwMBMA8GA1UdDwEB/wQFAwMHIAAwHQYDVR0OBBYEFApyi9vyZjFUT/R5
+pljFFTL5eqQfMA0GCSqGSIb3DQEBCwUAA4IBMQClJfUirEl9qEMwntrkiVkGVg0M
+Eq8+nXcMhxbNR1T3U59FOomfAn7c2LjkLmVrq5w0K8iwG/GVe9UubrYs7u9/BWN5
+hy8LlLv63g2h1vtBQ9Lg5paHtFeIWV96+zWFRvCZ7qiZ4G80aTe2dSizDE0fzF63
+eehyIwuNbILJKvx1DT0nAPd6qm1GvzxQTC21InGyKwDWyBrE8Z9/5iMvOrAnMWwa
+UbbIDqfAlgWWxZCFmRDoxVkTaZFCUKkV11iYBdI4bVOVNHv/qQjXHZPl7v5/DWcK
+jx3X6rm4QeeNnHM8z9hLRrwmezWUpaCjLOmvw4lNSePbcwGPmjQe2g3JYhnlx5aO
+8poVOhEPcJNLpeJsUhp1RKGDy1kuKdG5n4TmMNJwtx+p8JGJEOVg2i8gIhrz
+</ns2:X509Certificate>
+        </ns2:X509Data>
+      </ns2:KeyInfo>
+    </ns0:KeyDescriptor>
+    <ns0:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://unittest-idp.example.edu/slo/soap"/>
+    <ns0:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://unittest-idp.example.edu/slo/post"/>
+    <ns0:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://unittest-idp.example.edu/slo/redirect"/>
+    <ns0:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</ns0:NameIDFormat>
+    <ns0:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</ns0:NameIDFormat>
+    <ns0:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://unittest-idp.example.edu/sso/redirect"/>
+    <ns0:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://unittest-idp.example.edu/sso/post"/>
+  </ns0:IDPSSODescriptor>
+  <ns0:Organization>
+    <ns0:OrganizationName xml:lang="en">eduID LOCAL TEST</ns0:OrganizationName>
+    <ns0:OrganizationDisplayName xml:lang="en">eduID LOCAL TEST</ns0:OrganizationDisplayName>
+    <ns0:OrganizationURL xml:lang="en">http://www./</ns0:OrganizationURL>
+  </ns0:Organization>
+  <ns0:ContactPerson contactType="technical">
+    <ns0:GivenName>eduID</ns0:GivenName>
+    <ns0:SurName>developers</ns0:SurName>
+    <ns0:EmailAddress>eduid-dev@SEGATE.SUNET.SE</ns0:EmailAddress>
+  </ns0:ContactPerson>
+  <ns0:ContactPerson contactType="support">
+    <ns0:GivenName>Support</ns0:GivenName>
+    <ns0:EmailAddress>support@eduid.se</ns0:EmailAddress>
+  </ns0:ContactPerson>
+</ns0:EntityDescriptor>
