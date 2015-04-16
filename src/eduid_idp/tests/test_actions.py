@@ -47,6 +47,7 @@ import pymongo
 from mock import patch
 import webtest
 from bson import ObjectId
+from urlparse import urlsplit
 
 import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
@@ -166,63 +167,130 @@ TEST_USER = {
 # noinspection PyProtectedMember
 class TestActions(TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        # This code was originally in the setUp method, but there was
+        # something missing in the tearDown method to reset the IdP,
+        # so only the first test would work. Subsequent tests would fail
+        # due to some corruption in the config.
 
-    def setUp(self):
+        # create a temporary mongo instance
         try:
-            self.tmp_db = MongoTemporaryInstance.get_instance()
+            cls.tmp_db = MongoTemporaryInstance.get_instance()
         except OSError:
             raise unittest.SkipTest("requires accessible mongod executable")
-        self.conn = self.tmp_db.conn
-        self.port = self.tmp_db.port
+        cls.conn = cls.tmp_db.conn
+        cls.port = cls.tmp_db.port
 
+        # load the IdP configuration
+        datadir = pkg_resources.resource_filename(__name__, 'data')
+        cls.config_file = os.path.join(datadir, 'test_actions.ini')
+        debug = False
+        cls.config = eduid_idp.config.IdPConfig(cls.config_file, debug)
+
+        # Create the IdP app
+        cls.idp_app = IdPApplication(logger, cls.config)
+
+
+    def setUp(self):
+        # drop the mongo dbs
         for db_name in self.conn.database_names():
             self.conn.drop_database(db_name)
-
-        debug = False
-        datadir = pkg_resources.resource_filename(__name__, 'data')
-        self.config_file = os.path.join(datadir, 'test_actions.ini')
-        self.config = eduid_idp.config.IdPConfig(self.config_file, debug)
-
-        start_response = lambda: False
-        self.idp_app = IdPApplication(logger, self.config)
         
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
+        # mount the IdP app in the cherrypy app server
         cherrypy.tree.mount(self.idp_app, '/')
 
-        self.http = webtest.TestApp(cherrypy.tree)
+        # create a webtest testing environment
+        import cookielib
+        self.http = webtest.TestApp(cherrypy.tree,
+                extra_environ={'wsgi.url_scheme': 'https'},
+                cookiejar=cookielib.CookieJar())
         
     def tearDown(self):
+        # drop the mongo dbs
         for db_name in self.conn.database_names():
             self.conn.drop_database(db_name)
+        # reset the testing environment
         self.http.reset()
 
     def test_no_actions(self):
+
+        # insert a test user in the users db
         amdb = self.conn['eduid_am']
         amdb.attributes.insert(TEST_USER)
+        
+        # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
+        
+        # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
+        
+        # grab the login form from the response
         form = resp.forms['login-form']
+        
+        # fill in the form and post it to the test env
         form['username'].value = 'johnsmith@example.com'
         form['password'].value = '123456'
+
+        # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
+        
+            # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
+        url = urlsplit(resp.location)
+        url = '?'.join( (url.path, url.query) )
+
+        # get the redirect url. set the cookies manually,
+        # for some reason webtest doesn't set them in the request
+        cookies = '; '.join(['{}={}'.format(k, v) for k, v
+                              in self.http.cookies.items()])
+        resp = self.http.get(resp.location, headers={'Cookie': cookies})
+        self.assertEqual(resp.status, '200 Ok')
+        self.assertEqual(resp.body, 'hoho')
 
     def test_action(self):
+
+        # insert a test user in the users db
         amdb = self.conn['eduid_am']
         amdb.attributes.insert(TEST_USER)
+
+        # insert a test action in the actions db
         actionsdb = self.conn['eduid_actions']
         actionsdb.actions.insert(TEST_ACTION)
+        
+        # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
+        
+        # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
+        
+        # grab the login form from the response
         form = resp.forms['login-form']
+        
+        # fill in the form and post it to the test env
         form['username'].value = 'johnsmith@example.com'
         form['password'].value = '123456'
+
+        # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
+        
+            # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
+        url = urlsplit(resp.location)
+        url = '?'.join( (url.path, url.query) )
+
+        # get the redirect url. set the cookies manually,
+        # for some reason webtest doesn't set them in the request
+        cookies = '; '.join(['{}={}'.format(k, v) for k, v
+                              in self.http.cookies.items()])
+        resp = self.http.get(resp.location, headers={'Cookie': cookies})
+        self.assertEqual(resp.status, '302 Found')
+        self.assertEqual(resp.location, 'hoho')

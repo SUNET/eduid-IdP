@@ -75,7 +75,9 @@ CONFIG = {
     "key_file": "tests/data/idp-public-snakeoil.key",
     "cert_file": "tests/data/idp-public-snakeoil.pem",
     "metadata": {
-        "local": ["tests/data/idp_metadata.xml"],
+        "local": [
+            "tests/data/sp_metadata.xml",
+            ],
     },
     "organization": {
         "display_name": "Rolands Identiteter",

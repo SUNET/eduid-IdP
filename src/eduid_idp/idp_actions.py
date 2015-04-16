@@ -117,7 +117,7 @@ class ActionsDB(object):
             query['session'] = {'$exists': False}
         else:
             query['session'] = {'$or': [{'$exists': False}, session]}
-        actions = self.get_database().find(query)
+        actions = self.get_database()['actions'].find(query)
         return actions.count() > 0
 
 
@@ -142,7 +142,7 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     # Check for pending actions and redirect to the actions app
     # in case there are.
-    if idp_app.actions_db is not None and idp_app.actions_db.pending_actions():
+    if idp_app.actions_db is not None and idp_app.actions_db.pending_actions(user):
         idp_app.logger.info("There are pending actions for userid {0}".format(
             user.get_id()))
         # create auth token for actions app

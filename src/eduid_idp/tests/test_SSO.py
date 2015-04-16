@@ -93,9 +93,7 @@ def make_SAML_request(class_ref):
         IssueInstant="{now!s}"
         ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
         Version="2.0">
-  <ns1:Issuer Format="urn:oasis:names:tc:SAML:2.0:nameid-format:entity">
-     https://sp.example.edu/saml2/metadata/
-  </ns1:Issuer>
+  <ns1:Issuer Format="urn:oasis:names:tc:SAML:2.0:nameid-format:entity">https://sp.example.edu/saml2/metadata/</ns1:Issuer>
   <ns0:NameIDPolicy AllowCreate="false" Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"/>
   <ns0:RequestedAuthnContext>
     <ns1:AuthnContextClassRef>{class_ref!s}</ns1:AuthnContextClassRef>

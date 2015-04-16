@@ -471,7 +471,7 @@ class SSO(Service):
                 raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(ticket.req_info.message)
         except UnknownPrincipal as excp:
-            self.logger.info("{!s}: Unknown service provider: {!s}".format(ticket.key, excp))
+            self.logger.info("{!s}: Unknown service provider: '{!s}'".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
         except UnsupportedBinding as excp:
             self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(ticket.key, excp))
