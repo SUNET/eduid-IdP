@@ -7,15 +7,15 @@ from distutils import versionpredicate
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.3.21-dev'
+version = '0.3.21'
 
 install_requires = [
-    'pymongo == 2.6.3',
-    'pysaml2 == 1.2.0beta5',
-    'python-memcached == 1.53',
-    'cherrypy == 3.2.4',
-    'vccs_client == 0.4.1',
-    'eduid_am == 0.4.9',
+    'pymongo>=2.8,<3',
+    'pysaml2==1.2.0beta5',
+    'python-memcached==1.53',
+    'cherrypy==3.2.4',
+    'vccs_client==0.4.1',
+    'eduid_am==0.5.2',
 ]
 
 testing_extras = [
