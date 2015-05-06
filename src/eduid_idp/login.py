@@ -386,7 +386,7 @@ class SSO(Service):
                               pprint.pformat(resp_args),
                               pprint.pformat(response_authn)))
 
-        saml_response = self.IDP.create_authn_response(attributes, userid = user.username,
+        saml_response = self.IDP.create_authn_response(attributes, userid = str(user.username),
                                                        authn = response_authn, sign_assertion = True,
                                                        **resp_args)
 

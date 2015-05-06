@@ -35,6 +35,7 @@
 
 import os
 import time
+from bson import ObjectId
 import pymongo
 
 import eduid_idp.util
@@ -111,12 +112,12 @@ class ActionsDB(object):
 
         :rtype: bool
         '''
-        userid = user.get_id()
+        userid = ObjectId(user.get_id())
         query = {'user_oid': userid}
         if session is None:
             query['session'] = {'$exists': False}
         else:
-            query['session'] = {'$or': [{'$exists': False}, session]}
+            query['session'] = {'$or': [{'$exists': False}, {'$eq': session}]}
         actions = self.get_database()['actions'].find(query)
         return actions.count() > 0
 
@@ -138,11 +139,15 @@ def check_for_pending_actions(idp_app, user, ticket):
     '''
 
     actions_session = ticket.key
-    SpecialActions(ticket).add_actions()
+    SpecialActions(idp_app, ticket).add_actions()
+
+    if idp_app.actions_db is None:
+        idp_app.logger.info("This IdP is not initialized for special actions")
+        return
 
     # Check for pending actions and redirect to the actions app
     # in case there are.
-    if idp_app.actions_db is not None and idp_app.actions_db.pending_actions(user):
+    if idp_app.actions_db.pending_actions(user):
         idp_app.logger.info("There are pending actions for userid {0}".format(
             user.get_id()))
         # create auth token for actions app
@@ -162,23 +167,27 @@ def check_for_pending_actions(idp_app, user, ticket):
                 actions_uri, user.get_id(), auth_token,
                 nonce, timestamp, actions_session)
         raise eduid_idp.mischttp.Redirect(uri)
+    else:
+        idp_app.logger.info("There aren't pending actions for userid {0}".format(
+            user.get_id()))
 
 
 class SpecialActions(object):
     '''
     class that holds methods that add pending actions to the
     eduid_actions db.
-    Each method can examine self.sso_session to decide whether
+    Each method can examine self.ticket to decide whether
     to add new actions.
     The names of these methods have to start with 'action_'
     '''
 
-    def __init__(self, ticket):
+    def __init__(self, idp_app, ticket):
         '''
         :param ticket: the SSO login data
         :type ticket: eduid_idp.login.SSOLoginData
         '''
         self.ticket = ticket
+        self.idp_app = idp_app
 
     def add_actions(self):
         '''
@@ -188,3 +197,9 @@ class SpecialActions(object):
         for name, method in self.__class__.__dict__.items():
             if callable(method) and name.startswith('action_'):
                 method(self)
+
+    def action_test(self):
+        '''
+        Dummy method to be patched with real methods in tests
+        '''
+        pass

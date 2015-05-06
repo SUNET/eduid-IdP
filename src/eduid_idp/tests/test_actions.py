@@ -196,7 +196,7 @@ class TestActions(TestCase):
         # drop the mongo dbs
         for db_name in self.conn.database_names():
             self.conn.drop_database(db_name)
-        
+
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
         # mount the IdP app in the cherrypy app server
@@ -207,7 +207,7 @@ class TestActions(TestCase):
         self.http = webtest.TestApp(cherrypy.tree,
                 extra_environ={'wsgi.url_scheme': 'https'},
                 cookiejar=cookielib.CookieJar())
-        
+
     def tearDown(self):
         # drop the mongo dbs
         for db_name in self.conn.database_names():
@@ -220,16 +220,16 @@ class TestActions(TestCase):
         # insert a test user in the users db
         amdb = self.conn['eduid_am']
         amdb.attributes.insert(TEST_USER)
-        
+
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
-        
+
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
-        
+
         # grab the login form from the response
         form = resp.forms['login-form']
-        
+
         # fill in the form and post it to the test env
         form['username'].value = 'johnsmith@example.com'
         form['password'].value = '123456'
@@ -238,7 +238,7 @@ class TestActions(TestCase):
         from vccs_client import VCCSClient
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
-        
+
             # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
@@ -251,7 +251,7 @@ class TestActions(TestCase):
                               in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '200 Ok')
-        self.assertEqual(resp.body, 'hoho')
+        self.assertIn('action="https://sp.example.edu/saml2/acs/"', resp.body)
 
     def test_action(self):
 
@@ -265,10 +265,10 @@ class TestActions(TestCase):
         
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
-        
+
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
-        
+
         # grab the login form from the response
         form = resp.forms['login-form']
         
@@ -280,7 +280,7 @@ class TestActions(TestCase):
         from vccs_client import VCCSClient
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
-        
+
             # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
@@ -293,4 +293,58 @@ class TestActions(TestCase):
                               in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '302 Found')
-        self.assertEqual(resp.location, 'hoho')
+        self.assertIn(self.config.actions_app_uri, resp.location)
+
+    def test_add_action(self):
+
+        # insert a test user in the users db
+        amdb = self.conn['eduid_am']
+        amdb.attributes.insert(TEST_USER)
+
+        # insert a test action in the actions db
+        actionsdb = self.conn['eduid_actions']
+        actionsdb.actions.insert(TEST_ACTION)
+
+        # make the SAML authn request
+        req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
+
+        resp = self.http.post('/sso/post', {'SAMLRequest': req})
+
+        # grab the login form from the response
+        form = resp.forms['login-form']
+
+        # fill in the form and post it to the test env
+        form['username'].value = 'johnsmith@example.com'
+        form['password'].value = '123456'
+
+        # Patch SpecialActions with a dummy action
+        def action_test(self):
+            actions = self.idp_app.actions_db.get_database()['actions']
+            dummy = {u'action': u'dummy',
+                    u'user_oid': ObjectId('123467890123456789014567'),
+                    u'params': {},
+                    u'preference': 100,
+                    u'session': self.ticket.key}
+            actions.insert(dummy)
+
+        from eduid_idp.idp_actions import SpecialActions
+        with patch.object(SpecialActions, 'action_test', action_test):
+
+            # Patch the VCCSClient so we do not need a vccs server
+            from vccs_client import VCCSClient
+            with patch.object(VCCSClient, 'authenticate'):
+                VCCSClient.authenticate.return_value = True
+
+                # post the login form to the test env
+                resp = form.submit()
+                self.assertEqual(resp.status, '302 Found')
+            url = urlsplit(resp.location)
+            url = '?'.join( (url.path, url.query) )
+
+            # get the redirect url. set the cookies manually,
+            # for some reason webtest doesn't set them in the request
+            cookies = '; '.join(['{}={}'.format(k, v) for k, v
+                                  in self.http.cookies.items()])
+            resp = self.http.get(resp.location, headers={'Cookie': cookies})
+            self.assertEqual(resp.status, '302 Found')
+            self.assertIn(self.config.actions_app_uri, resp.location)
