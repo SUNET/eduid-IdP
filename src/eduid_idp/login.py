@@ -19,6 +19,8 @@ import pprint
 import hmac
 from hashlib import sha256
 
+from cgi import escape
+
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 import eduid_idp.util
@@ -81,7 +83,7 @@ class SSOLoginData(object):
         in SSOLoginDataCache.
         :rtype: string
         """
-        return self._key
+        return escape(self._key, quote=True)
 
     @property
     def SAMLRequest(self):
@@ -90,7 +92,7 @@ class SSOLoginData(object):
 
         :rtype : string
         """
-        return self._SAMLRequest
+        return escape(self._SAMLRequest, quote=True)
 
     @property
     def req_info(self):
@@ -109,7 +111,7 @@ class SSOLoginData(object):
 
         :rtype: string
         """
-        return self._RelayState
+        return escape(self._RelayState, quote=True)
 
     @property
     def FailCount(self):
@@ -139,7 +141,7 @@ class SSOLoginData(object):
 
         :rtype: string
         """
-        return self._binding
+        return escape(self._binding, quote=True)
 
 
 class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
