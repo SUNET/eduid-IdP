@@ -313,8 +313,7 @@ def set_cookie(name, path, logger, config, value=''):
     cookie[name]['path'] = path
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
-    if config.httponly_cookies:
-        cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
+    cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
     logger.debug("Set cookie : {!s}".format(cookie))
     return True
 
