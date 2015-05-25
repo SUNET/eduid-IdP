@@ -62,8 +62,8 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'content_packages': [],  # List of Python packages ("name:path") with content resources
                     'verify_request_signatures': '0',  # '1' for True, '0' for False
                     'status_test_usernames': [],
-                    'signup_link': '#',  # for login.html
-                    'dashboard_link': '#',  # for forbidden.html
+                    'signup_link': '#',          # for login.html
+                    'dashboard_link': '#',       # for forbidden.html
                     'password_reset_link': '#',  # for login.html
                     'default_language': 'en',
                     'base_url': None,
@@ -72,8 +72,8 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'max_authn_failures_per_month': '50',  # Kantara 30-day bad authn limit is 100
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
-                    'vccs_url': 'http://localhost:8550/',    # VCCS backend URL
-                    'insecure_cookies': '0',                     # Set to 1 to not set HTTP Cookie 'secure' flag
+                    'vccs_url': 'http://localhost:8550/',  # VCCS backend URL
+                    'insecure_cookies': '0',  # Set to 1 to not set HTTP Cookie 'secure' flag
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
