@@ -7,7 +7,7 @@ from distutils import versionpredicate
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.3.23b0'
+version = '0.3.23'
 
 install_requires = [
     'pymongo>=2.8,<3',
