@@ -79,7 +79,7 @@ class FakeIdPUser(eduid_idp.idp_user.IdPUser):
 
     def __init__(self, username, identity):
         self._username = username
-        self._data = identity
+        self._user = identity
 
 
 def make_SAML_request(class_ref):

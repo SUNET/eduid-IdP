@@ -1,21 +1,20 @@
 #!/usr/bin/env python
 #
-from setuptools import setup, find_packages
-import sys, os
-from distutils import versionpredicate
+from setuptools import setup
+import os
 
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.3.23'
+version = '0.3.24b0'
 
 install_requires = [
     'pymongo>=2.8,<3',
     'pysaml2==1.2.0beta5',
     'python-memcached==1.53',
     'cherrypy==3.2.4',
-    'vccs_client==0.4.1',
-    'eduid_am>=0.5.3',
+    'vccs_client >= 0.4.2',
+    'eduid_userdb >= 0.0.0, <= 0.1.0'
 ]
 
 testing_extras = [
