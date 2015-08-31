@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S
+# Copyright (c) 2013, 2014, 2015 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -40,13 +40,6 @@ from eduid_userdb import UserDB, User
 from eduid_userdb.exceptions import UserDoesNotExist
 
 
-class NoSuchUser(Exception):
-    """
-    Exception raised when a user can't be found in the userdb.
-    """
-    pass
-
-
 class IdPUser(object):
     """
     Representation of a user. Used to load data about a user from the
@@ -70,15 +63,10 @@ class IdPUser(object):
                 _user = userdb.get_user_by_eppn(username.lower())
         if not _user:
             # username will be ObjectId if this is a lookup using an existing SSO session
-            try:
-                _user = userdb.get_user_by_id(username)
-            except UserDoesNotExist:
-                pass
-        if not _user:
-            raise NoSuchUser("User {!r} not found".format(username))
+            _user = userdb.get_user_by_id(username)
         if not isinstance(_user, User):
             raise ValueError('Unknown User returned')
-        self._user = _user.to_dict(old_userdb_format = True)
+        self._user = _user
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -96,7 +84,7 @@ class IdPUser(object):
 
         :rtype: dict
         """
-        return self._user
+        return self._user.to_dict(old_userdb_format = True)
 
     @property
     def username(self):
@@ -122,7 +110,7 @@ class IdPUser(object):
 
         :rtype: [dict]
         """
-        return self._user.get('passwords', [])
+        return self._user.passwords.to_list_of_dicts()
 
 
 class IdPUserDb(object):
@@ -153,5 +141,5 @@ class IdPUserDb(object):
         """
         try:
             return IdPUser(username, userdb = self.userdb)
-        except NoSuchUser:
+        except UserDoesNotExist:
             return None
