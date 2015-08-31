@@ -66,7 +66,7 @@ class IdPUser(object):
             _user = userdb.get_user_by_id(username)
         if not isinstance(_user, User):
             raise ValueError('Unknown User returned')
-        self._user = _user.to_dict(old_userdb_format = True)
+        self._user = _user
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -84,7 +84,7 @@ class IdPUser(object):
 
         :rtype: dict
         """
-        return self._user
+        return self._user.to_dict(old_userdb_format = True)
 
     @property
     def username(self):
@@ -110,7 +110,7 @@ class IdPUser(object):
 
         :rtype: [dict]
         """
-        return self._user.get('passwords', [])
+        return self._user.passwords.to_list_of_dicts()
 
 
 class IdPUserDb(object):

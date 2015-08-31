@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (c) 2014 NORDUnet A/S
+# Copyright (c) 2014, 2015 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -40,6 +40,8 @@ from unittest import TestCase
 
 import eduid_idp
 from eduid_idp.idp import IdPApplication
+from eduid_userdb import User
+from eduid_userdb.exceptions import UserDBValueError
 import saml2.time_util
 from saml2 import server
 
@@ -78,8 +80,18 @@ class FakeIdPApp(IdPApplication):
 class FakeIdPUser(eduid_idp.idp_user.IdPUser):
 
     def __init__(self, username, identity):
+        if 'eduPersonPrincipalName' not in identity:
+            identity['eduPersonPrincipalName'] = 'testa-testa'
+        if 'mail' not in identity:
+            identity.update({'mail': 'test0909@example.com',
+                             'mailAliases': [{
+                                              'email': 'test0909@example.com',
+                                              'verified': True,
+                                            }],
+            })
+
         self._username = username
-        self._user = identity
+        self._user = User(data=identity)
 
 
 def make_SAML_request(class_ref):
@@ -195,9 +207,8 @@ class TestSSO(TestCase):
         with self.assertRaises(eduid_idp.error.Forbidden):
             self.SSO_AL2._get_login_response_authn(ticket, user)
         # Invalid NIN
-        user = FakeIdPUser('user1', {'norEduPersonNIN': [False]})
-        with self.assertRaises(eduid_idp.error.Forbidden):
-            self.SSO_AL2._get_login_response_authn(ticket, user)
+        with self.assertRaises(UserDBValueError):
+            FakeIdPUser('user1', {'norEduPersonNIN': [False]})
 
     def test__get_login_response_authn_3(self):
         """
