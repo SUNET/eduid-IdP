@@ -64,12 +64,12 @@ class IdPUser(object):
         self._data = None
         if isinstance(username, basestring):
             if '@' in username:
-                self._data = backend.get_user_by_mail(username.lower())
+                self._data = backend.userdb.get_user_by_mail(username.lower())
             if not self._data:
-                self._data = backend.get_user_by_field('eduPersonPrincipalName', username.lower())
+                self._data = backend.userdb.get_user_by_field('eduPersonPrincipalName', username.lower())
         if not self._data:
             # username will be ObjectId if this is a lookup using an existing SSO session
-            self._data = backend.get_user_by_id(username, raise_on_missing=False)
+            self._data = backend.userdb.get_user_by_id(username, raise_on_missing=False)
         if not self._data:
             raise NoSuchUser("User {!r} not found".format(username))
         assert isinstance(self._data, dict)
