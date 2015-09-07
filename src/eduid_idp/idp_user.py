@@ -37,13 +37,7 @@ User and user database module.
 """
 
 from eduid_am.celery import celery, get_attribute_manager
-
-
-class NoSuchUser(Exception):
-    """
-    Exception raised when a user can't be found in the userdb.
-    """
-    pass
+from eduid_am.exceptions import UserDoesNotExist
 
 
 class IdPUser(object):
@@ -71,7 +65,7 @@ class IdPUser(object):
             # username will be ObjectId if this is a lookup using an existing SSO session
             self._data = backend.get_user_by_id(username, raise_on_missing=False)
         if not self._data:
-            raise NoSuchUser("User {!r} not found".format(username))
+            raise UserDoesNotExist("User {!r} not found".format(username))
         assert isinstance(self._data, dict)
 
     def __repr__(self):
@@ -151,5 +145,5 @@ class IdPUserDb(object):
         """
         try:
             return IdPUser(username, backend = self.backend)
-        except NoSuchUser:
+        except UserDoesNotExist:
             return None
