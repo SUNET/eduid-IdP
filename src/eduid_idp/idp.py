@@ -292,6 +292,18 @@ class IdPApplication(object):
         raise eduid_idp.error.NotFound(logger = self.logger)
 
     @cherrypy.expose
+    def u2f(self):
+        self.logger.debug("\n\n")
+        self.logger.debug("--- U2F ---")
+        path = cherrypy.request.path_info.lstrip('/')
+        self.logger.debug("<application> PATH: %s" % path)
+        if path.endswith('register'):
+            return eduid_idp.u2f.register()
+        if path.endswith('authenticate'):
+            return eduid_idp.u2f.authenticate()
+        raise eduid_idp.error.NotFound(logger = self.logger)
+
+    @cherrypy.expose
     def status(self, request=None):
         """
         Check that the userdb and authentication backends are operational.

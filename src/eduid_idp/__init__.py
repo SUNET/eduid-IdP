@@ -51,3 +51,4 @@ from . import thirdparty
 from . import sso_session
 from . import authn
 from . import util
+from . import u2f
