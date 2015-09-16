@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S
+# Copyright (c) 2013, 2014, 2015 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -36,14 +36,8 @@
 User and user database module.
 """
 
-from eduid_am.celery import celery, get_attribute_manager
-
-
-class NoSuchUser(Exception):
-    """
-    Exception raised when a user can't be found in the userdb.
-    """
-    pass
+from eduid_userdb import UserDB, User
+from eduid_userdb.exceptions import UserDoesNotExist
 
 
 class IdPUser(object):
@@ -52,27 +46,27 @@ class IdPUser(object):
     userdb, and then represent it in a readable way.
 
     :param username: username to search for in userdb
-    :param backend: user database instance, probably a Celery task
+    :param userdb: user database instance
     :raise NoSuchUser: if 'username' was not found in the userdb
 
-    :type username: string or ObjectId
-    :type backend:
+    :type username: str or unicode or ObjectId
+    :type userdb: UserDB
     """
 
-    def __init__(self, username, backend):
+    def __init__(self, username, userdb):
         self._username = username
-        self._data = None
-        if isinstance(username, basestring):
+        _user = None
+        if isinstance(username, str) or isinstance(username, unicode):
             if '@' in username:
-                self._data = backend.userdb.get_user_by_mail(username.lower())
-            if not self._data:
-                self._data = backend.userdb.get_user_by_field('eduPersonPrincipalName', username.lower())
-        if not self._data:
+                _user = userdb.get_user_by_mail(username.lower())
+            if not _user:
+                _user = userdb.get_user_by_eppn(username.lower())
+        if not _user:
             # username will be ObjectId if this is a lookup using an existing SSO session
-            self._data = backend.userdb.get_user_by_id(username, raise_on_missing=False)
-        if not self._data:
-            raise NoSuchUser("User {!r} not found".format(username))
-        assert isinstance(self._data, dict)
+            _user = userdb.get_user_by_id(username)
+        if not isinstance(_user, User):
+            raise ValueError('Unknown User returned')
+        self._user = _user
 
     def __repr__(self):
         return ('<{} instance at {:#x}: user={username!r}>'.format(
@@ -100,7 +94,7 @@ class IdPUser(object):
 
         :rtype: dict
         """
-        return self._data
+        return self._user.to_dict(old_userdb_format = True)
 
     @property
     def username(self):
@@ -126,7 +120,7 @@ class IdPUser(object):
 
         :rtype: [dict]
         """
-        return self._data.get('passwords', [])
+        return self._user.passwords.to_list_of_dicts()
 
 
 class IdPUserDb(object):
@@ -134,22 +128,18 @@ class IdPUserDb(object):
 
     :param logger: logging logger
     :param config: IdP config
-    :param backend: User database
+    :param userdb: User database
 
     :type logger: logging.Logger
     :type config: eduid_idp.config.IdPConfig
     """
 
-    def __init__(self, logger, config, backend = None):
+    def __init__(self, logger, config, userdb = None):
         self.logger = logger
         self.config = config
-        self.backend = backend
-        if backend is None:
-            if config.userdb_mongo_uri and config.userdb_mongo_database:
-                settings = {'MONGO_URI': config.userdb_mongo_uri,
-                            }
-                celery.conf.update(settings)
-            self.backend = get_attribute_manager(celery)
+        if userdb is None:
+            userdb = UserDB(config.userdb_mongo_uri, db_name=config.userdb_mongo_database)
+        self.userdb = userdb
 
     def lookup_user(self, username):
         """
@@ -160,6 +150,6 @@ class IdPUserDb(object):
         :rtype: IdPUser | None
         """
         try:
-            return IdPUser(username, backend = self.backend)
-        except NoSuchUser:
+            return IdPUser(username, userdb = self.userdb)
+        except UserDoesNotExist:
             return None

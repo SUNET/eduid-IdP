@@ -296,8 +296,7 @@ class IdPApplication(object):
 
         static_fn = eduid_idp.mischttp.static_filename(self.config, path)
         if static_fn:
-            self.logger.debug("Serving static file {!r}".format(static_fn))
-            return eduid_idp.mischttp.static_file(self._my_start_response, static_fn)
+            return eduid_idp.mischttp.static_file(self._my_start_response, static_fn, self.logger)
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
