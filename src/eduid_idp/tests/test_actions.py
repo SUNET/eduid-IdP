@@ -149,7 +149,6 @@ TEST_USER = {
         'urn:mace:eduid.se:role:admin',
         'urn:mace:eduid.se:role:student',
     ],
-    'maxReachedLoa': 3,
     'mobile': [],
     'mail': 'johnsmith@example.com',
     'mailAliases': [{
@@ -319,7 +318,7 @@ class TestActions(TestCase):
 
         # Patch SpecialActions with a dummy action
         def action_test(self):
-            actions = self.idp_app.actions_db.get_database()['actions']
+            actions = self.idp_app.actions_db._coll
             dummy = {u'action': u'dummy',
                     u'user_oid': ObjectId('123467890123456789014567'),
                     u'params': {},

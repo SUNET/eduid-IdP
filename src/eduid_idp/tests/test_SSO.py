@@ -35,6 +35,7 @@
 
 import os
 import logging
+from bson import ObjectId
 import pkg_resources
 from unittest import TestCase
 
@@ -89,6 +90,11 @@ class FakeIdPUser(eduid_idp.idp_user.IdPUser):
                                               'verified': True,
                                             }],
             })
+        if 'passwords' not in identity:
+            identity['passwords'] = [{
+                'id': ObjectId('112345678901234567890123'),
+                'salt': '$NDNv1H1$9c810d852430b62a9a7c6159d5d64c41c3831846f81b6799b54e1e8922f11545$32$32$',
+                }]
 
         self._username = username
         self._user = User(data=identity)

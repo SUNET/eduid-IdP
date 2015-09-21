@@ -41,87 +41,6 @@ import pymongo
 import eduid_idp.util
 
 
-DEFAULT_MONGODB_HOST = 'localhost'
-DEFAULT_MONGODB_PORT = 27017
-DEFAULT_MONGODB_NAME = 'eduid_actions'
-DEFAULT_MONGODB_URI = 'mongodb://%s:%d/%s' % (DEFAULT_MONGODB_HOST,
-                                              DEFAULT_MONGODB_PORT,
-                                              DEFAULT_MONGODB_NAME)
-
-
-class ActionsDB(object):
-    """Simple wrapper to get pymongo real objects from the settings uri"""
-
-    def __init__(self, logger, db_uri=DEFAULT_MONGODB_URI,
-                 connection_factory=None, **kwargs):
-
-        self.logger = logger
-        if db_uri == "mongodb://":
-            db_uri = DEFAULT_MONGODB_URI
-        self.db_uri = db_uri
-
-        self.parsed_uri = pymongo.uri_parser.parse_uri(db_uri)
-
-        if 'replicaSet=' in db_uri:
-            if 'socketTimeoutMS' not in kwargs:
-                kwargs['socketTimeoutMS'] = 5000
-            if 'connectTimeoutMS' not in kwargs:
-                kwargs['connectTimeoutMS'] = 5000
-            connection_factory = pymongo.MongoReplicaSetClient
-        else:
-            connection_factory = pymongo.MongoClient
-
-        self.connection = connection_factory(
-            host=self.db_uri,
-            tz_aware=True,
-            **kwargs)
-
-        if self.parsed_uri.get("database", None):
-            self.database_name = self.parsed_uri["database"]
-        else:
-            self.database_name = DEFAULT_MONGODB_NAME
-
-    def get_connection(self):
-        return self.connection
-
-    def get_database(self, database_name=None, username=None, password=None):
-        if database_name is None:
-            db = self.connection[self.database_name]
-        else:
-            db = self.connection[database_name]
-        if username and password:
-            db.authenticate(username, password)
-        elif self.parsed_uri.get("username", None):
-            db.authenticate(
-                self.parsed_uri.get("username", None),
-                self.parsed_uri.get("password", None)
-            )
-        return db
-
-    def pending_actions(self, user, session=None):
-        '''
-        Find out whether the user has pending actions.
-        If session is None, search actions with no session,
-        otherwise search actions with either no session
-        or with the specified session.
-
-        :param user: The user with possible pending actions
-        :type user: eduid_idp.idp_user.IdPUser
-        :param session: The actions session for the user
-        :type session: str
-
-        :rtype: bool
-        '''
-        userid = ObjectId(user.get_id())
-        query = {'user_oid': userid}
-        if session is None:
-            query['session'] = {'$exists': False}
-        else:
-            query['session'] = {'$or': [{'$exists': False}, {'$eq': session}]}
-        actions = self.get_database()['actions'].find(query)
-        return actions.count() > 0
-
-
 def check_for_pending_actions(idp_app, user, ticket):
     '''
     Check whether there are any pending actions for the current user,
@@ -138,6 +57,7 @@ def check_for_pending_actions(idp_app, user, ticket):
     :rtype: None
     '''
 
+    # Add any actions that may depend on the login data
     actions_session = ticket.key
     SpecialActions(idp_app, ticket).add_actions()
 
@@ -147,9 +67,9 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     # Check for pending actions and redirect to the actions app
     # in case there are.
-    if idp_app.actions_db.pending_actions(user):
+    if idp_app.actions_db.has_pending_actions(user.user_id):
         idp_app.logger.info("There are pending actions for userid {0}".format(
-            user.get_id()))
+            str(user.user_id)))
         # create auth token for actions app
         eppn = user.identity.get('eduPersonPrincipalName')
         secret = idp_app.config.actions_auth_shared_secret
@@ -161,15 +81,15 @@ def check_for_pending_actions(idp_app, user, ticket):
                                                         timestamp)
         actions_uri = idp_app.config.actions_app_uri
         idp_app.logger.info("Redirecting userid {0} to actions app {1}".format(
-            user.get_id(), actions_uri))
+            str(user.user_id), actions_uri))
 
         uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}&session={5}'.format(
-                actions_uri, user.get_id(), auth_token,
+                actions_uri, str(user.user_id), auth_token,
                 nonce, timestamp, actions_session)
         raise eduid_idp.mischttp.Redirect(uri)
     else:
         idp_app.logger.info("There aren't pending actions for userid {0}".format(
-            user.get_id()))
+            str(user.user_id)))
 
 
 class SpecialActions(object):
@@ -179,6 +99,10 @@ class SpecialActions(object):
     Each method can examine self.ticket to decide whether
     to add new actions.
     The names of these methods have to start with 'action_'
+
+    XXX This functionality probably belongs in each actions
+    plugin, that would then provide the logic for both the
+    production and the consupmtion of actions.
     '''
 
     def __init__(self, idp_app, ticket):

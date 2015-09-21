@@ -388,7 +388,7 @@ class SSO(Service):
                               pprint.pformat(resp_args),
                               pprint.pformat(response_authn)))
 
-        saml_response = self.IDP.create_authn_response(attributes, userid = str(user.username),
+        saml_response = self.IDP.create_authn_response(attributes, userid = user.username,
                                                        authn = response_authn, sign_assertion = True,
                                                        **resp_args)
 
@@ -473,7 +473,7 @@ class SSO(Service):
                 raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(ticket.req_info.message)
         except UnknownPrincipal as excp:
-            self.logger.info("{!s}: Unknown service provider: '{!s}'".format(ticket.key, excp))
+            self.logger.info("{!s}: Unknown service provider: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
         except UnsupportedBinding as excp:
             self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(ticket.key, excp))

@@ -4,7 +4,7 @@
 """
 Example configuration for eduid-IdP.
 """
-
+import os
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_SOAP
@@ -21,6 +21,15 @@ if get_xmlsec_binary:
     xmlsec_path = get_xmlsec_binary(["/opt/local/bin"])
 else:
     xmlsec_path = '/usr/bin/xmlsec1'
+
+
+here = os.path.dirname(__file__)
+attrmaps_path = os.path.join(here, '../../attributemaps')
+
+key_path = os.path.join(here, 'data/idp-public-snakeoil.key')
+cert_path = os.path.join(here, 'data/idp-public-snakeoil.pem')
+
+spmd_path = os.path.join(here, 'data/sp_metadata.xml')
 
 
 BASE = "https://unittest-idp.example.edu"
@@ -72,11 +81,11 @@ CONFIG = {
         },
     },
     "debug": 1,
-    "key_file": "tests/data/idp-public-snakeoil.key",
-    "cert_file": "tests/data/idp-public-snakeoil.pem",
+    "key_file": key_path,
+    "cert_file": cert_path,
     "metadata": {
         "local": [
-            "tests/data/sp_metadata.xml",
+            spmd_path,
             ],
     },
     "organization": {
@@ -99,7 +108,7 @@ CONFIG = {
     # This database holds the map between a subjects local identifier and
     # the identifier returned to a SP
     "xmlsec_binary": xmlsec_path,
-    "attribute_map_dir": "../attributemaps",
+    "attribute_map_dir": attrmaps_path,
     "logger": {
         "rotating": {
             "filename": "idp.log",

@@ -75,15 +75,16 @@ class IdPUser(object):
                 username=self._username,
                 ))
 
-    def get_id(self):
+    @property
+    def user_id(self):
         """
         Get the _id of the user in the db.
 
         :return: User id
 
-        :rtype: str
+        :rtype: ObjectId
         """
-        return str(self._data.get('_id'))
+        return self._user.user_id
 
     @property
     def identity(self):
@@ -105,7 +106,7 @@ class IdPUser(object):
 
         :rtype: string
         """
-        return self._username
+        return str(self._username)
 
     @property
     def passwords(self):
