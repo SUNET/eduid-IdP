@@ -316,18 +316,28 @@ class TestActions(TestCase):
         form['username'].value = 'johnsmith@example.com'
         form['password'].value = '123456'
 
-        # Patch SpecialActions with a dummy action
-        def action_test(self):
-            actions = self.idp_app.actions_db._coll
-            dummy = {u'action': u'dummy',
-                    u'user_oid': ObjectId('123467890123456789014567'),
-                    u'params': {},
-                    u'preference': 100,
-                    u'session': self.ticket.key}
-            actions.insert(dummy)
+        # Patch pkg_resources.iter_entry_points
+        def mock_iep(name):
+            if name == 'eduid_actions.add_actions':
+                class inner():
+                    name = 'dummy'
+                    def load(self):
+                        def action_test(idp_app, ticket):
+                            actions = idp_app.actions_db._coll
+                            dummy = {u'action': u'dummy',
+                                    u'user_oid': ObjectId('123467890123456789014567'),
+                                    u'params': {},
+                                    u'preference': 100,
+                                    u'session': ticket.key}
+                            actions.insert(dummy)
+                        return action_test
+                return [inner()]
+            else:
+                import pkg_resources
+                return [ep for ep in pkg_resources.iter_entry_points(name)]
 
-        from eduid_idp.idp_actions import SpecialActions
-        with patch.object(SpecialActions, 'action_test', action_test):
+        from eduid_idp import idp_actions
+        with patch.object(idp_actions, 'iter_entry_points', mock_iep):
 
             # Patch the VCCSClient so we do not need a vccs server
             from vccs_client import VCCSClient

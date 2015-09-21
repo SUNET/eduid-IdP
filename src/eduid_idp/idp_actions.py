@@ -36,6 +36,7 @@
 import os
 import time
 from bson import ObjectId
+from pkg_resources import iter_entry_points
 import pymongo
 
 import eduid_idp.util
@@ -59,7 +60,7 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     # Add any actions that may depend on the login data
     actions_session = ticket.key
-    SpecialActions(idp_app, ticket).add_actions()
+    add_special_actions(idp_app, ticket)
 
     if idp_app.actions_db is None:
         idp_app.logger.info("This IdP is not initialized for special actions")
@@ -92,38 +93,22 @@ def check_for_pending_actions(idp_app, user, ticket):
             str(user.user_id)))
 
 
-class SpecialActions(object):
+def add_special_actions(idp_app, ticket):
     '''
-    class that holds methods that add pending actions to the
-    eduid_actions db.
-    Each method can examine self.ticket to decide whether
-    to add new actions.
-    The names of these methods have to start with 'action_'
+    Iterate over add_actions entry points and execute them.
+    These entry points take the IdP app and the login data (ticket)
+    and add actions that depend on those.
 
-    XXX This functionality probably belongs in each actions
-    plugin, that would then provide the logic for both the
-    production and the consupmtion of actions.
+    :param idp_app: IdP application instance
+    :type idp_app: eduid_idp.idp.IdPApplication
+    :param ticket: the SSO login data
+    :type ticket: eduid_idp.login.SSOLoginData
     '''
-
-    def __init__(self, idp_app, ticket):
-        '''
-        :param ticket: the SSO login data
-        :type ticket: eduid_idp.login.SSOLoginData
-        '''
-        self.ticket = ticket
-        self.idp_app = idp_app
-
-    def add_actions(self):
-        '''
-        Iterate over the methods is this class that start with 'action_',
-        and call them.
-        '''
-        for name, method in self.__class__.__dict__.items():
-            if callable(method) and name.startswith('action_'):
-                method(self)
-
-    def action_test(self):
-        '''
-        Dummy method to be patched with real methods in tests
-        '''
-        pass
+    for entry_point in iter_entry_points('eduid_actions.add_actions'):
+        idp_app.logger.debug('Using entry point %s to add new actions'
+                                             % entry_point.name)
+        try:
+            entry_point.load()(idp_app, ticket)
+        except Exception, e:
+            ipd_app.logger.warn('Error executing entry point "%s": %s'
+                                             % (entry_point.name, str(e)))
