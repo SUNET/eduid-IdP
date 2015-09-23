@@ -292,15 +292,17 @@ class IdPApplication(object):
         raise eduid_idp.error.NotFound(logger = self.logger)
 
     @cherrypy.expose
-    def u2f(self):
+    def u2f(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
         self.logger.debug("--- U2F ---")
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.debug("<application> PATH: %s" % path)
-        if path.endswith('register'):
-            return eduid_idp.u2f.register()
+        if path.endswith('u2f/enroll'):
+            return eduid_idp.u2f.enroll(self.logger, self.config, self._my_start_response)
+        if path.endswith('u2f/finishRegistration'):
+            return eduid_idp.u2f.finishRegistration(self.logger, self.config, self._my_start_response)
         if path.endswith('authenticate'):
-            return eduid_idp.u2f.authenticate()
+            return eduid_idp.u2f.authenticate(self.logger, self.config, self._my_start_response)
         raise eduid_idp.error.NotFound(logger = self.logger)
 
     @cherrypy.expose

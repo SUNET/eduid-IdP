@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S
+# Copyright (c) 2013, 2014, 2015 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -74,6 +74,8 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',  # VCCS backend URL
                     'insecure_cookies': '0',  # Set to 1 to not set HTTP Cookie 'secure' flag
+                    'u2f_challenge_bytes': '64',
+                    'u2f_appId': 'https://eduid.se/u2f_appId',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -423,3 +425,18 @@ class IdPConfig(object):
         Set to True to NOT set HTTP Cookie 'secure' flag (boolean).
         """
         return self.config.getboolean(self.section, 'insecure_cookies')
+
+    @property
+    def u2f_challenge_bytes(self):
+        """
+        The number of random bytes to use in U2F challenges.
+        """
+        return self.config.getint(self.section, 'u2f_challenge_bytes')
+
+    @property
+    def u2f_appId(self):
+        """
+        The U2F appId URL.
+        """
+        return self.config.get(self.section, 'u2f_appId')
+
