@@ -52,6 +52,9 @@ from urlparse import urlsplit
 import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
 from eduid_idp.idp import IdPApplication
+
+from eduid_userdb.testing import MongoTemporaryInstance
+
 import saml2.time_util
 from saml2 import server
 
@@ -66,66 +69,6 @@ logger = logging.getLogger(__name__)
 
 local = cherrypy.lib.httputil.Host('127.0.0.1', 50000, "")
 remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
-
-
-class MongoTemporaryInstance(object):
-    """Singleton to manage a temporary MongoDB instance
-
-    Use this for testing purpose only. The instance is automatically destroyed
-    at the end of the program.
-
-    """
-    _instance = None
-
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-            atexit.register(cls._instance.shutdown)
-        return cls._instance
-
-    def __init__(self):
-        self._tmpdir = tempfile.mkdtemp()
-        self._port = 44444
-        self._process = subprocess.Popen(['mongod', '--bind_ip', 'localhost',
-                                          '--port', str(self._port),
-                                          '--dbpath', self._tmpdir,
-                                          '--nojournal', '--nohttpinterface',
-                                          '--noauth', '--smallfiles',
-                                          '--syncdelay', '0',
-                                          '--nssize', '1', ],
-                                         stdout=open(os.devnull, 'wb'),
-                                         stderr=subprocess.STDOUT)
-
-        # XXX: wait for the instance to be ready
-        #      Mongo is ready in a glance, we just wait to be able to open a
-        #      Connection.
-        for i in range(10):
-            time.sleep(0.2)
-            try:
-                self._conn = pymongo.Connection('localhost', self._port)
-            except pymongo.errors.ConnectionFailure:
-                continue
-            else:
-                break
-        else:
-            self.shutdown()
-            assert False, 'Cannot connect to the mongodb test instance'
-
-    @property
-    def conn(self):
-        return self._conn
-
-    @property
-    def port(self):
-        return self._port
-
-    def shutdown(self):
-        if self._process:
-            self._process.terminate()
-            self._process.wait()
-            self._process = None
-            shutil.rmtree(self._tmpdir, ignore_errors=True)
 
 
 TEST_ACTION = {
@@ -175,7 +118,7 @@ class TestActions(TestCase):
 
         # create a temporary mongo instance
         try:
-            cls.tmp_db = MongoTemporaryInstance.get_instance()
+            cls.tmp_db = MongoTemporaryInstance.get_instance(port=44444)
         except OSError:
             raise unittest.SkipTest("requires accessible mongod executable")
         cls.conn = cls.tmp_db.conn
