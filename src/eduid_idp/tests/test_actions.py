@@ -35,11 +35,13 @@
 
 import os
 import logging
+import unittest
 import pkg_resources
-from unittest import TestCase
-import cherrypy
-from mock import patch
+
 import webtest
+import cherrypy
+
+from mock import patch
 from bson import ObjectId
 from urlparse import urlsplit
 
@@ -93,7 +95,7 @@ TEST_USER = {
 
 
 # noinspection PyProtectedMember
-class TestActions(TestCase):
+class TestActions(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -104,7 +106,7 @@ class TestActions(TestCase):
 
         # create a temporary mongo instance
         try:
-            cls.tmp_db = MongoTemporaryInstance.get_instance(port=44444)
+            cls.tmp_db = MongoTemporaryInstance.get_instance()
         except OSError:
             raise unittest.SkipTest("requires accessible mongod executable")
         cls.conn = cls.tmp_db.conn
@@ -119,7 +121,6 @@ class TestActions(TestCase):
         # Create the IdP app
         cls.idp_app = IdPApplication(logger, cls.config)
 
-
     def setUp(self):
         # drop the mongo dbs
         for db_name in self.conn.database_names():
@@ -133,8 +134,8 @@ class TestActions(TestCase):
         # create a webtest testing environment
         import cookielib
         self.http = webtest.TestApp(cherrypy.tree,
-                extra_environ={'wsgi.url_scheme': 'https'},
-                cookiejar=cookielib.CookieJar())
+                                    extra_environ={'wsgi.url_scheme': 'https'},
+                                    cookiejar=cookielib.CookieJar())
 
     def tearDown(self):
         # drop the mongo dbs
@@ -171,12 +172,12 @@ class TestActions(TestCase):
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
         url = urlsplit(resp.location)
-        url = '?'.join( (url.path, url.query) )
+        url = '?'.join([url.path, url.query])
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
         cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                              in self.http.cookies.items()])
+                             in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '200 Ok')
         self.assertIn('action="https://sp.example.edu/saml2/acs/"', resp.body)
@@ -213,12 +214,12 @@ class TestActions(TestCase):
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
         url = urlsplit(resp.location)
-        url = '?'.join( (url.path, url.query) )
+        url = '?'.join([url.path, url.query])
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
         cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                              in self.http.cookies.items()])
+                             in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '302 Found')
         self.assertIn(self.config.actions_app_uri, resp.location)
@@ -254,10 +255,10 @@ class TestActions(TestCase):
                         def action_test(idp_app, ticket):
                             actions = idp_app.actions_db._coll
                             dummy = {u'action': u'dummy',
-                                    u'user_oid': ObjectId('123467890123456789014567'),
-                                    u'params': {},
-                                    u'preference': 100,
-                                    u'session': ticket.key}
+                                     u'user_oid': ObjectId('123467890123456789014567'),
+                                     u'params': {},
+                                     u'preference': 100,
+                                     u'session': ticket.key}
                             actions.insert(dummy)
                         return action_test
                 return [inner()]
@@ -282,7 +283,7 @@ class TestActions(TestCase):
             # get the redirect url. set the cookies manually,
             # for some reason webtest doesn't set them in the request
             cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                                  in self.http.cookies.items()])
+                                 in self.http.cookies.items()])
             resp = self.http.get(resp.location, headers={'Cookie': cookies})
             self.assertEqual(resp.status, '302 Found')
             self.assertIn(self.config.actions_app_uri, resp.location)
