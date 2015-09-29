@@ -77,7 +77,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'actions_mongo_uri': None,
                     'actions_auth_shared_secret': 'abcdef',
                     'actions_app_uri': 'http://actions.example.com/',
-                    'tou_version': '',
+                    'tou_version': 'version1',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
