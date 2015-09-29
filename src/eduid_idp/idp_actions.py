@@ -60,7 +60,7 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     # Add any actions that may depend on the login data
     actions_session = ticket.key
-    add_special_actions(idp_app, ticket)
+    add_special_actions(idp_app, user, ticket)
 
     if idp_app.actions_db is None:
         idp_app.logger.info("This IdP is not initialized for special actions")
@@ -93,7 +93,7 @@ def check_for_pending_actions(idp_app, user, ticket):
             str(user.user_id)))
 
 
-def add_special_actions(idp_app, ticket):
+def add_special_actions(idp_app, user, ticket):
     '''
     Iterate over add_actions entry points and execute them.
     These entry points take the IdP app and the login data (ticket)
@@ -108,7 +108,7 @@ def add_special_actions(idp_app, ticket):
         idp_app.logger.debug('Using entry point %s to add new actions'
                                              % entry_point.name)
         try:
-            entry_point.load()(idp_app, ticket)
+            entry_point.load()(idp_app, user, ticket)
         except Exception, e:
             ipd_app.logger.warn('Error executing entry point "%s": %s'
                                              % (entry_point.name, str(e)))
