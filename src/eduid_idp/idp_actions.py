@@ -110,5 +110,5 @@ def add_special_actions(idp_app, user, ticket):
         try:
             entry_point.load()(idp_app, user, ticket)
         except Exception, e:
-            ipd_app.logger.warn('Error executing entry point "%s": %s'
+            idp_app.logger.warn('Error executing entry point "%s": %s'
                                              % (entry_point.name, str(e)))
