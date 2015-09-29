@@ -189,40 +189,21 @@ class IdPApplication(object):
         # Log both 'starting' and 'started' messages.
         self.logger.info("eduid-IdP server starting")
 
-        old_path = sys.path
-        cfgdir = os.path.dirname(config.pysaml2_config)
-        cfgfile = config.pysaml2_config
-        if cfgdir:
-            # add directory part to sys.path, since pysaml2 'import's it's config
-            sys.path = [cfgdir] + sys.path
-            cfgfile = os.path.basename(config.pysaml2_config)
-        _session_ttl = self.config.sso_session_lifetime * 60
+        self._init_pysaml2()
+
         if config.authn_info_mongo_uri:
             self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(self.config.authn_info_mongo_uri,
                                                                    logger)
         else:
             self.authn_info_db = None
-        if self.config.sso_session_mongo_uri:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
-                                                              logger, _session_ttl)
-        else:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(logger, _session_ttl, threading.Lock())
-        self.IDP = server.Server(cfgfile, cache = _SSOSessions)
-        # restore path
-        sys.path = old_path
-        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', logger, _login_state_ttl,
-                                                            self.config, threading.Lock())
+
         if config.actions_mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
             self.actions_db = ActionDB(config.actions_mongo_uri)
-            self.logger.info("eduid-IdP configured to redirect users with pending actions")
+            self.logger.info("configured to redirect users with pending actions")
         else:
             self.actions_db = None
-            self.logger.info("There are missing configuration parameters to configure "
-                             "eduid-IdP to redirect users with pending actions")
+            self.logger.debug("NOT configured to redirect users with pending actions")
 
-        _my_id = self.IDP.config.entityid
-        self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
         self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.userdb)
 
@@ -237,6 +218,35 @@ class IdPApplication(object):
         else:  # IPv4
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
+
+    def _init_pysaml2(self):
+        """
+        Initialization of PySAML2. Part of __init__().
+
+        :return:
+        """
+        old_path = sys.path
+        cfgdir = os.path.dirname(self.config.pysaml2_config)
+        cfgfile = self.config.pysaml2_config
+        if cfgdir:
+            # add directory part to sys.path, since pysaml2 'import's it's config
+            sys.path = [cfgdir] + sys.path
+            cfgfile = os.path.basename(self.config.pysaml2_config)
+        # restore path
+        sys.path = old_path
+
+        _session_ttl = self.config.sso_session_lifetime * 60
+        if self.config.sso_session_mongo_uri:
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+                                                              self.logger, _session_ttl)
+        else:
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
+        self.IDP = server.Server(cfgfile, cache = _SSOSessions)
+        _my_id = self.IDP.config.entityid
+        self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
+        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
+        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
+                                                            self.config, threading.Lock())
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
