@@ -77,6 +77,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'actions_mongo_uri': None,
                     'actions_auth_shared_secret': 'abcdef',
                     'actions_app_uri': 'http://actions.example.com/',
+                    'tou_version': '',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -449,3 +450,10 @@ class IdPConfig(object):
         URI of the actions app.
         """
         return self.config.get(self.section, 'actions_app_uri')
+
+    @property
+    def tou_version(self):
+        """
+        The current version of the terms of use agreement.
+        """
+        return self.config.get(self.section, 'tou_version')
