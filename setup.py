@@ -14,7 +14,7 @@ install_requires = [
     'python-memcached==1.53',
     'cherrypy==3.2.4',
     'vccs_client >= 0.4.2',
-    'eduid_userdb >= 0.0.4b4',
+    'eduid_userdb >= 0.0.4b3',
 ]
 
 testing_extras = [
