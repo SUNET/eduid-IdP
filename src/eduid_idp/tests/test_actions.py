@@ -30,20 +30,14 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-# Author : Fredrik Thulin <fredrik@thulin.net>
+# Author : Enrique Perez <enrique@cazalla.net>
 #
 
 import os
-import time
-import atexit
-import shutil
 import logging
-import tempfile
-import subprocess
 import pkg_resources
 from unittest import TestCase
 import cherrypy
-import pymongo
 from mock import patch
 import webtest
 from bson import ObjectId
@@ -54,14 +48,6 @@ from eduid_idp.tests.test_SSO import make_SAML_request
 from eduid_idp.idp import IdPApplication
 
 from eduid_userdb.testing import MongoTemporaryInstance
-
-import saml2.time_util
-from saml2 import server
-
-from saml2.authn_context import MOBILETWOFACTORCONTRACT
-from saml2.authn_context import PASSWORD
-from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
-from saml2.authn_context import UNSPECIFIED
 
 
 logger = logging.getLogger(__name__)

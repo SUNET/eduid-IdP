@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S
+# Copyright (c) 2013, 2014, 2015 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -35,15 +35,13 @@
 
 import os
 import time
-from bson import ObjectId
 from pkg_resources import iter_entry_points
-import pymongo
 
 import eduid_idp.util
 
 
 def check_for_pending_actions(idp_app, user, ticket):
-    '''
+    """
     Check whether there are any pending actions for the current user,
     and if there are, redirect to the actions app.
     The redirection is performed by raising a eduid_idp.mischttp.Redirect.
@@ -56,7 +54,7 @@ def check_for_pending_actions(idp_app, user, ticket):
     :type ticket: SSOLoginData
 
     :rtype: None
-    '''
+    """
 
     # Add any actions that may depend on the login data
     actions_session = ticket.key
@@ -67,48 +65,48 @@ def check_for_pending_actions(idp_app, user, ticket):
         return
 
     # Check for pending actions and redirect to the actions app
-    # in case there are.
-    if idp_app.actions_db.has_pending_actions(user.user_id):
-        idp_app.logger.info("There are pending actions for userid {0}".format(
-            str(user.user_id)))
-        # create auth token for actions app
-        eppn = user.identity.get('eduPersonPrincipalName')
-        secret = idp_app.config.actions_auth_shared_secret
-        timestamp = '{:x}'.format(int(time.time()))
-        nonce = os.urandom(16).encode('hex')
-        auth_token = eduid_idp.util.generate_auth_token(secret,
-                                                        eppn,
-                                                        nonce,
-                                                        timestamp)
-        actions_uri = idp_app.config.actions_app_uri
-        idp_app.logger.info("Redirecting userid {0} to actions app {1}".format(
-            str(user.user_id), actions_uri))
+    # in case there are any.
+    if not idp_app.actions_db.has_pending_actions(user.user_id):
+        idp_app.logger.debug("There are no pending actions for userid {!s}".format(user.user_id))
+        return
 
-        uri = '{0}?userid={1}&token={2}&nonce={3}&ts={4}&session={5}'.format(
-                actions_uri, str(user.user_id), auth_token,
-                nonce, timestamp, actions_session)
-        raise eduid_idp.mischttp.Redirect(uri)
-    else:
-        idp_app.logger.info("There aren't pending actions for userid {0}".format(
-            str(user.user_id)))
+    idp_app.logger.debug("There are pending actions for userid {!s}".format(user.user_id))
+    # create auth token for actions app
+    eppn = user.identity.get('eduPersonPrincipalName')
+    secret = idp_app.config.actions_auth_shared_secret
+    timestamp = '{:x}'.format(int(time.time()))
+    nonce = os.urandom(16).encode('hex')
+    auth_token = eduid_idp.util.generate_auth_token(secret, eppn, nonce, timestamp)
+
+    actions_uri = idp_app.config.actions_app_uri
+    idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
+
+    uri = '{uri!s}?userid={user_id!s}&token={auth_token!s}&nonce={nonce!s}&ts={ts!s}&session={session!s}'.format(
+            uri = actions_uri,
+            user_id = user.user_id,
+            auth_token = auth_token,
+            nonce = nonce,
+            ts = timestamp,
+            session = actions_session)
+    raise eduid_idp.mischttp.Redirect(uri)
 
 
 def add_special_actions(idp_app, user, ticket):
-    '''
+    """
     Iterate over add_actions entry points and execute them.
     These entry points take the IdP app and the login data (ticket)
     and add actions that depend on those.
 
     :param idp_app: IdP application instance
     :type idp_app: eduid_idp.idp.IdPApplication
+    :param user: the authenticating user
+    :type user: eduid_idp.idp_user.IdPUser
     :param ticket: the SSO login data
     :type ticket: eduid_idp.login.SSOLoginData
-    '''
+    """
     for entry_point in iter_entry_points('eduid_actions.add_actions'):
-        idp_app.logger.debug('Using entry point %s to add new actions'
-                                             % entry_point.name)
+        idp_app.logger.debug('Using entry point {!r} to add new actions'.format(entry_point.name))
         try:
             entry_point.load()(idp_app, user, ticket)
-        except Exception, e:
-            idp_app.logger.warn('Error executing entry point "%s": %s'
-                                             % (entry_point.name, str(e)))
+        except Exception as exc:
+            idp_app.logger.warn('Error executing entry point {!r}: {!s}'.format(entry_point.name, exc))
