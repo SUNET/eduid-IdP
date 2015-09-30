@@ -35,14 +35,12 @@
 
 import os
 import logging
-import unittest
 import pkg_resources
 
 import webtest
 import cherrypy
 
 from mock import patch
-from bson import ObjectId
 from urlparse import urlsplit
 
 import eduid_idp
@@ -54,19 +52,8 @@ from eduid_userdb.testing import MongoTestCase
 
 logger = logging.getLogger(__name__)
 
-
 local = cherrypy.lib.httputil.Host('127.0.0.1', 50000, "")
 remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
-
-
-TEST_ACTION = {
-        '_id': ObjectId('234567890123456789012301'),
-        'user_oid': ObjectId('123467890123456789014567'),
-        'action': 'dummy',
-        'preference': 100,
-        'params': {
-            }
-        }
 
 
 # noinspection PyProtectedMember
@@ -74,12 +61,6 @@ class TestActions(MongoTestCase):
 
     def setUp(self):
         super(TestActions, self).setUp(celery=None, get_attribute_manager=None)
-
-        # setup some test data
-        _email = 'johnsmith@example.com'
-        self.test_user = self.amdb.get_user_by_mail(_email)
-        self.test_action = TEST_ACTION
-        self.test_action['user_oid'] = self.test_user.user_id
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
@@ -91,6 +72,17 @@ class TestActions(MongoTestCase):
 
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
+
+        self.actions = self.idp_app.actions_db
+
+        # setup some test data
+        _email = 'johnsmith@example.com'
+        self.test_user = self.amdb.get_user_by_mail(_email)
+        self.test_action = self.actions.add_action(userid = self.test_user.user_id,
+                                                   action_type = 'dummy',
+                                                   preference = 100,
+                                                   params = {})
+
 
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
@@ -109,6 +101,9 @@ class TestActions(MongoTestCase):
         super(TestActions, self).tearDown()
 
     def test_no_actions(self):
+
+        # Remove the standard test_action from the database
+        self.actions.remove_action_by_id(self.test_action.action_id)
 
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
@@ -144,10 +139,6 @@ class TestActions(MongoTestCase):
 
     def test_action(self):
 
-        # insert a test action in the actions db
-        actionsdb = self.conn['eduid_actions']
-        actionsdb.actions.insert(self.test_action)
-
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
 
@@ -182,10 +173,6 @@ class TestActions(MongoTestCase):
 
     def test_add_action(self):
 
-        # insert a test action in the actions db
-        actionsdb = self.conn['eduid_actions']
-        actionsdb.actions.insert(self.test_action)
-
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
 
@@ -207,13 +194,11 @@ class TestActions(MongoTestCase):
                     name = 'dummy'
                     def load(self):
                         def action_test(idp_app, ticket):
-                            actions = idp_app.actions_db._coll
-                            dummy = {u'action': u'dummy',
-                                     u'user_oid': _user_id,
-                                     u'params': {},
-                                     u'preference': 100,
-                                     u'session': ticket.key}
-                            actions.insert(dummy)
+                            idp_app.actions_db.add_action(
+                                userid = _user_id,
+                                action_type = 'dummy',
+                                preference = 100,
+                                session = ticket.key)
                         return action_test
                 return [inner()]
             else:
