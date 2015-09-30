@@ -49,7 +49,7 @@ import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
 from eduid_idp.idp import IdPApplication
 
-from eduid_userdb.testing import MongoTemporaryInstance
+from eduid_userdb.testing import MongoTestCase
 
 
 logger = logging.getLogger(__name__)
@@ -63,68 +63,34 @@ TEST_ACTION = {
         '_id': ObjectId('234567890123456789012301'),
         'user_oid': ObjectId('123467890123456789014567'),
         'action': 'dummy',
-        'preference': 100, 
+        'preference': 100,
         'params': {
             }
         }
 
-TEST_USER = {
-    '_id': ObjectId('123467890123456789014567'),
-    'givenName': 'John',
-    'sn': 'Smith',
-    'displayName': 'John Smith',
-    'norEduPersonNIN': ['197801011234'],
-    'preferredLanguage': 'en',
-    'eduPersonPrincipalName': 'hubba-bubba',
-    'eduPersonEntitlement': [
-        'urn:mace:eduid.se:role:admin',
-        'urn:mace:eduid.se:role:student',
-    ],
-    'mobile': [],
-    'mail': 'johnsmith@example.com',
-    'mailAliases': [{
-        'email': 'johnsmith@example.com',
-        'verified': True,
-    }],
-    'passwords': [{
-        'id': ObjectId('112345678901234567890123'),
-        'salt': '$NDNv1H1$9c810d852430b62a9a7c6159d5d64c41c3831846f81b6799b54e1e8922f11545$32$32$',
-    }],
-    'postalAddress': [],
-}
-
 
 # noinspection PyProtectedMember
-class TestActions(unittest.TestCase):
+class TestActions(MongoTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        # This code was originally in the setUp method, but there was
-        # something missing in the tearDown method to reset the IdP,
-        # so only the first test would work. Subsequent tests would fail
-        # due to some corruption in the config.
+    def setUp(self):
+        super(TestActions, self).setUp(celery=None, get_attribute_manager=None)
 
-        # create a temporary mongo instance
-        try:
-            cls.tmp_db = MongoTemporaryInstance.get_instance()
-        except OSError:
-            raise unittest.SkipTest("requires accessible mongod executable")
-        cls.conn = cls.tmp_db.conn
-        cls.port = cls.tmp_db.port
+        # setup some test data
+        _email = 'johnsmith@example.com'
+        self.test_user = self.amdb.get_user_by_mail(_email)
+        self.test_action = TEST_ACTION
+        self.test_action['user_oid'] = self.test_user.user_id
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
-        cls.config_file = os.path.join(datadir, 'test_actions.ini')
-        debug = False
-        cls.config = eduid_idp.config.IdPConfig(cls.config_file, debug)
+        self.config_file = os.path.join(datadir, 'test_actions.ini')
+        _defaults = eduid_idp.config._CONFIG_DEFAULTS
+        _defaults['mongo_uri'] = self.tmp_db.get_uri('')
+        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
+        self.config = eduid_idp.config.IdPConfig(self.config_file, debug=False, defaults=_defaults)
 
         # Create the IdP app
-        cls.idp_app = IdPApplication(logger, cls.config)
-
-    def setUp(self):
-        # drop the mongo dbs
-        for db_name in self.conn.database_names():
-            self.conn.drop_database(db_name)
+        self.idp_app = IdPApplication(logger, self.config)
 
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
@@ -138,17 +104,11 @@ class TestActions(unittest.TestCase):
                                     cookiejar=cookielib.CookieJar())
 
     def tearDown(self):
-        # drop the mongo dbs
-        for db_name in self.conn.database_names():
-            self.conn.drop_database(db_name)
         # reset the testing environment
         self.http.reset()
+        super(TestActions, self).tearDown()
 
     def test_no_actions(self):
-
-        # insert a test user in the users db
-        amdb = self.conn['eduid_am']
-        amdb.attributes.insert(TEST_USER)
 
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
@@ -184,14 +144,10 @@ class TestActions(unittest.TestCase):
 
     def test_action(self):
 
-        # insert a test user in the users db
-        amdb = self.conn['eduid_am']
-        amdb.attributes.insert(TEST_USER)
-
         # insert a test action in the actions db
         actionsdb = self.conn['eduid_actions']
-        actionsdb.actions.insert(TEST_ACTION)
-        
+        actionsdb.actions.insert(self.test_action)
+
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
 
@@ -200,9 +156,9 @@ class TestActions(unittest.TestCase):
 
         # grab the login form from the response
         form = resp.forms['login-form']
-        
+
         # fill in the form and post it to the test env
-        form['username'].value = 'johnsmith@example.com'
+        form['username'].value = self.test_user.mail_addresses.primary.email
         form['password'].value = '123456'
 
         # Patch the VCCSClient so we do not need a vccs server
@@ -226,13 +182,9 @@ class TestActions(unittest.TestCase):
 
     def test_add_action(self):
 
-        # insert a test user in the users db
-        amdb = self.conn['eduid_am']
-        amdb.attributes.insert(TEST_USER)
-
         # insert a test action in the actions db
         actionsdb = self.conn['eduid_actions']
-        actionsdb.actions.insert(TEST_ACTION)
+        actionsdb.actions.insert(self.test_action)
 
         # make the SAML authn request
         req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
@@ -246,6 +198,8 @@ class TestActions(unittest.TestCase):
         form['username'].value = 'johnsmith@example.com'
         form['password'].value = '123456'
 
+        _user_id = self.test_user.user_id
+
         # Patch pkg_resources.iter_entry_points
         def mock_iep(name):
             if name == 'eduid_actions.add_actions':
@@ -255,7 +209,7 @@ class TestActions(unittest.TestCase):
                         def action_test(idp_app, ticket):
                             actions = idp_app.actions_db._coll
                             dummy = {u'action': u'dummy',
-                                     u'user_oid': ObjectId('123467890123456789014567'),
+                                     u'user_oid': _user_id,
                                      u'params': {},
                                      u'preference': 100,
                                      u'session': ticket.key}

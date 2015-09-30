@@ -121,7 +121,7 @@ class FakeAuthClient(object):
 
 
 class FakeConfig(object):
-    authn_info_mongo_uri = None
+    mongo_uri = None
 
 
 class TestIdPUserDb(TestCase):
