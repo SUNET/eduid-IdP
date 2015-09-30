@@ -35,9 +35,20 @@
 """
 User and user database module.
 """
+import pprint
 
 from eduid_userdb import UserDB, User
 from eduid_userdb.exceptions import UserDoesNotExist
+
+# default list of SAML attributes to release
+_SAML_ATTRIBUTES = ['displayName',
+                    'eduPersonEntitlement',
+                    'eduPersonPrincipalName',
+                    'givenName',
+                    'mail',
+                    'norEduPersonNIN',
+                    'preferredLanguage',
+                    'sn']
 
 
 class IdPUser(object):
@@ -123,6 +134,18 @@ class IdPUser(object):
         """
         return self._user.passwords.to_list_of_dicts()
 
+    def to_saml_attributes(self, config, logger, filter_attributes=_SAML_ATTRIBUTES):
+        """
+        """
+        attributes_in = self._user.to_dict(old_userdb_format = True)
+        attributes = {}
+        for approved in filter_attributes:
+            if approved in attributes_in:
+                attributes[approved] = attributes_in.pop(approved)
+        logger.debug('Discarded non-attributes:\n{!s}'.format(pprint.pformat(attributes_in)))
+        attributes = _make_scoped_eppn(attributes, config)
+        return attributes
+
 
 class IdPUserDb(object):
     """
@@ -139,7 +162,7 @@ class IdPUserDb(object):
         self.logger = logger
         self.config = config
         if userdb is None:
-            userdb = UserDB(config.userdb_mongo_uri, db_name=config.userdb_mongo_database)
+            userdb = UserDB(config.mongo_uri, db_name=config.userdb_mongo_database)
         self.userdb = userdb
 
     def lookup_user(self, username):
@@ -154,3 +177,50 @@ class IdPUserDb(object):
             return IdPUser(username, userdb = self.userdb)
         except UserDoesNotExist:
             return None
+
+
+def _make_scoped_eppn(attributes, config):
+    """
+    Add scope to unscoped eduPersonPrincipalName attributes before relasing them.
+
+    What scope to add, if any, is currently controlled by the configuration parameter
+    `default_eppn_scope'.
+
+    :param attributes: Attributes of a user
+    :param config: IdP configuration data
+    :return: New attributes
+
+    :type attributes: dict
+    :type config: IdPConfig
+    :rtype: dict
+    """
+    eppn = attributes.get('eduPersonPrincipalName')
+    scope = config.default_eppn_scope
+    if not eppn or not scope:
+        return attributes
+    if '@' not in eppn:
+        attributes['eduPersonPrincipalName'] = eppn + '@' + scope
+    return attributes
+
+
+def _add_scoped_affiliation(attributes, config):
+    """
+    Add eduPersonScopedAffiliation if configured, and not already present.
+
+    This default affiliation is currently controlled by the configuration parameter
+    `default_scoped_affiliation'.
+
+    :param attributes: Attributes of a user
+    :param config: IdP configuration data
+    :return: New attributes
+
+    :type attributes: dict
+    :type config: IdPConfig
+    :rtype: dict
+    """
+    epsa = 'eduPersonScopedAffiliation'
+    if epsa not in attributes and config.default_scoped_affiliation:
+        attributes[epsa] = config.default_scoped_affiliation
+    return attributes
+
+
