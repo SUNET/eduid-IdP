@@ -44,42 +44,45 @@ def check_for_pending_actions(idp_app, user, ticket):
     """
     Check whether there are any pending actions for the current user,
     and if there are, redirect to the actions app.
-    The redirection is performed by raising a eduid_idp.mischttp.Redirect.
+
+    The redirection is performed by raising an eduid_idp.mischttp.Redirect.
 
     :param idp_app: IdP application instance
-    :type idp_app: eduid_idp.idp.IdPApplication
     :param user: the authenticating user
-    :type user: eduid_idp.idp_user.IdPUser
     :param ticket: SSOLoginData instance
+
+    :type user: eduid_idp.idp_user.IdPUser
+    :type idp_app: eduid_idp.idp.IdPApplication
     :type ticket: SSOLoginData
 
     :rtype: None
     """
 
-    # Add any actions that may depend on the login data
-    actions_session = ticket.key
-    add_special_actions(idp_app, user, ticket)
-
     if idp_app.actions_db is None:
         idp_app.logger.info("This IdP is not initialized for special actions")
         return
 
-    # Check for pending actions and redirect to the actions app
-    # in case there are any.
+    # Add any actions that may depend on the login data
+    add_special_actions(idp_app, user, ticket)
+
+    # Check for pending actions
     if not idp_app.actions_db.has_pending_actions(user.user_id):
-        idp_app.logger.debug("There are no pending actions for userid {!s}".format(user.user_id))
+        idp_app.logger.debug("There are no pending actions for user {!s}".format(user))
         return
 
-    idp_app.logger.debug("There are pending actions for userid {!s}".format(user.user_id))
+    # Pending actions found, redirect to the actions app
+    idp_app.logger.debug("There are pending actions for user {!s}".format(user))
+
     # create auth token for actions app
     secret = idp_app.config.actions_auth_shared_secret
-    timestamp = '{:x}'.format(int(time.time()))
     nonce = os.urandom(16).encode('hex')
+    timestamp = '{:x}'.format(int(time.time()))
     auth_token = eduid_idp.util.generate_auth_token(secret, user.eppn, nonce, timestamp)
 
     actions_uri = idp_app.config.actions_app_uri
     idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
+    actions_session = ticket.key
     uri = '{uri!s}?userid={user_id!s}&token={auth_token!s}&nonce={nonce!s}&ts={ts!s}&session={session!s}'.format(
             uri = actions_uri,
             user_id = user.user_id,
@@ -97,10 +100,11 @@ def add_special_actions(idp_app, user, ticket):
     and add actions that depend on those.
 
     :param idp_app: IdP application instance
-    :type idp_app: eduid_idp.idp.IdPApplication
     :param user: the authenticating user
-    :type user: eduid_idp.idp_user.IdPUser
     :param ticket: the SSO login data
+
+    :type user: eduid_idp.idp_user.IdPUser
+    :type idp_app: eduid_idp.idp.IdPApplication
     :type ticket: eduid_idp.login.SSOLoginData
     """
     for entry_point in iter_entry_points('eduid_actions.add_actions'):
