@@ -51,93 +51,12 @@ _SAML_ATTRIBUTES = ['displayName',
                     'sn']
 
 
-class IdPUser(object):
-    """
-    Representation of a user. Used to load data about a user from the
-    userdb, and then represent it in a readable way.
-
-    :param username: username to search for in userdb
-    :param userdb: user database instance
-    :raise NoSuchUser: if 'username' was not found in the userdb
-
-    :type username: str or unicode or ObjectId
-    :type userdb: UserDB
-    """
-
-    def __init__(self, username, userdb):
-        self._username = username
-        _user = None
-        if isinstance(username, str) or isinstance(username, unicode):
-            if '@' in username:
-                _user = userdb.get_user_by_mail(username.lower())
-            if not _user:
-                _user = userdb.get_user_by_eppn(username.lower())
-        if not _user:
-            # username will be ObjectId if this is a lookup using an existing SSO session
-            _user = userdb.get_user_by_id(username)
-        if not isinstance(_user, User):
-            raise ValueError('Unknown User returned')
-        self._user = _user
-
-    def __repr__(self):
-        return ('<{} instance at {:#x}: user={username!r}>'.format(
-                self.__class__.__name__,
-                id(self),
-                username=self._username,
-                ))
-
-    @property
-    def user_id(self):
-        """
-        Get the _id of the user in the db.
-
-        :return: User id
-
-        :rtype: ObjectId
-        """
-        return self._user.user_id
-
-    @property
-    def identity(self):
-        """
-        All the key-value pairs of this user in the user database.
-
-        :return: Full user identity
-
-        :rtype: dict
-        """
-        return self._user.to_dict(old_userdb_format = True)
-
-    @property
-    def username(self):
-        """
-        Primary identifying username for this user.
-
-        :return: username
-
-        :rtype: string
-        """
-        return str(self._username)
-
-    @property
-    def passwords(self):
-        """
-        Return the password credentials for this user.
-        This is a list of dicts with "salt" and "id" keys.
-
-        If a user is halfway into the signup process, an account exists but
-        has no passwords. Return empty list in that case.
-
-        :return: User password credentials
-
-        :rtype: [dict]
-        """
-        return self._user.passwords.to_list_of_dicts()
+class IdPUser(User):
 
     def to_saml_attributes(self, config, logger, filter_attributes=_SAML_ATTRIBUTES):
         """
         """
-        attributes_in = self._user.to_dict(old_userdb_format = True)
+        attributes_in = self.to_dict(old_userdb_format = True)
         attributes = {}
         for approved in filter_attributes:
             if approved in attributes_in:
@@ -162,7 +81,7 @@ class IdPUserDb(object):
         self.logger = logger
         self.config = config
         if userdb is None:
-            userdb = UserDB(config.mongo_uri, db_name=config.userdb_mongo_database)
+            userdb = UserDB(config.mongo_uri, db_name=config.userdb_mongo_database, user_class=IdPUser)
         self.userdb = userdb
 
     def lookup_user(self, username):
@@ -173,10 +92,16 @@ class IdPUserDb(object):
         :return: user found in database
         :rtype: IdPUser | None
         """
-        try:
-            return IdPUser(username, userdb = self.userdb)
-        except UserDoesNotExist:
-            return None
+        _user = None
+        if isinstance(username, str) or isinstance(username, unicode):
+            if '@' in username:
+                _user = self.userdb.get_user_by_mail(username.lower())
+            if not _user:
+                _user = self.userdb.get_user_by_eppn(username.lower())
+        if not _user:
+            # username will be ObjectId if this is a lookup using an existing SSO session
+            _user = self.userdb.get_user_by_id(username)
+        return _user
 
 
 def _make_scoped_eppn(attributes, config):

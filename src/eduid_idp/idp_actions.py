@@ -72,11 +72,10 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     idp_app.logger.debug("There are pending actions for userid {!s}".format(user.user_id))
     # create auth token for actions app
-    eppn = user.identity.get('eduPersonPrincipalName')
     secret = idp_app.config.actions_auth_shared_secret
     timestamp = '{:x}'.format(int(time.time()))
     nonce = os.urandom(16).encode('hex')
-    auth_token = eduid_idp.util.generate_auth_token(secret, eppn, nonce, timestamp)
+    auth_token = eduid_idp.util.generate_auth_token(secret, user.eppn, nonce, timestamp)
 
     actions_uri = idp_app.config.actions_app_uri
     idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))

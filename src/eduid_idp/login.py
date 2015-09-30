@@ -387,7 +387,7 @@ class SSO(Service):
                               pprint.pformat(resp_args),
                               pprint.pformat(response_authn)))
 
-        saml_response = self.IDP.create_authn_response(attributes, userid = user.username,
+        saml_response = self.IDP.create_authn_response(attributes, userid = user.eppn,
                                                        authn = response_authn, sign_assertion = True,
                                                        **resp_args)
 
@@ -858,7 +858,7 @@ def do_verify(idp_app):
 
     # Create SSO session
     idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, user_authn['class_ref']))
-    _sso_session = SSOSession(user_id = user.identity['_id'],
+    _sso_session = SSOSession(user_id = user.user_id,
                               authn_ref = authn_ref,
                               authn_class_ref = user_authn['class_ref'],
                               authn_request_id = _ticket.req_info.message.id,
@@ -867,7 +867,7 @@ def do_verify(idp_app):
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = idp_app.IDP.cache.add_session(user.identity['_id'], _sso_session.to_dict())
+    _session_id = idp_app.IDP.cache.add_session(user.user_id, _sso_session.to_dict())
     eduid_idp.mischttp.set_cookie("idpauthn", "/", idp_app.logger, idp_app.config, _session_id)
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id

@@ -37,14 +37,13 @@ Module handling authentication of users. Also applies login policies
 such as rate limiting.
 """
 
-import pprint
 import datetime
 import vccs_client
 
 import eduid_idp.assurance
 import eduid_idp.error
 
-from eduid_userdb import MongoDB
+from eduid_userdb import MongoDB, Password
 
 
 class IdPAuthn(object):
@@ -135,7 +134,6 @@ class IdPAuthn(object):
             # response in this case. Maybe send bogus auth request to backends?
             return None
         self.logger.debug("Found user {!r}".format(user))
-        self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
 
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
@@ -148,14 +146,14 @@ class IdPAuthn(object):
             # user used in the last successful authentication. This optimization
             # is based on plain assumption, no measurements whatsoever.
             last_creds = authn_info.last_used_credentials()
-            creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
-            if creds != user.passwords:
+            creds = sorted(user.passwords.to_list(), key=lambda x: x.id not in last_creds)
+            if creds != user.passwords.to_list():
                 self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
-                    [x['id'] for x in user.passwords],
-                    [x['id'] for x in creds],
+                    [x.id for x in user.passwords.to_list()],
+                    [x.id for x in creds],
                     last_creds))
         else:
-            creds = user.passwords
+            creds = user.passwords.to_list()
 
         return self._authn_passwords(user, username, password, creds)
 
@@ -172,29 +170,32 @@ class IdPAuthn(object):
         :type user: IdPUser
         :type username: string
         :type password: string
-        :type credentials: [dict()]
+        :type credentials: [Password]
         :rtype: IdPUser | None
         """
         for cred in credentials:
-            try:
-                factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
-            except ValueError as exc:
-                self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred['id'], exc))
-                continue
-            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
-                username, str(cred['id']), factor))
-            user_id = str(user.identity['_id'])
-            try:
-                if self.auth_client.authenticate(user_id, [factor]):
-                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
-                    self.log_authn(user, success=[cred['id']], failure=[])
-                    return user
-            except vccs_client.VCCSClientHTTPError as exc:
-                if exc.http_code == 500:
-                    self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
+            if isinstance(cred, Password):
+                try:
+                    factor = vccs_client.VCCSPasswordFactor(password, str(cred.id), str(cred.salt))
+                except ValueError as exc:
+                    self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred.id, exc))
                     continue
+                self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
+                    username, str(cred.id), factor))
+                user_id = str(user.user_id)
+                try:
+                    if self.auth_client.authenticate(user_id, [factor]):
+                        self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                        self.log_authn(user, success=[cred.id], failure=[])
+                        return user
+                except vccs_client.VCCSClientHTTPError as exc:
+                    if exc.http_code == 500:
+                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred.id))
+                        continue
+            else:
+                self.logger.debug("Unknown credential: {!s}".format(cred))
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
-        self.log_authn(user, success=[], failure=[cred['id'] for cred in user.passwords])
+        self.log_authn(user, success=[], failure=[cred.id for cred in user.passwords.to_list()])
         return None
 
     def log_authn(self, user, success, failure):
@@ -215,7 +216,7 @@ class IdPAuthn(object):
         if success:
             self.authn_store.credential_success(success)
         if success or failure:
-            self.authn_store.update_user(user.identity['_id'], success, failure)
+            self.authn_store.update_user(user.user_id, success, failure)
         return None
 
 
@@ -324,7 +325,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         :type user: IdPUser
         :rtype: UserAuthnInfo
         """
-        data = self.collection.find({'_id': user.identity['_id']})
+        data = self.collection.find({'_id': user.user_id})
         if not data.count():
             return UserAuthnInfo({})
         return UserAuthnInfo(data[0])
