@@ -41,7 +41,6 @@ import webtest
 import cherrypy
 
 from mock import patch
-from urlparse import urlsplit
 
 import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
@@ -126,8 +125,6 @@ class TestActions(MongoTestCase):
             # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
-        url = urlsplit(resp.location)
-        url = '?'.join([url.path, url.query])
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
@@ -160,8 +157,6 @@ class TestActions(MongoTestCase):
             # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
-        url = urlsplit(resp.location)
-        url = '?'.join([url.path, url.query])
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
@@ -216,8 +211,6 @@ class TestActions(MongoTestCase):
                 # post the login form to the test env
                 resp = form.submit()
                 self.assertEqual(resp.status, '302 Found')
-            url = urlsplit(resp.location)
-            url = '?'.join( (url.path, url.query) )
 
             # get the redirect url. set the cookies manually,
             # for some reason webtest doesn't set them in the request
