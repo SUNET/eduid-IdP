@@ -191,17 +191,16 @@ class IdPApplication(object):
 
         self._init_pysaml2()
 
-        if config.authn_info_mongo_uri:
-            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(self.config.authn_info_mongo_uri,
-                                                                   logger)
-        else:
-            self.authn_info_db = None
+        self.authn_info_db = None
+        self.actions_db = None
 
-        if config.actions_mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
-            self.actions_db = ActionDB(config.actions_mongo_uri)
+        if config.mongo_uri:
+            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
+
+        if config.mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
+            self.actions_db = ActionDB(config.mongo_uri)
             self.logger.info("configured to redirect users with pending actions")
         else:
-            self.actions_db = None
             self.logger.debug("NOT configured to redirect users with pending actions")
 
         self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
@@ -226,22 +225,28 @@ class IdPApplication(object):
         :return:
         """
         old_path = sys.path
-        cfgdir = os.path.dirname(self.config.pysaml2_config)
         cfgfile = self.config.pysaml2_config
+        cfgdir = os.path.dirname(cfgfile)
         if cfgdir:
             # add directory part to sys.path, since pysaml2 'import's it's config
             sys.path = [cfgdir] + sys.path
             cfgfile = os.path.basename(self.config.pysaml2_config)
-        # restore path
-        sys.path = old_path
 
         _session_ttl = self.config.sso_session_lifetime * 60
-        if self.config.sso_session_mongo_uri:
+        if self.config.sso_session_use_mongodb:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               self.logger, _session_ttl)
         else:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
-        self.IDP = server.Server(cfgfile, cache = _SSOSessions)
+
+        _path = sys.path[0]
+        self.logger.debug("Loading PySAML2 server using cfgfile {!r} and path {!r}".format(cfgfile, _path))
+        try:
+            self.IDP = server.Server(cfgfile, cache = _SSOSessions)
+        finally:
+            # restore path
+            sys.path = old_path
+
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60

@@ -38,12 +38,13 @@ such as rate limiting.
 """
 
 import pprint
-import pymongo
 import datetime
 import vccs_client
 
 import eduid_idp.assurance
 import eduid_idp.error
+
+from eduid_userdb import MongoDB
 
 
 class IdPAuthn(object):
@@ -64,12 +65,8 @@ class IdPAuthn(object):
         if self.auth_client is None:
             self.auth_client = vccs_client.VCCSClient(base_url = config.vccs_url)
         self.authn_store = authn_store
-        if self.authn_store is None:
-            authn_info_uri = self.config.authn_info_mongo_uri
-            if authn_info_uri:
-                self.authn_store = AuthnInfoStoreMDB(uri = authn_info_uri, logger = logger)
-            else:
-                self.authn_store = None
+        if self.authn_store is None and config.mongo_uri:
+            self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
 
     def get_authn_user(self, login_data, user_authn):
         """
@@ -235,29 +232,14 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
     This is a MongoDB version of AuthnInfoStore().
     """
 
-    def __init__(self, uri, logger, conn = None, db_name = 'eduid_idp',
+    def __init__(self, uri, logger, db_name = 'eduid_idp',
                  collection_name = 'authn_info',
                  **kwargs):
         AuthnInfoStore.__init__(self, logger)
 
-        if conn is not None:
-            self.connection = conn
-        else:
-            if 'replicaSet=' in uri:
-                if 'socketTimeoutMS' not in kwargs:
-                    kwargs['socketTimeoutMS'] = 5000
-                if 'connectTimeoutMS' not in kwargs:
-                    kwargs['connectTimeoutMS'] = 5000
-                self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
-            else:
-                self.connection = pymongo.MongoClient(uri, **kwargs)
-
-        self.parsed_uri = pymongo.uri_parser.parse_uri(uri)
-        if self.parsed_uri.get("database", None):
-            db_name = self.parsed_uri.get("database")
-
-        self.db = self.connection[db_name]
-        self.collection = self.db[collection_name]
+        logger.debug("Setting up AuthnInfoStoreMDB with URI {!r}, db_name {!r}".format(uri, db_name))
+        self._db = MongoDB(db_uri = uri, db_name = db_name)
+        self.collection = self._db.get_collection(collection_name)
 
     def credential_success(self, cred_ids, ts=None):
         """
