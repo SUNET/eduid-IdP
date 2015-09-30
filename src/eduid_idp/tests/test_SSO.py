@@ -33,71 +33,17 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
-import os
-import logging
-from bson import ObjectId
-import pkg_resources
-from unittest import TestCase
-
 import eduid_idp
-from eduid_idp.idp import IdPApplication
-from eduid_userdb import User
+
+from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
+
+from eduid_userdb.nin import Nin
 from eduid_userdb.exceptions import UserDBValueError
 import saml2.time_util
-from saml2 import server
 
 from saml2.authn_context import MOBILETWOFACTORCONTRACT
 from saml2.authn_context import PASSWORD
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
-from saml2.authn_context import UNSPECIFIED
-
-
-class FakeSAML2Server(server.Server):
-
-    def __init__(self):
-        # avoid all the init of saml2.server - we just want the simple functions
-        pass
-
-class FakeMetadata(object):
-    """
-    Fake the SAML2 Server metadata.
-    """
-    def entity_attributes(self, _name):
-        return {}
-
-class FakeIdPApp(IdPApplication):
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker('unittest-idp.example.edu')
-        #self.IDP = FakeSAML2Server()
-        datadir = pkg_resources.resource_filename(__name__, 'data')
-        config_file = os.path.join(datadir, 'test_SSO_conf.py')
-        self.IDP = server.Server(config_file=config_file)
-        self.config = {}
-        self.IDP.metadata = FakeMetadata()
-
-
-class FakeIdPUser(eduid_idp.idp_user.IdPUser):
-
-    def __init__(self, username, identity):
-        if 'eduPersonPrincipalName' not in identity:
-            identity['eduPersonPrincipalName'] = 'testa-testa'
-        if 'mail' not in identity:
-            identity.update({'mail': 'test0909@example.com',
-                             'mailAliases': [{
-                                              'email': 'test0909@example.com',
-                                              'verified': True,
-                                            }],
-            })
-        if 'passwords' not in identity:
-            identity['passwords'] = [{
-                'id': ObjectId('112345678901234567890123'),
-                'salt': '$NDNv1H1$9c810d852430b62a9a7c6159d5d64c41c3831846f81b6799b54e1e8922f11545$32$32$',
-                }]
-
-        self._username = username
-        self._user = User(data=identity)
 
 
 def make_SAML_request(class_ref):
@@ -144,9 +90,11 @@ def make_login_ticket(req_class_ref):
 
 
 # noinspection PyProtectedMember
-class TestSSO(TestCase):
+class TestSSO(IdPSimpleTestCase):
 
     def setUp(self):
+        super(TestSSO, self).setUp()
+
         start_response = lambda: False
         idp_app = FakeIdPApp()
 
@@ -170,6 +118,30 @@ class TestSSO(TestCase):
         self.SSO_AL3 = eduid_idp.login.SSO(sso_session_3, start_response, idp_app)
 
     # ------------------------------------------------------------------------
+    def get_user_set_nins(self, eppn, ninlist):
+        """
+        Fetch a user from the FakeUserDb and set it's NINs to those in ninlist.
+        :param eppn: eduPersonPrincipalName or email address
+        :param ninlist: List of NINs to configure user with (all verified)
+
+        :type eppn: str or unicode
+        :type ninlist: [str or unicode]
+
+        :return: IdPUser instance
+        :rtype: IdPUser
+        """
+        user = self.idp_userdb.lookup_user(eppn)
+        [user.nins.remove(x) for x in user.nins.to_list()]
+        for number in ninlist:
+            this_nin = Nin(number = number,
+                           application = 'unittest',
+                           created_ts = True,
+                           verified = True,
+                           primary = user.nins.primary is None)
+            user.nins.add(this_nin)
+        return user
+
+    # ------------------------------------------------------------------------
 
     def test__get_login_response_authn_1(self):
         """
@@ -179,7 +151,7 @@ class TestSSO(TestCase):
         :return:
         """
         ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL1)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL2._get_login_response_authn(ticket, user)
         self.assertEqual(eduid_idp.assurance.SWAMID_AL1, out['class_ref'])
 
@@ -191,7 +163,7 @@ class TestSSO(TestCase):
         :return:
         """
         ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL2)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL2._get_login_response_authn(ticket, user)
         self.assertEqual(eduid_idp.assurance.SWAMID_AL2, out['class_ref'])
 
@@ -203,16 +175,16 @@ class TestSSO(TestCase):
         """
         ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL2)
         # No NIN 1
-        user = FakeIdPUser('user1', {})
+        user = self.get_user_set_nins('test1@eduid.se', [])
         with self.assertRaises(eduid_idp.error.Forbidden):
             self.SSO_AL2._get_login_response_authn(ticket, user)
         # No NIN 2
-        user = FakeIdPUser('user1', {'norEduPersonNIN': []})
+        user = self.get_user_set_nins('test1@eduid.se', [])
         with self.assertRaises(eduid_idp.error.Forbidden):
             self.SSO_AL2._get_login_response_authn(ticket, user)
         # Invalid NIN
         with self.assertRaises(UserDBValueError):
-            FakeIdPUser('user1', {'norEduPersonNIN': [False]})
+            self.get_user_set_nins('test1@eduid.se', [False])
 
     def test__get_login_response_authn_3(self):
         """
@@ -221,7 +193,7 @@ class TestSSO(TestCase):
         Expect MustAuthenticate exception.
         """
         ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL3)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         with self.assertRaises(eduid_idp.login.MustAuthenticate):
             self.SSO_AL2._get_login_response_authn(ticket, user)
 
@@ -235,7 +207,7 @@ class TestSSO(TestCase):
         PASSWORD is special in that it is mapped to AL1/AL2/AL3 in the response.
         """
         ticket = make_login_ticket(req_class_ref = PASSWORD)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL1._get_login_response_authn(ticket, user)
         self.assertEqual(eduid_idp.assurance.SWAMID_AL1, out['class_ref'])
 
@@ -247,7 +219,7 @@ class TestSSO(TestCase):
         PASSWORD is special in that it is mapped to AL1/AL2/AL3 in the response.
         """
         ticket = make_login_ticket(req_class_ref = PASSWORD)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL2._get_login_response_authn(ticket, user)
         self.assertEqual(eduid_idp.assurance.SWAMID_AL2, out['class_ref'])
 
@@ -261,7 +233,7 @@ class TestSSO(TestCase):
         PASSWORD is special in that it is mapped to AL1/AL2/AL3 in the response.
         """
         ticket = make_login_ticket(req_class_ref = PASSWORD)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         with self.assertRaises(eduid_idp.error.Forbidden):
             self.SSO_AL3._get_login_response_authn(ticket, user)
         #self.assertEqual(eduid_idp.assurance.SWAMID_AL3, out['class_ref'])
@@ -275,7 +247,7 @@ class TestSSO(TestCase):
         Expect the response Authn to be the requested PASSWORDPROTECTEDTRANSPORT.
         """
         ticket = make_login_ticket(req_class_ref = PASSWORDPROTECTEDTRANSPORT)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL1._get_login_response_authn(ticket, user)
         self.assertEqual(PASSWORDPROTECTEDTRANSPORT, out['class_ref'])
 
@@ -286,7 +258,7 @@ class TestSSO(TestCase):
         Expect the response Authn to be the requested PASSWORDPROTECTEDTRANSPORT.
         """
         ticket = make_login_ticket(req_class_ref = PASSWORDPROTECTEDTRANSPORT)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL2._get_login_response_authn(ticket, user)
         self.assertEqual(PASSWORDPROTECTEDTRANSPORT, out['class_ref'])
 
@@ -297,7 +269,7 @@ class TestSSO(TestCase):
         Expect the response Authn to be AL1 (default response for unknown requested authn contexts is auth level).
         """
         ticket = make_login_ticket(req_class_ref = 'http://www.example.edu/assurance/UNKNOWN')
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL1._get_login_response_authn(ticket, user)
         self.assertEqual(eduid_idp.assurance.SWAMID_AL1, out['class_ref'])
 
@@ -308,7 +280,7 @@ class TestSSO(TestCase):
         Expect the response Authn to be AL2 (default response for unknown requested authn contexts is auth level).
         """
         ticket = make_login_ticket(req_class_ref = 'http://www.example.edu/assurance/UNKNOWN')
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         out = self.SSO_AL2._get_login_response_authn(ticket, user)
         self.assertEqual(eduid_idp.assurance.SWAMID_AL2, out['class_ref'])
 
@@ -321,7 +293,7 @@ class TestSSO(TestCase):
         Expect MustAuthenticate exception.
         """
         ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL2)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         with self.assertRaises(eduid_idp.login.MustAuthenticate):
             self.SSO_AL1._get_login_response_authn(ticket, user)
 
@@ -332,7 +304,7 @@ class TestSSO(TestCase):
         Expect MustAuthenticate exception.
         """
         ticket = make_login_ticket(req_class_ref = MOBILETWOFACTORCONTRACT)
-        user = FakeIdPUser('user1', {'norEduPersonNIN': '123456780123'})
+        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
         with self.assertRaises(eduid_idp.login.MustAuthenticate):
             self.SSO_AL1._get_login_response_authn(ticket, user)
 
