@@ -54,10 +54,10 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'server_cert': None,  # SSL cert filename
                     'server_key': None,   # SSL key filename
                     'cert_chain': None,   # SSL certificate chain filename, or None
-                    'userdb_mongo_uri': None,
-                    'userdb_mongo_database': None,
+                    'userdb_mongo_database': 'eduid_am',  # eduid_am for old userdb, eduid_userdb for new
+                    'mongo_uri': None,    # Base mongodb:// URI
                     'sso_session_lifetime': '15',  # Lifetime of SSO session in minutes
-                    'sso_session_mongo_uri': None,
+                    'sso_session_use_mongodb': '0',  # '1' for True, '0' for False
                     'raven_dsn': None,
                     'content_packages': [],  # List of Python packages ("name:path") with content resources
                     'verify_request_signatures': '0',  # '1' for True, '0' for False
@@ -68,12 +68,14 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_language': 'en',
                     'base_url': None,
                     'default_eppn_scope': None,
-                    'authn_info_mongo_uri': None,
                     'max_authn_failures_per_month': '50',  # Kantara 30-day bad authn limit is 100
                     'login_state_ttl': '5',   # time to complete an IdP login, in minutes
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',  # VCCS backend URL
                     'insecure_cookies': '0',  # Set to 1 to not set HTTP Cookie 'secure' flag
+                    'actions_auth_shared_secret': 'abcdef',
+                    'actions_app_uri': 'http://actions.example.com/',
+                    'tou_version': 'version1',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -88,17 +90,19 @@ class IdPConfig(object):
 
     :param filename: string, INI-file name
     :param debug: boolean, default debug value
+    :param defaults: None or a dict with default values
     :raise ValueError: if INI-file can't be parsed
     """
 
-    def __init__(self, filename, debug):
+    def __init__(self, filename, debug, defaults=None):
         self._parsed_content_packages = None
         self._parsed_status_test_usernames = None
         self.section = _CONFIG_SECTION
-        _CONFIG_DEFAULTS['debug'] = str(debug)
+        _defaults = defaults or _CONFIG_DEFAULTS
+        _defaults['debug'] = str(debug)
         cfgdir = os.path.dirname(filename)
-        _CONFIG_DEFAULTS['pysaml2_config'] = os.path.join(cfgdir, _CONFIG_DEFAULTS['pysaml2_config'])
-        self.config = ConfigParser.ConfigParser(_CONFIG_DEFAULTS)
+        _defaults['pysaml2_config'] = os.path.join(cfgdir, _defaults['pysaml2_config'])
+        self.config = ConfigParser.ConfigParser(_defaults)
         if not self.config.read([filename]):
             raise ValueError("Failed loading config file {!r}".format(filename))
 
@@ -230,11 +234,11 @@ class IdPConfig(object):
         return self.config.get(self.section, 'cert_chain')
 
     @property
-    def userdb_mongo_uri(self):
+    def mongo_uri(self):
         """
-        UserDB MongoDB connection URI (string). See MongoDB documentation for details.
+        MongoDB connection URI (string). See MongoDB documentation for details.
         """
-        return self.config.get(self.section, 'userdb_mongo_uri')
+        return self.config.get(self.section, 'mongo_uri')
 
     @property
     def userdb_mongo_database(self):
@@ -258,13 +262,13 @@ class IdPConfig(object):
         return self.config.getint(self.section, 'sso_session_lifetime')
 
     @property
-    def sso_session_mongo_uri(self):
+    def sso_session_use_mongodb(self):
         """
-        SSO session MongoDB connection URI (string). See MongoDB documentation for details.
+        Use MongoDB for IdP session caching or not.
 
-        If not set, an in-memory SSO session cache will be used.
+        If not, an in-memory SSO session cache will be used.
         """
-        return self.config.get(self.section, 'sso_session_mongo_uri')
+        return self.config.getboolean(self.section, 'sso_session_use_mongodb')
 
     @property
     def raven_dsn(self):
@@ -371,16 +375,6 @@ class IdPConfig(object):
         return self.config.get(self.section, 'default_eppn_scope')
 
     @property
-    def authn_info_mongo_uri(self):
-        """
-        Authn info (failed logins etc.) MongoDB connection URI (string).
-        See MongoDB documentation for details.
-
-        If not set, Kantara authn logs will not be maintained.
-        """
-        return self.config.get(self.section, 'authn_info_mongo_uri')
-
-    @property
     def max_authn_failures_per_month(self):
         """
         Disallow login for a user after N failures in a given month.
@@ -423,3 +417,25 @@ class IdPConfig(object):
         Set to True to NOT set HTTP Cookie 'secure' flag (boolean).
         """
         return self.config.getboolean(self.section, 'insecure_cookies')
+
+    @property
+    def actions_auth_shared_secret(self):
+        """
+        Secret shared with the actions app to convince it
+        that the redirected user is authenticated.
+        """
+        return self.config.get(self.section, 'actions_auth_shared_secret')
+
+    @property
+    def actions_app_uri(self):
+        """
+        URI of the actions app.
+        """
+        return self.config.get(self.section, 'actions_app_uri')
+
+    @property
+    def tou_version(self):
+        """
+        The current version of the terms of use agreement.
+        """
+        return self.config.get(self.section, 'tou_version')

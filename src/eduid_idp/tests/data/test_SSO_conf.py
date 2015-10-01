@@ -1,3 +1,5 @@
+import os
+
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_SOAP
@@ -5,8 +7,26 @@ from saml2.saml import NAME_FORMAT_URI
 from saml2.saml import NAMEID_FORMAT_TRANSIENT
 from saml2.saml import NAMEID_FORMAT_PERSISTENT
 
+try:
+    from saml2.sigver import get_xmlsec_binary
+except ImportError:
+    get_xmlsec_binary = None
+
+if get_xmlsec_binary:
+    xmlsec_path = get_xmlsec_binary(["/opt/local/bin"])
+else:
+    xmlsec_path = '/usr/bin/xmlsec1'
+
 _hostname = 'unittest-idp.example.edu'
 BASE = "https://{!s}".format(_hostname)
+
+here = os.path.dirname(__file__)
+key_path = os.path.join(here, 'idp-public-snakeoil.key')
+cert_path = os.path.join(here, 'idp-public-snakeoil.pem')
+
+attrmaps_path = os.path.join(here, '../../../attributemaps')
+sp_metadata_path = os.path.join(here, 'sp_metadata.xml')
+
 
 CONFIG = {
     "entityid": "%s/idp.xml" % BASE,
@@ -38,10 +58,15 @@ CONFIG = {
             },
             "name_id_format": [NAMEID_FORMAT_TRANSIENT,
                                NAMEID_FORMAT_PERSISTENT],
-            #"metadata": {"local": []},
         },
     },
     "debug": 1,
+    "metadata": {"local": [sp_metadata_path]},
+    "attribute_map_dir": attrmaps_path,
+    "key_file": key_path,
+    "cert_file": cert_path,
+    "xmlsec_binary": xmlsec_path,
+
     "organization": {
         "display_name": "eduID UNITTEST",
         "name": "eduID UNITTEST",

@@ -33,112 +33,18 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
-import logging
-
-from unittest import TestCase
-from vccs_client import VCCSPasswordFactor
-
-import eduid_idp
-from eduid_userdb import User
-import bson
-
-logger = logging.getLogger()
-
-PWHASHES = {}
+from eduid_idp.testing import IdPSimpleTestCase
 
 
-def _create_passwords(username, factors):
-    res = []
-    for _f in factors:
-        _this = {'id': bson.ObjectId(_f.credential_id),
-                 'salt': _f.salt,
-        }
-        res.append(_this)
-        # remember the hash for the correct password 'out-of-band' since the User
-        # object will reject any unknown data in _this
-        PWHASHES[_this['id']] = _f.hash
-    return res
-
-
-_PASSWORDS = [VCCSPasswordFactor("foo", "a" * 24),
-              VCCSPasswordFactor("bar", "b" * 24),
-              VCCSPasswordFactor("baz", "c" * 24),
-]
-
-_USERDB = [
-    {'_id': '0' * 24,
-     'eduPersonPrincipalName': 'test1@eduid.se',
-     'mail': 'test@example.com',
-     'mailAliases': [{
-                         'email': 'test@example.com',
-                         'verified': True,
-                     }],
-     'passwords': _create_passwords('user1', [_PASSWORDS[0], _PASSWORDS[1]])
-    },
-    {'_id': '1' * 24,
-     'eduPersonPrincipalName': 'test2@eduid.se',
-     'mail': 'test2@example.com',
-     'mailAliases': [{
-                         'email': 'test2@example.com',
-                         'verified': True,
-                     }],
-     'passwords': _create_passwords('user2', [_PASSWORDS[2]]),
-    }]
-
-
-class FakeUserDb(object):
-    def get_user_by_field(self, field, username):
-        for _user in _USERDB:
-            if _user.get(field) == username:
-                res = User(data=_user)
-                return res
-
-    def get_user_by_mail(self, email):
-        return self.get_user_by_field('mail', email)
-
-    def get_user_by_eppn(self, eppn):
-        return self.get_user_by_field('eduPersonPrincipalName', eppn)
-
-
-class FakeAuthClient(object):
-    userdb = FakeUserDb()
-
-    def authenticate(self, username, factors):
-        assert (len(factors) == 1)
-        _f = factors[0]
-        _expect = {'id': bson.ObjectId(_f.credential_id),
-                   'salt': _f.salt,
-                   'hash': _f.hash,
-        }
-        for field in ['_id', 'eduPersonPrincipalName']:
-            _user = self.userdb.get_user_by_field(field, username)
-            if _user:
-                for _cred in _user.passwords.to_list_of_dicts():
-                    _cred['hash'] = PWHASHES[_cred['id']]  # restore the expected hash from out-of-band memory
-                    if _cred == _expect:
-                        return True
-        return False
-
-
-class FakeConfig(object):
-    authn_info_mongo_uri = None
-
-
-class TestIdPUserDb(TestCase):
-    def setUp(self):
-        config = FakeConfig()
-        #noinspection PyTypeChecker
-        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, userdb = FakeUserDb())
-        self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.idp_userdb,
-                                              auth_client = FakeAuthClient())
+class TestIdPUserDb(IdPSimpleTestCase):
 
     def test_lookup_user(self):
         _this = self.idp_userdb.lookup_user('test@example.com')
-        self.assertEqual(_this.username, 'test@example.com')
+        self.assertEqual(_this.mail_addresses.primary.email, 'test@example.com')
 
     def test_lookup_user_eppn(self):
         _this = self.idp_userdb.lookup_user('test2@eduid.se')
-        self.assertEqual(_this.identity.get('mail'), 'test2@example.com')
+        self.assertEqual(_this.mail_addresses.primary.email, 'test2@example.com')
 
     def test_verify_username_and_password(self):
         self.assertTrue(self._test_authn('test@example.com', 'foo'))

@@ -290,16 +290,13 @@ def permitted_authn(user, authn, logger, contexts=_context_to_internal):
     """
     internal_class_ref = _canonical_ctx(authn['class_ref'], contexts, logger)
     if internal_class_ref == EDUID_INTERNAL_2:
-        if 'norEduPersonNIN' in user.identity:
-            if len(user.identity['norEduPersonNIN']) and isinstance(user.identity['norEduPersonNIN'][0], basestring):
-                logger.debug('Asserting AL2 based on norEduPersonNIN attribute')
-                return True
-            else:
-                logger.info('NOT asserting AL2 for invalid norEduPersonNIN {!r}'.format(
-                    user.identity['norEduPersonNIN']))
-                raise eduid_idp.error.Forbidden("The SP requires AuthnContext {!r} (AL2)".format(authn['class_ref']))
+        _verified_nins = [x for x in user.nins.to_list() if x.is_verified]
+        if _verified_nins:
+            logger.debug('Asserting AL2 based on {!r} verified norEduPersonNIN attribute'.format(
+                len(_verified_nins)))
+            return True
         else:
-            logger.debug('NOT asserting AL2 - no norEduPersonNIN')
+            logger.debug('NOT asserting AL2, no verified NINs: {!r}'.format(user.nins.to_list()))
             raise eduid_idp.error.Forbidden("The SP requires AuthnContext {!r} (AL2)".format(authn['class_ref']))
     elif internal_class_ref == EDUID_INTERNAL_1:
         return True

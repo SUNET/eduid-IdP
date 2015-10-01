@@ -37,13 +37,13 @@ Module handling authentication of users. Also applies login policies
 such as rate limiting.
 """
 
-import pprint
-import pymongo
 import datetime
 import vccs_client
 
 import eduid_idp.assurance
 import eduid_idp.error
+
+from eduid_userdb import MongoDB, Password
 
 
 class IdPAuthn(object):
@@ -64,12 +64,8 @@ class IdPAuthn(object):
         if self.auth_client is None:
             self.auth_client = vccs_client.VCCSClient(base_url = config.vccs_url)
         self.authn_store = authn_store
-        if self.authn_store is None:
-            authn_info_uri = self.config.authn_info_mongo_uri
-            if authn_info_uri:
-                self.authn_store = AuthnInfoStoreMDB(uri = authn_info_uri, logger = logger)
-            else:
-                self.authn_store = None
+        if self.authn_store is None and config.mongo_uri:
+            self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
 
     def get_authn_user(self, login_data, user_authn):
         """
@@ -138,7 +134,6 @@ class IdPAuthn(object):
             # response in this case. Maybe send bogus auth request to backends?
             return None
         self.logger.debug("Found user {!r}".format(user))
-        self.logger.debug("Extra debug: user {!r} attributes :\n{!s}".format(user, pprint.pformat(user.identity)))
 
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
@@ -151,14 +146,14 @@ class IdPAuthn(object):
             # user used in the last successful authentication. This optimization
             # is based on plain assumption, no measurements whatsoever.
             last_creds = authn_info.last_used_credentials()
-            creds = sorted(user.passwords, key=lambda x: x['id'] not in last_creds)
-            if creds != user.passwords:
+            creds = sorted(user.passwords.to_list(), key=lambda x: x.id not in last_creds)
+            if creds != user.passwords.to_list():
                 self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
-                    [x['id'] for x in user.passwords],
-                    [x['id'] for x in creds],
+                    [x.id for x in user.passwords.to_list()],
+                    [x.id for x in creds],
                     last_creds))
         else:
-            creds = user.passwords
+            creds = user.passwords.to_list()
 
         return self._authn_passwords(user, username, password, creds)
 
@@ -175,29 +170,32 @@ class IdPAuthn(object):
         :type user: IdPUser
         :type username: string
         :type password: string
-        :type credentials: [dict()]
+        :type credentials: [Password]
         :rtype: IdPUser | None
         """
         for cred in credentials:
-            try:
-                factor = vccs_client.VCCSPasswordFactor(password, str(cred['id']), str(cred['salt']))
-            except ValueError as exc:
-                self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred['id'], exc))
-                continue
-            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
-                username, str(cred['id']), factor))
-            user_id = str(user.identity['_id'])
-            try:
-                if self.auth_client.authenticate(user_id, [factor]):
-                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
-                    self.log_authn(user, success=[cred['id']], failure=[])
-                    return user
-            except vccs_client.VCCSClientHTTPError as exc:
-                if exc.http_code == 500:
-                    self.logger.debug("VCCS credential {!r} might be revoked".format(cred['id']))
+            if isinstance(cred, Password):
+                try:
+                    factor = vccs_client.VCCSPasswordFactor(password, str(cred.id), str(cred.salt))
+                except ValueError as exc:
+                    self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred.id, exc))
                     continue
+                self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
+                    username, str(cred.id), factor))
+                user_id = str(user.user_id)
+                try:
+                    if self.auth_client.authenticate(user_id, [factor]):
+                        self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                        self.log_authn(user, success=[cred.id], failure=[])
+                        return user
+                except vccs_client.VCCSClientHTTPError as exc:
+                    if exc.http_code == 500:
+                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred.id))
+                        continue
+            else:
+                self.logger.debug("Unknown credential: {!s}".format(cred))
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
-        self.log_authn(user, success=[], failure=[cred['id'] for cred in user.passwords])
+        self.log_authn(user, success=[], failure=[cred.id for cred in user.passwords.to_list()])
         return None
 
     def log_authn(self, user, success, failure):
@@ -218,7 +216,7 @@ class IdPAuthn(object):
         if success:
             self.authn_store.credential_success(success)
         if success or failure:
-            self.authn_store.update_user(user.identity['_id'], success, failure)
+            self.authn_store.update_user(user.user_id, success, failure)
         return None
 
 
@@ -235,29 +233,14 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
     This is a MongoDB version of AuthnInfoStore().
     """
 
-    def __init__(self, uri, logger, conn = None, db_name = 'eduid_idp',
+    def __init__(self, uri, logger, db_name = 'eduid_idp',
                  collection_name = 'authn_info',
                  **kwargs):
         AuthnInfoStore.__init__(self, logger)
 
-        if conn is not None:
-            self.connection = conn
-        else:
-            if 'replicaSet=' in uri:
-                if 'socketTimeoutMS' not in kwargs:
-                    kwargs['socketTimeoutMS'] = 5000
-                if 'connectTimeoutMS' not in kwargs:
-                    kwargs['connectTimeoutMS'] = 5000
-                self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
-            else:
-                self.connection = pymongo.MongoClient(uri, **kwargs)
-
-        self.parsed_uri = pymongo.uri_parser.parse_uri(uri)
-        if self.parsed_uri.get("database", None):
-            db_name = self.parsed_uri.get("database")
-
-        self.db = self.connection[db_name]
-        self.collection = self.db[collection_name]
+        logger.debug("Setting up AuthnInfoStoreMDB with URI {!r}, db_name {!r}".format(uri, db_name))
+        self._db = MongoDB(db_uri = uri, db_name = db_name)
+        self.collection = self._db.get_collection(collection_name)
 
     def credential_success(self, cred_ids, ts=None):
         """
@@ -342,7 +325,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         :type user: IdPUser
         :rtype: UserAuthnInfo
         """
-        data = self.collection.find({'_id': user.identity['_id']})
+        data = self.collection.find({'_id': user.user_id})
         if not data.count():
             return UserAuthnInfo({})
         return UserAuthnInfo(data[0])

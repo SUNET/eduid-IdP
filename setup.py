@@ -14,12 +14,15 @@ install_requires = [
     'python-memcached==1.53',
     'cherrypy==3.2.4',
     'vccs_client >= 0.4.2',
-    'eduid_userdb >= 0.0.0, <= 0.1.0'
+    'eduid_userdb >= 0.0.4b3',
 ]
 
 testing_extras = [
     'nose==1.2.1',
     'coverage==3.6',
+    'WebTest==2.0.15',
+    'mock==1.0.1',
+    'nosexcover == 1.0.8',
 ]
 
 setup(name='eduid_idp',

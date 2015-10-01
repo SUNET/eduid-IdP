@@ -12,3 +12,4 @@ idp.subject
 *.pem
 metadata.xml
 .idea
+.*.swp

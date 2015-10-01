@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <title>eduID login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="/static/css/bootstrap-2.3.1.min.css" rel="stylesheet" media="screen">
+  </head>
+  <body>
+    <div class="container">
+      <div class="masthead">
+        <ul class="nav nav-pills pull-right">
+          <li class="active"><a href="#">Home</a></li>
+          <li class=""><a href="#">Help</a></li>
+        </ul>
+        <h3 class="muted"><a href="#">eduID</a></h3>
+      </div>
+
+      <div class="row">
+        <div class="span8 offset2">
+
+          <form id="login-form" class="form-horizontal well well-large" action='{action!s}' method="POST">
+            <fieldset>
+              <legend class="">Sign in to eduID</legend>
+
+	      <input type="hidden" name="key" value="{key!s}"/>
+	      <input type="hidden" name="authn_reference" value="{authn_reference!s}"/>
+	      <input type="hidden" name="redirect_uri" value="{redirect_uri!s}"/>
+
+              <div id="alert_div" class="alert alert-error">
+                <a class="close" data-dismiss="alert" href="#">&times;</a>
+                <div id="alert_msg">Something failed, or Javascript disabled</div>
+              </div>
+
+              <div class="control-group">
+              <!-- Username -->
+                <label class="control-label" for="username">Username:</label>
+                <div class="controls">
+                  <div class="input-append">
+                    <input type="text" id="username" name="username" value="{username!s}" placeholder="" class="input-large" autofocus="autofocus">
+                    <span class="add-on"><i class="icon-user"></i></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="control-group">
+              <!-- Password-->
+                <label class="control-label" for="password">Password:</label>
+                <div class="controls">
+                  <div class="input-append">
+                    <input type="password" id="password" name="password" placeholder="" class="input-large">
+                    <span class="add-on"><i class="icon-lock"></i></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="control-group">
+              <!-- Remember me -->
+                <div class="controls">
+                  <label class="checkbox">
+                    <input type="checkbox">Remember me
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-actions" style="margin-bottom: 0;">
+              <!-- Button -->
+                <button class="btn btn-primary btn-large">Sign in</button>
+              </div>
+
+            </fieldset>
+          </form>
+          <p class="muted">You are logging in to {sp_entity_id} who requests {authn_reference}.</p>
+	  <p class="muted"></p>
+
+          <p class="muted">Don't have an account yet? <a href="#">Go to the registration form</a></p>
+          <p class="muted">Can't remember your password? <a href="#">Go to the reset password form</a></p>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>&copy; NORDUnet A/S 2013</p>
+      </div>
+    </div>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src=\'/static/js/libs/jquery-1.9.1.min.js\'><\/script>')</script>
+    <script src="/static/js/libs/bootstrap-2.3.1.min.js"></script>
+    <script type="text/javascript">
+      $(function() {{
+        var msg = '{alert_msg}';
+        if (msg) {{
+            $('#alert_msg').text(msg);
+            $('#alert_div').show();
+        }} else {{
+            $('#alert_div').hide();
+        }}
+      }});
+    </script>
+
+  </body>
+</html>

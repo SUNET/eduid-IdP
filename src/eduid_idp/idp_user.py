@@ -35,82 +35,35 @@
 """
 User and user database module.
 """
+import pprint
 
 from eduid_userdb import UserDB, User
 from eduid_userdb.exceptions import UserDoesNotExist
 
+# default list of SAML attributes to release
+_SAML_ATTRIBUTES = ['displayName',
+                    'eduPersonEntitlement',
+                    'eduPersonPrincipalName',
+                    'givenName',
+                    'mail',
+                    'norEduPersonNIN',
+                    'preferredLanguage',
+                    'sn']
 
-class IdPUser(object):
-    """
-    Representation of a user. Used to load data about a user from the
-    userdb, and then represent it in a readable way.
 
-    :param username: username to search for in userdb
-    :param userdb: user database instance
-    :raise NoSuchUser: if 'username' was not found in the userdb
+class IdPUser(User):
 
-    :type username: str or unicode or ObjectId
-    :type userdb: UserDB
-    """
-
-    def __init__(self, username, userdb):
-        self._username = username
-        _user = None
-        if isinstance(username, str) or isinstance(username, unicode):
-            if '@' in username:
-                _user = userdb.get_user_by_mail(username.lower())
-            if not _user:
-                _user = userdb.get_user_by_eppn(username.lower())
-        if not _user:
-            # username will be ObjectId if this is a lookup using an existing SSO session
-            _user = userdb.get_user_by_id(username)
-        if not isinstance(_user, User):
-            raise ValueError('Unknown User returned')
-        self._user = _user
-
-    def __repr__(self):
-        return ('<{} instance at {:#x}: user={username!r}>'.format(
-                self.__class__.__name__,
-                id(self),
-                username=self._username,
-                ))
-
-    @property
-    def identity(self):
+    def to_saml_attributes(self, config, logger, filter_attributes=_SAML_ATTRIBUTES):
         """
-        All the key-value pairs of this user in the user database.
-
-        :return: Full user identity
-
-        :rtype: dict
         """
-        return self._user.to_dict(old_userdb_format = True)
-
-    @property
-    def username(self):
-        """
-        Primary identifying username for this user.
-
-        :return: username
-
-        :rtype: string
-        """
-        return self._username
-
-    @property
-    def passwords(self):
-        """
-        Return the password credentials for this user.
-        This is a list of dicts with "salt" and "id" keys.
-
-        If a user is halfway into the signup process, an account exists but
-        has no passwords. Return empty list in that case.
-
-        :return: User password credentials
-
-        :rtype: [dict]
-        """
-        return self._user.passwords.to_list_of_dicts()
+        attributes_in = self.to_dict(old_userdb_format = True)
+        attributes = {}
+        for approved in filter_attributes:
+            if approved in attributes_in:
+                attributes[approved] = attributes_in.pop(approved)
+        logger.debug('Discarded non-attributes:\n{!s}'.format(pprint.pformat(attributes_in)))
+        attributes = _make_scoped_eppn(attributes, config)
+        return attributes
 
 
 class IdPUserDb(object):
@@ -128,7 +81,7 @@ class IdPUserDb(object):
         self.logger = logger
         self.config = config
         if userdb is None:
-            userdb = UserDB(config.userdb_mongo_uri, db_name=config.userdb_mongo_database)
+            userdb = UserDB(config.mongo_uri, db_name=config.userdb_mongo_database, user_class=IdPUser)
         self.userdb = userdb
 
     def lookup_user(self, username):
@@ -139,7 +92,60 @@ class IdPUserDb(object):
         :return: user found in database
         :rtype: IdPUser | None
         """
-        try:
-            return IdPUser(username, userdb = self.userdb)
-        except UserDoesNotExist:
-            return None
+        _user = None
+        if isinstance(username, str) or isinstance(username, unicode):
+            if '@' in username:
+                _user = self.userdb.get_user_by_mail(username.lower())
+            if not _user:
+                _user = self.userdb.get_user_by_eppn(username.lower())
+        if not _user:
+            # username will be ObjectId if this is a lookup using an existing SSO session
+            _user = self.userdb.get_user_by_id(username)
+        return _user
+
+
+def _make_scoped_eppn(attributes, config):
+    """
+    Add scope to unscoped eduPersonPrincipalName attributes before relasing them.
+
+    What scope to add, if any, is currently controlled by the configuration parameter
+    `default_eppn_scope'.
+
+    :param attributes: Attributes of a user
+    :param config: IdP configuration data
+    :return: New attributes
+
+    :type attributes: dict
+    :type config: IdPConfig
+    :rtype: dict
+    """
+    eppn = attributes.get('eduPersonPrincipalName')
+    scope = config.default_eppn_scope
+    if not eppn or not scope:
+        return attributes
+    if '@' not in eppn:
+        attributes['eduPersonPrincipalName'] = eppn + '@' + scope
+    return attributes
+
+
+def _add_scoped_affiliation(attributes, config):
+    """
+    Add eduPersonScopedAffiliation if configured, and not already present.
+
+    This default affiliation is currently controlled by the configuration parameter
+    `default_scoped_affiliation'.
+
+    :param attributes: Attributes of a user
+    :param config: IdP configuration data
+    :return: New attributes
+
+    :type attributes: dict
+    :type config: IdPConfig
+    :rtype: dict
+    """
+    epsa = 'eduPersonScopedAffiliation'
+    if epsa not in attributes and config.default_scoped_affiliation:
+        attributes[epsa] = config.default_scoped_affiliation
+    return attributes
+
+
