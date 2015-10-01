@@ -63,7 +63,7 @@ def check_for_pending_actions(idp_app, user, ticket):
         return
 
     # Add any actions that may depend on the login data
-    add_special_actions(idp_app, user, ticket)
+    add_idp_initiated_actions(idp_app, user, ticket)
 
     # Check for pending actions
     if not idp_app.actions_db.has_pending_actions(user.user_id):
@@ -93,7 +93,7 @@ def check_for_pending_actions(idp_app, user, ticket):
     raise eduid_idp.mischttp.Redirect(uri)
 
 
-def add_special_actions(idp_app, user, ticket):
+def add_idp_initiated_actions(idp_app, user, ticket):
     """
     Iterate over add_actions entry points and execute them.
     These entry points take the IdP app and the login data (ticket)
