@@ -77,7 +77,7 @@ def check_for_pending_actions(idp_app, user, ticket):
     secret = idp_app.config.actions_auth_shared_secret
     nonce = os.urandom(16).encode('hex')
     timestamp = '{:x}'.format(int(time.time()))
-    auth_token = eduid_idp.util.generate_auth_token(secret, user.eppn, nonce, timestamp)
+    auth_token = eduid_idp.util.generate_auth_token(secret, user.user_id, nonce, timestamp)
 
     actions_uri = idp_app.config.actions_app_uri
     idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
