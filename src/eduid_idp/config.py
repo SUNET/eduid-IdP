@@ -56,8 +56,8 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'cert_chain': None,   # SSL certificate chain filename, or None
                     'userdb_mongo_database': 'eduid_am',  # eduid_am for old userdb, eduid_userdb for new
                     'mongo_uri': None,    # Base mongodb:// URI
+                    'sso_session_mongo_uri': None,   # mongodb:// URI for SSO session cache
                     'sso_session_lifetime': '15',  # Lifetime of SSO session in minutes
-                    'sso_session_use_mongodb': '0',  # '1' for True, '0' for False
                     'raven_dsn': None,
                     'content_packages': [],  # List of Python packages ("name:path") with content resources
                     'verify_request_signatures': '0',  # '1' for True, '0' for False
@@ -248,6 +248,13 @@ class IdPConfig(object):
         return self.config.get(self.section, 'userdb_mongo_database')
 
     @property
+    def sso_session_mongo_uri(self):
+        """
+        MongoDB connection URI (string) for PySAML2 SSO sessions.
+        """
+        return self.config.get(self.section, 'sso_session_mongo_uri')
+
+    @property
     def sso_session_lifetime(self):
         """
         Lifetime of SSO session (in minutes).
@@ -260,15 +267,6 @@ class IdPConfig(object):
         this value, plus the pysaml2 lifetime of the assertion.
         """
         return self.config.getint(self.section, 'sso_session_lifetime')
-
-    @property
-    def sso_session_use_mongodb(self):
-        """
-        Use MongoDB for IdP session caching or not.
-
-        If not, an in-memory SSO session cache will be used.
-        """
-        return self.config.getboolean(self.section, 'sso_session_use_mongodb')
 
     @property
     def raven_dsn(self):
