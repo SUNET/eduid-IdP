@@ -233,7 +233,7 @@ class IdPApplication(object):
             cfgfile = os.path.basename(self.config.pysaml2_config)
 
         _session_ttl = self.config.sso_session_lifetime * 60
-        if self.config.sso_session_use_mongodb:
+        if self.config.sso_session_mongo_uri:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               self.logger, _session_ttl)
         else:
