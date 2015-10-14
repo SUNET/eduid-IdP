@@ -362,6 +362,8 @@ def get_default_template_arguments(config):
     :rtype: dict
     """
     return {
+        'dashboard_link': config.dashboard_link,
+        'signup_link': config.signup_link,
         'student_link': config.student_link,
         'technicians_link': config.technicians_link,
         'staff_link': config.staff_link,
