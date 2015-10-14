@@ -350,6 +350,25 @@ class IdPConfig(object):
         return self.config.get(self.section, 'password_reset_link')
 
     @property
+    def student_link(self):
+        """
+            URL (string) for use in simple templating of base.
+            """
+        return self.config.get(self.section, 'student_link')
+
+    @property
+    def technicians_link(self):
+        return self.config.get(self.section, 'technicians_link')
+
+    @property
+    def staff_link(self):
+        return self.config.get(self.section, 'staff_link')
+
+    @property
+    def faq_link(self):
+        return self.config.get(self.section, 'faq_link')
+
+    @property
     def default_language(self):
         """
         Default language code to use when looking for web pages ('en').

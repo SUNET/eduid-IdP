@@ -521,13 +521,14 @@ class IdPApplication(object):
             pass
 
         # apply simplistic HTML formatting to template in 'res'
-        argv = {
+        argv = eduid_idp.mischttp.get_default_template_arguments(self.config)
+        argv.update({
             'error_status': str(status),
             'error_code': str(status_code),
             'error_reason': str(reason),
             'error_traceback': str(traceback),
             'dashboard_link': self.config.dashboard_link,
-        }
+        })
         res = res.format(**argv)
 
         if status_code not in [404, 440]:

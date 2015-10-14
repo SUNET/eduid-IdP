@@ -354,6 +354,21 @@ def parse_accept_lang_header(lang_string):
     return eduid_idp.thirdparty.parse_accept_lang_header(lang_string)
 
 
+def get_default_template_arguments(config):
+    """
+    :param config: IdP config
+    :type config: IdPConfig
+    :return: header links
+    :rtype: dict
+    """
+    return {
+        'student_link': config.student_link,
+        'technicians_link': config.technicians_link,
+        'staff_link': config.staff_link,
+        'faq_link': config.faq_link
+    }
+
+
 def localized_resource(start_response, filename, config, logger=None, status=None):
     """
     Locate a static page in the users preferred language. Such pages are

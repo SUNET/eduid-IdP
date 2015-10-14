@@ -756,7 +756,8 @@ class SSO(Service):
         """
         assert isinstance(ticket, SSOLoginData)
 
-        argv = {
+        argv = eduid_idp.mischttp.get_default_template_arguments(self.config)
+        argv.update({
             "action": "/verify",
             "username": "",
             "password": "",
@@ -772,7 +773,7 @@ class SSO(Service):
             "SAMLRequest": ticket.SAMLRequest,
             "RelayState": ticket.RelayState,
             "binding": ticket.binding,
-        }
+        })
 
         # Set alert msg if FailCount is greater than zero
         if ticket.FailCount:
