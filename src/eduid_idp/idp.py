@@ -347,7 +347,7 @@ class IdPApplication(object):
         user = self.authn.verify_username_and_password(parsed)
         if user:
             response = {'status': 'OK',
-                        'testuser_name': user.identity.get('displayName'),
+                        'testuser_name': user.display_name,
                         }
 
         return "{}\n".format(simplejson.dumps(response))
