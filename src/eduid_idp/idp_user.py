@@ -95,12 +95,12 @@ class IdPUserDb(object):
         _user = None
         if isinstance(username, str) or isinstance(username, unicode):
             if '@' in username:
-                _user = self.userdb.get_user_by_mail(username.lower())
+                _user = self.userdb.get_user_by_mail(username.lower(), raise_on_missing=False)
             if not _user:
-                _user = self.userdb.get_user_by_eppn(username.lower())
+                _user = self.userdb.get_user_by_eppn(username.lower(), raise_on_missing=False)
         if not _user:
             # username will be ObjectId if this is a lookup using an existing SSO session
-            _user = self.userdb.get_user_by_id(username)
+            _user = self.userdb.get_user_by_id(username, raise_on_missing=False)
         return _user
 
 
