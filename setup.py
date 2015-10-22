@@ -6,11 +6,11 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.4.0b0'
+version = '0.4.0b1'
 
 install_requires = [
     'vccs_client >= 0.4.2',
-    'eduid_userdb >= 0.0.4b4',
+    'eduid_userdb >= 0.0.4b5',
 
     'pysaml2==1.2.0beta5',
     'python-memcached==1.53',

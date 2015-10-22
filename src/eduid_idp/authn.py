@@ -44,6 +44,7 @@ import eduid_idp.assurance
 import eduid_idp.error
 
 from eduid_userdb import MongoDB, Password
+from eduid_userdb.exceptions import UserHasNotCompletedSignup
 
 
 class IdPAuthn(object):
@@ -127,7 +128,11 @@ class IdPAuthn(object):
         :type password: string
         :rtype: IdPUser | None
         """
-        user = self.userdb.lookup_user(username)
+        try:
+            user = self.userdb.lookup_user(username)
+        except UserHasNotCompletedSignup:
+            # XXX Redirect user to some kind of info page
+            user = None
         if not user:
             self.logger.info("Unknown user : {!r}".format(username))
             # XXX we effectively disclose there was no such user by the quick
