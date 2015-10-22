@@ -38,7 +38,6 @@ User and user database module.
 import pprint
 
 from eduid_userdb import UserDB, User
-from eduid_userdb.exceptions import UserDoesNotExist
 
 # default list of SAML attributes to release
 _SAML_ATTRIBUTES = ['displayName',
