@@ -93,17 +93,19 @@ _USERDB = [
 
 
 class FakeUserDb(object):
-    def get_user_by_field(self, field, username):
+    def get_user_by_field(self, field, username, raise_on_missing=True):
         for _user in _USERDB:
             if _user.get(field) == username:
                 res = IdPUser(data=_user)
                 return res
+            elif raise_on_missing:
+                raise Exception('No user with username {} found'.format(username))
 
-    def get_user_by_mail(self, email):
-        return self.get_user_by_field('mail', email)
+    def get_user_by_mail(self, email, raise_on_missing=True):
+        return self.get_user_by_field('mail', email, raise_on_missing)
 
-    def get_user_by_eppn(self, eppn):
-        return self.get_user_by_field('eduPersonPrincipalName', eppn)
+    def get_user_by_eppn(self, eppn, raise_on_missing=True):
+        return self.get_user_by_field('eduPersonPrincipalName', eppn, raise_on_missing)
 
 
 class FakeAuthClient(object):
@@ -117,7 +119,7 @@ class FakeAuthClient(object):
                    'hash': _f.hash,
         }
         for field in ['_id', 'eduPersonPrincipalName']:
-            _user = self.userdb.get_user_by_field(field, username)
+            _user = self.userdb.get_user_by_field(field, username, raise_on_missing=False)
             if _user:
                 for _cred in _user.passwords.to_list_of_dicts():
                     _cred['hash'] = PWHASHES[_cred['id']]  # restore the expected hash from out-of-band memory
