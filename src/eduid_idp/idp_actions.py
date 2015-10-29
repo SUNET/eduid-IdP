@@ -66,7 +66,7 @@ def check_for_pending_actions(idp_app, user, ticket):
     add_idp_initiated_actions(idp_app, user, ticket)
 
     # Check for pending actions
-    if not idp_app.actions_db.has_pending_actions(user.user_id):
+    if not idp_app.actions_db.has_pending_actions(user.user_id, clean_cache=True):
         idp_app.logger.debug("There are no pending actions for user {!s}".format(user))
         return
 
