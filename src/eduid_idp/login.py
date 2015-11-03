@@ -235,6 +235,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
             _key = info["key"]
         elif "SAMLRequest" in info:
             _key = self.key(info["SAMLRequest"])
+            self.logger.debug("No 'key' in info, hashed SAMLRequest into key {!s}".format(_key))
         else:
             raise eduid_idp.error.BadRequest("Missing SAMLRequest, please re-initiate login",
                                              logger = self.logger, extra = {'info': info, 'binding': binding})
@@ -414,7 +415,7 @@ class SSO(Service):
         if self.config.fticks_secret_key:
             self._fticks_log(relying_party = resp_args.get('sp_entity_id', self.destination),
                              authn_method = response_authn['class_ref'],
-                             user_id = str(user.identity['_id']),
+                             user_id = str(user.user_id),
                              )
 
         return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
