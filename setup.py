@@ -20,7 +20,7 @@ install_requires = [
 testing_extras = [
     'nose==1.2.1',
     'coverage==3.6',
-    'WebTest==2.0.15',
+    'WebTest==2.0.18',
     'mock==1.0.1',
     'nosexcover == 1.0.8',
 ]
