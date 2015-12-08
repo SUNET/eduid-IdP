@@ -1,12 +1,19 @@
+addons:
+  apt:
+    packages:
+      libxml2-dev
+      libxslt1-dev
+      zlib1g-dev
+      xmlsec1
+      libxml2-utils
+      libffi-dev
+      libssl-dev
 language: python
 python:
   - "2.7"
 # Have Travis CI start a mongodb server for us
 services:
   - mongodb
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq -y libxml2-dev libxslt1-dev zlib1g-dev xmlsec1 libxml2-utils libffi-dev libssl-dev
 # command to install dependencies
 install:
   - python setup.py develop
