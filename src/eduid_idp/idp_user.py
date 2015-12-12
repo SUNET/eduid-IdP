@@ -47,13 +47,32 @@ _SAML_ATTRIBUTES = ['displayName',
                     'mail',
                     'norEduPersonNIN',
                     'preferredLanguage',
-                    'sn']
+                    'sn',
+                    ]
 
 
 class IdPUser(User):
+    """
+    Wrapper class for eduid_userdb.User adding functions useful in the IdP.
+    """
 
     def to_saml_attributes(self, config, logger, filter_attributes=_SAML_ATTRIBUTES):
         """
+        Return a list of SAML attributes for a user.
+
+        Note that this is _all_ parts of the user that this IdP knows how to express as
+        SAML attributes. It is not necessarily the attributes that will actually be released.
+
+        :param config: IdP config
+        :param logger: logging logger
+        :param filter_attributes: Filter to apply
+
+        :type config: eduid_idp.config.IdPConfig
+        :type logger: logging.Logger
+        :type filter_attributes: [str | unicode]
+
+        :return: SAML attributes
+        :rtype: dict
         """
         attributes_in = self.to_dict(old_userdb_format = True)
         attributes = {}
@@ -74,6 +93,7 @@ class IdPUserDb(object):
 
     :type logger: logging.Logger
     :type config: eduid_idp.config.IdPConfig
+    :type userdb: eduid_userdb.UserDB
     """
 
     def __init__(self, logger, config, userdb = None):
@@ -136,10 +156,11 @@ def _add_scoped_affiliation(attributes, config):
 
     :param attributes: Attributes of a user
     :param config: IdP configuration data
-    :return: New attributes
 
     :type attributes: dict
     :type config: IdPConfig
+
+    :return: New attributes
     :rtype: dict
     """
     epsa = 'eduPersonScopedAffiliation'

@@ -143,8 +143,8 @@ class IdPAuthn(object):
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
             if authn_info.failures_this_month() > self.config.max_authn_failures_per_month:
-                self.logger.debug("User AuthN failures this month {!r} > {!r}".format(
-                    authn_info.failures_this_month(), self.config.max_authn_failures_per_month))
+                self.logger.info("User {!r} AuthN failures this month {!r} > {!r}".format(
+                    user, authn_info.failures_this_month(), self.config.max_authn_failures_per_month))
                 raise eduid_idp.error.TooManyRequests("Too Many Requests")
 
             # Optimize list of credentials to try based on which credentials the
@@ -253,7 +253,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         a period of 18 months is disabled (taken to mean revoked).
 
         Therefor we need to log all successful authentications and have a cron
-        job handling the revoking of unused ccredentials.
+        job handling the revoking of unused credentials.
 
         :param cred_ids: List of Credential ID
         :param ts: Optional timestamp
@@ -301,7 +301,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         :type user_id: bson.ObjectId
         :type success: [bson.ObjectId]
         :type failure: [bson.ObjectId]
-        :type ts: datetime.datetime()
+        :type ts: datetime.datetime() | None
         """
         if ts is None:
             ts = datetime.datetime.utcnow()
@@ -317,6 +317,35 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
                 '$inc': {
                     'fail_count.' + str(this_month): len(failure),
                     'success_count.' + str(this_month): len(success)
+                },
+            }, upsert = True, new = True, multi = False)
+        return None
+
+    def unlock_user(self, user_id, fail_count = 0, ts=None):
+        """
+        Set the fail count for a specific user and month.
+
+        Used from the CLI `unlock_user`.
+
+        :param user_id: User identifier
+        :param fail_count: Number of failed attempts to put the user at
+        :param ts: Optional timestamp
+
+        :type user_id: bson.ObjectId
+        :type fail_count: int
+        :type ts: datetime.datetime() | None
+
+        :return: None
+        """
+        if ts is None:
+            ts = datetime.datetime.utcnow()
+        this_month = (ts.year * 100) + ts.month  # format year-month as integer (e.g. 201402)
+        self.collection.find_and_modify(
+            query = {
+                '_id': user_id,
+            }, update = {
+                '$set': {
+                    'fail_count.' + str(this_month): fail_count,
                 },
             }, upsert = True, new = True, multi = False)
         return None
@@ -352,7 +381,7 @@ class UserAuthnInfo(object):
 
         :return: Number of failed attempts
 
-        :type ts: datetime.datetime
+        :type ts: datetime.datetime | None
         :rtype: int
         """
         if ts is None:

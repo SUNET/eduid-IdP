@@ -36,17 +36,20 @@ setup(name='eduid_idp',
       author='Fredrik Thulin',
       author_email='fredrik@thulin.net',
       license='BSD',
-      packages=['eduid_idp',],
+      packages=['eduid_idp',
+                'eduid_idp.scripts',
+                ],
       package_dir = {'': 'src'},
       #include_package_data=True,
       #package_data = { },
       zip_safe=False,
       install_requires=install_requires,
       extras_require={
-        'testing': testing_extras,
-        },
+          'testing': testing_extras,
+      },
       entry_points={
-        'console_scripts': ['eduid_idp=eduid_idp.idp:main',
-                            ]
-        }
+          'console_scripts': ['eduid_idp=eduid_idp.idp:main',
+                              'eduid_unlock_user=eduid_idp.scripts.unlock_user:main',
+                              ]
+      }
       )
