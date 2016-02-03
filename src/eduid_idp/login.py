@@ -145,7 +145,7 @@ class SSOLoginData(object):
         return escape(self._binding, quote=True)
 
 
-class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
+class SSOLoginDataCache(object):
     """
     Login data is state kept between rendering the login screen, to when the user is
     completely logged in and redirected from the IdP to the original resource the
@@ -169,8 +169,9 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
     def __init__(self, idp_app, name, logger, ttl, config, lock = None):
         assert isinstance(config, eduid_idp.config.IdPConfig)
         self.IDP = idp_app
+        self.logger = logger
         self.config = config
-        eduid_idp.cache.ExpiringCache.__init__(self, name, logger, ttl, lock)
+        self._cache = eduid_idp.cache.ExpiringCache(name, logger, ttl, lock)
 
     def store_ticket(self, ticket):
         """
@@ -180,7 +181,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         :returns: True on success
         """
         self.logger.debug("Storing login state (IdP ticket) :\n{!s}".format(ticket))
-        self.add(ticket.key, ticket)
+        self._cache.add(ticket.key, ticket)
         return True
 
     def create_ticket(self, data, binding, key=None):
@@ -208,7 +209,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
             raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = self.logger)
         req_info = self._parse_SAMLRequest(data, binding)
         if not key:
-            key = self.key(data["SAMLRequest"])
+            key = self._cache.key(data["SAMLRequest"])
         ticket = SSOLoginData(key, req_info, data, binding)
         self.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
         return ticket
@@ -234,7 +235,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         if "key" in info:
             _key = info["key"]
         elif "SAMLRequest" in info:
-            _key = self.key(info["SAMLRequest"])
+            _key = self._cache.key(info["SAMLRequest"])
             self.logger.debug("No 'key' in info, hashed SAMLRequest into key {!s}".format(_key))
         else:
             raise eduid_idp.error.BadRequest("Missing SAMLRequest, please re-initiate login",
@@ -242,11 +243,11 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
 
         # lookup
         self.logger.debug("Lookup SSOLoginData (ticket) using key {!r}".format(_key))
-        _ticket = self.get(_key)
+        _ticket = self._cache.get(_key)
 
         if _ticket is None:
             self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self))
-            if "key" in info and not "SAMLRequest" in info:
+            if "key" in info and "SAMLRequest" not in info:
                 #raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
                 #                                   logger = self.logger, extra = {'info': info, 'binding': binding})
                 # This error could perhaps be handled better, but the LoginTimeout error message
@@ -311,7 +312,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                         verified_ok = True
                         break
                 if not verified_ok:
-                    _key = self.key(info["SAMLRequest"])
+                    _key = self._cache.key(info["SAMLRequest"])
                     self.logger.info("{!s}: SAML request signature verification failure".format(_key))
                     raise eduid_idp.error.BadRequest("SAML request signature verification failure",
                                                      logger = self.logger)
