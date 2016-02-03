@@ -14,9 +14,7 @@ Code handling Single Log Out requests.
 import pprint
 from hashlib import sha1
 
-import eduid_idp.util
-import eduid_idp.mischttp
-import eduid_idp.sso_session
+import eduid_idp
 from eduid_idp.service import Service
 
 from saml2 import BINDING_HTTP_REDIRECT
@@ -235,7 +233,7 @@ class SLO(Service):
 
         ht_args = self.IDP.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
                                          response = True)
-        #self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
+        # self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 
         # Delete the SSO session cookie in the browser
         eduid_idp.mischttp.delete_cookie('idpauthn', self.logger, self.config)

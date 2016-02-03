@@ -12,7 +12,6 @@
 Code handling Single Sign On logins.
 """
 
-import os
 import time
 import pprint
 
@@ -21,11 +20,10 @@ from hashlib import sha256
 
 from cgi import escape
 
+import eduid_idp
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.idp_actions import check_for_pending_actions
-import eduid_idp.util
-import eduid_idp.mischttp
 
 from saml2.request import AuthnRequest
 
@@ -248,7 +246,7 @@ class SSOLoginDataCache(object):
         if _ticket is None:
             self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self))
             if "key" in info and "SAMLRequest" not in info:
-                #raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
+                # raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
                 #                                   logger = self.logger, extra = {'info': info, 'binding': binding})
                 # This error could perhaps be handled better, but the LoginTimeout error message
                 # is not the right one for a number of scenarios where this problem has been
@@ -282,7 +280,7 @@ class SSOLoginDataCache(object):
         :type binding: string
         :rtype: AuthnRequest
         """
-        #self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
+        # self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
         _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], binding)
         if not _req_info:
             # Either there was no request, or pysaml2 found it to be unacceptable.
@@ -840,7 +838,7 @@ def do_verify(idp_app):
     idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(
         user_authn['class_ref'], authn_ref))
 
-    if not password or not 'username' in query:
+    if not password or 'username' not in query:
         raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
 
     login_data = {'username': query['username'].strip(),

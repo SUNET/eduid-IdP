@@ -167,5 +167,3 @@ def _add_scoped_affiliation(attributes, config):
     if epsa not in attributes and config.default_scoped_affiliation:
         attributes[epsa] = config.default_scoped_affiliation
     return attributes
-
-

@@ -80,7 +80,7 @@ class SSOSession(object):
             uid = str(self._data['user_id']),
             clref = self._data['authn_class_ref'],
             ts = self._data['authn_timestamp'],
-            )
+        )
 
     def to_dict(self):
         """
