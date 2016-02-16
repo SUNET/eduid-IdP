@@ -26,7 +26,7 @@ testing_extras = [
 
 setup(name='eduid_idp',
       version=version,
-      description="eduID SAML frontend IdP",
+      description='eduID SAML frontend IdP',
       long_description=README,
       classifiers=[
         # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers

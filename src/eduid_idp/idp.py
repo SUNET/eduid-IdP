@@ -544,13 +544,13 @@ class IdPApplication(object):
 # ----------------------------------------------------------------------------
 
 
-def main(myname = 'eduid.saml2.idp', args = None, logger = None):
+def main(myname = 'eduid-IdP', args = None, logger = None):
     """
     Initialize everything and start the IdP application.
 
     :param myname: name of IdP application
     :param args: Object with attributes
-    :param logger: logging logger
+    :param logger: logging root_logger
     :return: Does not return
 
     :type myname: string
@@ -560,71 +560,76 @@ def main(myname = 'eduid.saml2.idp', args = None, logger = None):
     if not args:
         args = parse_args()
 
+    config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
+
+    # This is the root log level
+    level = logging.INFO
+    if config.debug:
+        level = logging.DEBUG
+
+    root_logger = logging.getLogger()
+
     # initialize various components
     if not logger:
+        logging.basicConfig(level = level, stream = sys.stderr,
+                            format='%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
         logger = logging.getLogger(myname)
-    config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
-    if config.debug:
-        logger.setLevel(logging.DEBUG)
-        # log to stderr when debugging
-        formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
-        stream_h = logging.StreamHandler(sys.stderr)
-        stream_h.setFormatter(formatter)
-        logger.addHandler(stream_h)
+        # If stderr is not a TTY, change the log level of the StreamHandler (stream = sys.stderr above) to WARNING
+        if not sys.stderr.isatty():
+            for this_h in root_logger.handlers:
+                this_h.setLevel(logging.WARNING)
     if config.logfile:
         formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
         file_h = logging.handlers.RotatingFileHandler(config.logfile, maxBytes=10 * 1024 * 1024)
         file_h.setFormatter(formatter)
-        logger.addHandler(file_h)
+        file_h.setLevel(level)
+        root_logger.addHandler(file_h)
     if config.syslog_socket:
         syslog_h = logging.handlers.SysLogHandler(config.syslog_socket)
         formatter = logging.Formatter('%(name)s: %(message)s')
         syslog_h.setFormatter(formatter)
-        syslog_h.setLevel(logging.INFO)
-        if config.syslog_debug:
-            syslog_h.setLevel(logging.DEBUG)
-        logger.addHandler(syslog_h)
+        syslog_h.setLevel(level)
+        root_logger.addHandler(syslog_h)
     if config.raven_dsn:
         if raven and SentryHandler:
-            logger.debug("Setting up Raven exception logging")
+            root_logger.debug("Setting up Raven exception logging")
             client = raven.Client(config.raven_dsn, timeout=10)
             handler = SentryHandler(client, level=logging.ERROR)
             if not raven.conf.setup_logging(handler):
-                logger.warning("Failed setting up Raven/Sentry logging")
+                root_logger.warning("Failed setting up Raven/Sentry logging")
         else:
-            logger.warning("Config option raven_dsn set, but raven not available")
+            root_logger.warning("Config option raven_dsn set, but raven not available")
 
     cherry_conf = {'server.thread_pool': config.num_threads,
                    'server.socket_host': config.listen_addr,
                    'server.socket_port': config.listen_port,
                    # enables X-Forwarded-For, since BCP is to run this server
-                   # behind a webserver that handles SSL
+                   # behind a webserver that handles TLS
                    'tools.proxy.on': True,
                    'request.show_tracebacks': config.debug,
                    }
     if config.server_cert and config.server_key:
-        _ssl_opts = {'server.ssl_module': config.ssl_adapter,
+        _tls_opts = {'server.ssl_module': config.ssl_adapter,
                      'server.ssl_certificate': config.server_cert,
                      'server.ssl_private_key': config.server_key,
                      #'server.ssl_certificate_chain':
                      }
-        cherry_conf.update(_ssl_opts)
+        cherry_conf.update(_tls_opts)
 
     if config.logdir:
         cherry_conf['log.access_file'] = os.path.join(config.logdir, 'access.log')
         cherry_conf['log.error_file'] = os.path.join(config.logdir, 'error.log')
     else:
         sys.stderr.write("NOTE: Config option 'logdir' not set.\n")
-        cherry_conf['log.screen'] = True
 
+    cherrypy.log.access_log.propagate = False
     cherrypy.config.update(cherry_conf)
 
     cherrypy.quickstart(IdPApplication(logger, config))
 
 if __name__ == '__main__':
     try:
-        progname = os.path.basename(sys.argv[0])
-        if main(progname):
+        if main():
             sys.exit(0)
         sys.exit(1)
     except KeyboardInterrupt:
