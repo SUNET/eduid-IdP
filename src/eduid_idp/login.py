@@ -67,13 +67,21 @@ class SSOLoginData(object):
         self._binding = binding
 
     def __str__(self):
-        return pprint.pformat({'key': self._key,
-                               'req_info': self._req_info,
-                               'SAMLRequest length': len(self._SAMLRequest),
-                               'RelayState': self._RelayState,
-                               'binding': self._binding,
-                               'FailCount': self._FailCount,
-                               })
+        data = self.to_dict()
+        if 'SAMLRequest' in data:
+            data['SAMLRequest length'] = len(data['SAMLRequest'])
+            del data['SAMLRequest']
+        return pprint.pformat(data)
+
+    def to_dict(self):
+        res = {'key': self._key,
+               'req_info': self._req_info,
+               'SAMLRequest': self._SAMLRequest,
+               'RelayState': self._RelayState,
+               'binding': self._binding,
+               'FailCount': self._FailCount,
+               }
+        return res
 
     @property
     def key(self):
@@ -173,6 +181,7 @@ class SSOLoginDataCache(object):
             self._cache = eduid_idp.cache.ExpiringCacheCommonSession(name, logger, ttl, config)
         else:
             self._cache = eduid_idp.cache.ExpiringCacheMem(name, logger, ttl, lock)
+        logger.debug('Set up IDP ticket cache {!s}'.format(self._cache))
 
     def store_ticket(self, ticket):
         """
@@ -181,8 +190,10 @@ class SSOLoginDataCache(object):
         :param ticket: SSOLoginData instance
         :returns: True on success
         """
-        self.logger.debug("Storing login state (IdP ticket) :\n{!s}".format(ticket))
-        self._cache.add(ticket.key, ticket)
+        self.logger.debug('Storing login state (IdP ticket) in {!r}:\n{!s}'.format(self._cache, ticket))
+        data = ticket.to_dict()
+        del data['req_info']
+        self._cache.add(ticket.key, data)
         return True
 
     def create_ticket(self, data, binding, key=None):
@@ -247,7 +258,7 @@ class SSOLoginDataCache(object):
         _ticket = self._cache.get(_key)
 
         if _ticket is None:
-            self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self))
+            self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self._cache))
             if "key" in info and "SAMLRequest" not in info:
                 # raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
                 #                                   logger = self.logger, extra = {'info': info, 'binding': binding})
@@ -263,6 +274,11 @@ class SSOLoginDataCache(object):
             self.store_ticket(_ticket)
         else:
             self.logger.debug("Retreived login state (IdP.ticket) :\n{!s}".format(_ticket))
+
+        if isinstance(_ticket, dict):
+            # Ticket was stored in a backend that could not natively store a SSOLoginData instance. Recreate.
+            self.logger.debug('Recreating SSOLoginData from stored ticket state:\n{!s}'.format(_ticket))
+            _ticket = self.create_ticket(_ticket, _ticket['binding'], key=_key)
 
         return _ticket
 

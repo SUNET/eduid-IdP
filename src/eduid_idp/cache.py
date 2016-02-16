@@ -17,6 +17,8 @@ import datetime
 
 import pymongo
 
+from eduid_idp.login import SSOLoginData
+
 from eduid_common.session.session import SessionManager, Session
 
 
@@ -210,8 +212,18 @@ class ExpiringCacheCommonSession(ExpiringCache):
                               })
         else:
             redis_cfg['redis_host'] = config.redis_host
+        self._redis_cfg = redis_cfg
 
         self._manager = SessionManager(redis_cfg, ttl = ttl, secret = config.session_app_key)
+
+    def __repr__(self):
+        return '<{!s}: {!s}>'.format(self.__class__.__name__, unicode(self))
+
+    def __unicode__(self):
+        if 'redis_sentinel_hosts' in self._redis_cfg:
+            return u'redis sentinel={!r}'.format(','.join(self._redis_cfg['redis_sentinel_hosts']))
+        else:
+            return u'redis host={!r}'.format(self._redis_cfg['redis_host'])
 
     def add(self, key, info):
         """
@@ -219,10 +231,20 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :param key: Lookup key for entry
         :param info: Value to be stored for 'key'
+
+        :type key: str | unciode
+        :type info: dict
+
         :return: New session
         :rtype: Session
         """
-        session = self._manager.get_session(session_id = key, data = info)
+        if isinstance(info, SSOLoginData):
+            data = info.to_dict()
+            data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
+        else:
+            data = info
+        _session_id = bytes(key.decode('hex'))
+        session = self._manager.get_session(session_id = _session_id, data = data)
         session.commit()
         return session
 
@@ -231,19 +253,31 @@ class ExpiringCacheCommonSession(ExpiringCache):
         Fetch data from cache based on `key'.
 
         :param key: hash key to use for lookup
-        :returns: Any data found matching `key', or None.
+
+        :type key: str | unicode
+
+        :returns: The previously added session
+        :rtype: Session | None
         """
-        session = self._manager.get_session(session_id = key)
-        return session
+        _session_id = bytes(key.decode('hex'))
+        try:
+            session = self._manager.get_session(session_id = _session_id)
+            return dict(session)
+        except KeyError:
+            pass
 
     def delete(self, key):
         """
         Delete an item from the cache.
 
         :param key: hash key to delete
+
+        :type key: str | unicode
+
         :return: True on success
         """
-        session = self._manager.get_session(session_id = key)
+        _session_id = bytes(key.decode('hex'))
+        session = self._manager.get_session(session_id = _session_id)
         if not session:
             return False
         session.clear()
