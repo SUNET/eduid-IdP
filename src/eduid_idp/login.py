@@ -169,7 +169,10 @@ class SSOLoginDataCache(object):
         self.IDP = idp_app
         self.logger = logger
         self.config = config
-        self._cache = eduid_idp.cache.ExpiringCache(name, logger, ttl, lock)
+        if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
+            self._cache = eduid_idp.cache.ExpiringCacheCommonSession(name, logger, ttl, config)
+        else:
+            self._cache = eduid_idp.cache.ExpiringCacheMem(name, logger, ttl, lock)
 
     def store_ticket(self, ticket):
         """

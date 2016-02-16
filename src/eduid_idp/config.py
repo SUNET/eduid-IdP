@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S
+# Copyright (c) 2013-2016 NORDUnet A/S
 # All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or
@@ -76,6 +76,13 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'actions_auth_shared_secret': 'abcdef',
                     'actions_app_uri': 'http://actions.example.com/',
                     'tou_version': 'version1',
+                    'login_session_secret_key': None,  # used to secure data in redis
+                    'redis_sentinel_hosts': [],
+                    'redis_sentinel_service_name': None,
+                    'redis_host': None,
+                    'redis_port': '6379',
+                    'redis_db': '0',
+                    'session_app_key': None,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -97,6 +104,7 @@ class IdPConfig(object):
     def __init__(self, filename, debug, defaults=None):
         self._parsed_content_packages = None
         self._parsed_status_test_usernames = None
+        self._parsed_redis_sentinel_hosts = None
         self.section = _CONFIG_SECTION
         _defaults = defaults or _CONFIG_DEFAULTS
         _defaults['debug'] = str(debug)
@@ -322,7 +330,9 @@ class IdPConfig(object):
         if self._parsed_status_test_usernames:
             return self._parsed_status_test_usernames
         value = self.config.get(self.section, 'status_test_usernames')
-        res = [x.strip() for x in value.split(',')]
+        res = []
+        if value:
+            res = [x.strip() for x in value.split(',')]
         self._parsed_status_test_usernames = res
         return res
 
@@ -456,3 +466,57 @@ class IdPConfig(object):
         The current version of the terms of use agreement.
         """
         return self.config.get(self.section, 'tou_version')
+
+    @property
+    def redis_sentinel_hosts(self):
+        """
+        Redis sentinel hosts, comma separated
+
+        :return: list of hosts
+
+        :rtype: [string]
+        """
+        if self._parsed_redis_sentinel_hosts:
+            return self._parsed_redis_sentinel_hosts
+        value = self.config.get(self.section, 'redis_sentinel_hosts')
+        res = []
+        if value:
+            res = [x.strip() for x in value.split(',')]
+        self._parsed_redis_sentinel_hosts = res
+        return res
+
+    @property
+    def redis_host(self):
+        """
+        The Redis host to use for session storage.
+        """
+        return self.config.get(self.section, 'redis_host')
+
+    @property
+    def redis_port(self):
+        """
+        The port of the Redis server (integer).
+        """
+        return self.config.getint(self.section, 'redis_port')
+
+    @property
+    def redis_sentinel_service_name(self):
+        """
+        The Redis sentinel 'service name'.
+        """
+        return self.config.get(self.section, 'redis_sentinel_service_name')
+
+    @property
+    def redis_db(self):
+        """
+        The Redis database number (integer).
+        """
+        return self.config.getint(self.section, 'redis_db')
+
+    @property
+    def session_app_key(self):
+        """
+        The Redis session encrypted application key.
+        """
+        return self.config.get(self.section, 'session_app_key')
+
