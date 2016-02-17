@@ -17,7 +17,7 @@ import datetime
 
 import pymongo
 
-from eduid_idp.login import SSOLoginData
+from eduid_idp.loginstate import SSOLoginData
 
 from eduid_common.session.session import SessionManager, Session
 
