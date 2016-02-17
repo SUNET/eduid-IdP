@@ -191,9 +191,7 @@ class SSOLoginDataCache(object):
         :returns: True on success
         """
         self.logger.debug('Storing login state (IdP ticket) in {!r}:\n{!s}'.format(self._cache, ticket))
-        data = ticket.to_dict()
-        del data['req_info']
-        self._cache.add(ticket.key, data)
+        self._cache.add(ticket.key, ticket)
         return True
 
     def create_ticket(self, data, binding, key=None):
