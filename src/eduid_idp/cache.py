@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S
+# Copyright (c) 2013, 2014, 2016 NORDUnet A/S
 # Copyright 2012 Roland Hedberg. All rights reserved.
 # All rights reserved.
 #
@@ -16,6 +16,10 @@ from hashlib import sha1
 import datetime
 
 import pymongo
+
+from eduid_idp.login import SSOLoginData
+
+from eduid_common.session.session import SessionManager, Session
 
 
 class NoOpLock(object):
@@ -44,6 +48,59 @@ class NoOpLock(object):
 
 class ExpiringCache(object):
     """
+    Base class of caches with a TTL.
+
+    :param name: name of cache as string, only used for debugging
+    :param logger: logging logger instance
+    :param ttl: data time to live in this cache, as seconds (integer)
+    :param lock: threading.Lock compatible locking instance
+    """
+
+    def __init__(self, name, logger, ttl, lock = None):
+        self.logger = logger
+        self.ttl = ttl
+        self.name = name
+
+    def key(self, something):
+        """
+        Generate a unique (not strictly guaranteed) key based on `something'.
+
+        :param something: object
+        :return:
+        """
+        return sha1(something).hexdigest()
+
+    def add(self, key, info):
+        """
+        Add entry to the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+        :return: None
+        """
+        raise NotImplementedError('add not implemented in subclass')
+
+    def get(self, key):
+        """
+        Fetch data from cache based on `key'.
+
+        :param key: hash key to use for lookup
+        :returns: Any data found matching `key', or None.
+        """
+        raise NotImplementedError('get not implemented in subclass')
+
+    def delete(self, key):
+        """
+        Delete an item from the cache.
+
+        :param key: hash key to delete
+        :return: True on success
+        """
+        raise NotImplementedError('delete not implemented in subclass')
+
+
+class ExpiringCacheMem(ExpiringCache):
+    """
     Simplistic implementation of a cache that removes entrys as they become too old.
 
     This implementation invokes garbage collecting on every addition of data. This
@@ -58,23 +115,12 @@ class ExpiringCache(object):
     """
 
     def __init__(self, name, logger, ttl, lock = None):
-        self.logger = logger
+        super(ExpiringCacheMem, self).__init__(name, logger, ttl)
         self._data = {}
         self._ages = deque()
-        self._ttl = ttl
-        self._name = name
         self.lock = lock
         if self.lock is None:
             self.lock = NoOpLock()
-
-    def key(self, something):
-        """
-        Generate a unique (not strictly guaranteed) key based on `something'.
-
-        :param something: object
-        :return:
-        """
-        return sha1(something).hexdigest()
 
     def add(self, key, info, now = None):
         """
@@ -93,9 +139,9 @@ class ExpiringCache(object):
         if _now is None:
             _now = int(time.time())
         self._ages.append((_now, key))
-        self.purge_expired(_now - self._ttl)
+        self._purge_expired(_now - self.ttl)
 
-    def purge_expired(self, timestamp):
+    def _purge_expired(self, timestamp):
         """
         Purge expired records.
 
@@ -117,7 +163,7 @@ class ExpiringCache(object):
                     self._ages.appendleft((_exp_ts, _exp_key))
                     break
                 self.logger.debug('Purged {!s} cache entry {!s} seconds over limit : {!s}'.format(
-                    self._name, timestamp - _exp_ts, _exp_key))
+                    self.name, timestamp - _exp_ts, _exp_key))
                 self.delete(_exp_key)
         finally:
             self.lock.release()
@@ -149,7 +195,93 @@ class ExpiringCache(object):
             return True
         except KeyError:
             self.logger.debug('Failed deleting key {!r} from {!s} cache (entry did not exist)'.format(
-                key, self._name))
+                key, self.name))
+
+
+class ExpiringCacheCommonSession(ExpiringCache):
+
+    def __init__(self, name, logger, ttl, config):
+        super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
+
+        redis_cfg = {'redis_port': config.redis_port,
+                     'redis_db': config.redis_db,
+                     }
+        if config.redis_sentinel_hosts:
+            redis_cfg.update({'redis_sentinel_hosts': config.redis_sentinel_hosts,
+                              'redis_sentinel_service_name': config.redis_sentinel_service_name,
+                              })
+        else:
+            redis_cfg['redis_host'] = config.redis_host
+        self._redis_cfg = redis_cfg
+
+        self._manager = SessionManager(redis_cfg, ttl = ttl, secret = config.session_app_key)
+
+    def __repr__(self):
+        return '<{!s}: {!s}>'.format(self.__class__.__name__, unicode(self))
+
+    def __unicode__(self):
+        if 'redis_sentinel_hosts' in self._redis_cfg:
+            return u'redis sentinel={!r}'.format(','.join(self._redis_cfg['redis_sentinel_hosts']))
+        else:
+            return u'redis host={!r}'.format(self._redis_cfg['redis_host'])
+
+    def add(self, key, info):
+        """
+        Add entry to the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+
+        :type key: str | unciode
+        :type info: dict
+
+        :return: New session
+        :rtype: Session
+        """
+        if isinstance(info, SSOLoginData):
+            data = info.to_dict()
+            data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
+        else:
+            data = info
+        _session_id = bytes(key.decode('hex'))
+        session = self._manager.get_session(session_id = _session_id, data = data)
+        session.commit()
+        return session
+
+    def get(self, key):
+        """
+        Fetch data from cache based on `key'.
+
+        :param key: hash key to use for lookup
+
+        :type key: str | unicode
+
+        :returns: The previously added session
+        :rtype: Session | None
+        """
+        _session_id = bytes(key.decode('hex'))
+        try:
+            session = self._manager.get_session(session_id = _session_id)
+            return dict(session)
+        except KeyError:
+            pass
+
+    def delete(self, key):
+        """
+        Delete an item from the cache.
+
+        :param key: hash key to delete
+
+        :type key: str | unicode
+
+        :return: True on success
+        """
+        _session_id = bytes(key.decode('hex'))
+        session = self._manager.get_session(session_id = _session_id)
+        if not session:
+            return False
+        session.clear()
+        return True
 
 
 class SSOSessionCache(object):
@@ -230,7 +362,7 @@ class SSOSessionCacheMem(SSOSessionCache):
 
     def __init__(self, logger, ttl, lock = None):
         SSOSessionCache.__init__(self, logger, ttl, lock)
-        self.lid2data = ExpiringCache('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
+        self.lid2data = ExpiringCacheMem('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
 
     def remove_session(self, sid):
         self.logger.debug('Purging SSO session, data : {!s}'.format(self.lid2data.get(sid)))

@@ -12,7 +12,6 @@
 Code handling Single Sign On logins.
 """
 
-import os
 import time
 import pprint
 
@@ -21,11 +20,10 @@ from hashlib import sha256
 
 from cgi import escape
 
+import eduid_idp
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.idp_actions import check_for_pending_actions
-import eduid_idp.util
-import eduid_idp.mischttp
 
 from saml2.request import AuthnRequest
 
@@ -65,17 +63,25 @@ class SSOLoginData(object):
         self._req_info = req_info
         self._SAMLRequest = data['SAMLRequest']
         self._RelayState = data.get('RelayState', '')
-        self._FailCount = 0
+        self._FailCount = data.get('FailCount', 0)
         self._binding = binding
 
     def __str__(self):
-        return pprint.pformat({'key': self._key,
-                               'req_info': self._req_info,
-                               'SAMLRequest length': len(self._SAMLRequest),
-                               'RelayState': self._RelayState,
-                               'binding': self._binding,
-                               'FailCount': self._FailCount,
-                               })
+        data = self.to_dict()
+        if 'SAMLRequest' in data:
+            data['SAMLRequest length'] = len(data['SAMLRequest'])
+            del data['SAMLRequest']
+        return pprint.pformat(data)
+
+    def to_dict(self):
+        res = {'key': self._key,
+               'req_info': self._req_info,
+               'SAMLRequest': self._SAMLRequest,
+               'RelayState': self._RelayState,
+               'binding': self._binding,
+               'FailCount': self._FailCount,
+               }
+        return res
 
     @property
     def key(self):
@@ -145,7 +151,7 @@ class SSOLoginData(object):
         return escape(self._binding, quote=True)
 
 
-class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
+class SSOLoginDataCache(object):
     """
     Login data is state kept between rendering the login screen, to when the user is
     completely logged in and redirected from the IdP to the original resource the
@@ -169,8 +175,13 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
     def __init__(self, idp_app, name, logger, ttl, config, lock = None):
         assert isinstance(config, eduid_idp.config.IdPConfig)
         self.IDP = idp_app
+        self.logger = logger
         self.config = config
-        eduid_idp.cache.ExpiringCache.__init__(self, name, logger, ttl, lock)
+        if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
+            self._cache = eduid_idp.cache.ExpiringCacheCommonSession(name, logger, ttl, config)
+        else:
+            self._cache = eduid_idp.cache.ExpiringCacheMem(name, logger, ttl, lock)
+        logger.debug('Set up IDP ticket cache {!s}'.format(self._cache))
 
     def store_ticket(self, ticket):
         """
@@ -179,8 +190,8 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         :param ticket: SSOLoginData instance
         :returns: True on success
         """
-        self.logger.debug("Storing login state (IdP ticket) :\n{!s}".format(ticket))
-        self.add(ticket.key, ticket)
+        self.logger.debug('Storing login state (IdP ticket) in {!r}:\n{!s}'.format(self._cache, ticket))
+        self._cache.add(ticket.key, ticket)
         return True
 
     def create_ticket(self, data, binding, key=None):
@@ -208,7 +219,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
             raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = self.logger)
         req_info = self._parse_SAMLRequest(data, binding)
         if not key:
-            key = self.key(data["SAMLRequest"])
+            key = self._cache.key(data["SAMLRequest"])
         ticket = SSOLoginData(key, req_info, data, binding)
         self.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
         return ticket
@@ -234,7 +245,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         if "key" in info:
             _key = info["key"]
         elif "SAMLRequest" in info:
-            _key = self.key(info["SAMLRequest"])
+            _key = self._cache.key(info["SAMLRequest"])
             self.logger.debug("No 'key' in info, hashed SAMLRequest into key {!s}".format(_key))
         else:
             raise eduid_idp.error.BadRequest("Missing SAMLRequest, please re-initiate login",
@@ -242,12 +253,12 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
 
         # lookup
         self.logger.debug("Lookup SSOLoginData (ticket) using key {!r}".format(_key))
-        _ticket = self.get(_key)
+        _ticket = self._cache.get(_key)
 
         if _ticket is None:
-            self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self))
-            if "key" in info and not "SAMLRequest" in info:
-                #raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
+            self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(_key, self._cache))
+            if "key" in info and "SAMLRequest" not in info:
+                # raise eduid_idp.error.LoginTimeout("Missing IdP ticket, please re-initiate login",
                 #                                   logger = self.logger, extra = {'info': info, 'binding': binding})
                 # This error could perhaps be handled better, but the LoginTimeout error message
                 # is not the right one for a number of scenarios where this problem has been
@@ -261,6 +272,11 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
             self.store_ticket(_ticket)
         else:
             self.logger.debug("Retreived login state (IdP.ticket) :\n{!s}".format(_ticket))
+
+        if isinstance(_ticket, dict):
+            # Ticket was stored in a backend that could not natively store a SSOLoginData instance. Recreate.
+            _ticket = self.create_ticket(_ticket, _ticket['binding'], key=_key)
+            self.logger.debug('Re-created SSOLoginData from stored ticket state:\n{!s}'.format(_ticket))
 
         return _ticket
 
@@ -281,7 +297,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
         :type binding: string
         :rtype: AuthnRequest
         """
-        #self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
+        # self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
         _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], binding)
         if not _req_info:
             # Either there was no request, or pysaml2 found it to be unacceptable.
@@ -311,7 +327,7 @@ class SSOLoginDataCache(eduid_idp.cache.ExpiringCache):
                         verified_ok = True
                         break
                 if not verified_ok:
-                    _key = self.key(info["SAMLRequest"])
+                    _key = self._cache.key(info["SAMLRequest"])
                     self.logger.info("{!s}: SAML request signature verification failure".format(_key))
                     raise eduid_idp.error.BadRequest("SAML request signature verification failure",
                                                      logger = self.logger)
@@ -659,9 +675,10 @@ class SSO(Service):
 
     def _redirect_or_post(self, ticket):
         """
-        Commmon code for redirect() and post() endpoints.
+        Common code for redirect() and post() endpoints.
 
-        :param ticket: SSOLoginData instance
+        :type ticket: SSOLoginData
+
         :rtype: string
         """
         _force_authn = self._should_force_authn(ticket)
@@ -839,7 +856,7 @@ def do_verify(idp_app):
     idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(
         user_authn['class_ref'], authn_ref))
 
-    if not password or not 'username' in query:
+    if not password or 'username' not in query:
         raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
 
     login_data = {'username': query['username'].strip(),

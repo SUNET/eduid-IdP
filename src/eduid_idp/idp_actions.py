@@ -38,6 +38,7 @@ import time
 from pkg_resources import iter_entry_points
 
 import eduid_idp.util
+import eduid_idp.mischttp
 
 
 def check_for_pending_actions(idp_app, user, ticket):

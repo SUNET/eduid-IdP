@@ -37,17 +37,17 @@ __organization__ = 'NORDUnet'
 __license__ = 'BSD'
 __authors__ = ['Fredrik Thulin']
 
-from . import config
-from . import idp_user
-from . import service
-from . import cache
-from . import login
-from . import logout
-from . import mischttp
-from . import error
-from . import idp_conf
-from . import assurance
-from . import thirdparty
-from . import sso_session
-from . import authn
-from . import util
+import eduid_idp.config
+import eduid_idp.idp_user
+import eduid_idp.service
+import eduid_idp.cache
+import eduid_idp.login
+import eduid_idp.logout
+import eduid_idp.mischttp
+import eduid_idp.error
+import eduid_idp.idp_conf
+import eduid_idp.assurance
+import eduid_idp.thirdparty
+import eduid_idp.sso_session
+import eduid_idp.authn
+import eduid_idp.util

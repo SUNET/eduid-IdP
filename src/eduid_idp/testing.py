@@ -32,8 +32,6 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
-__author__ = 'ft'
-
 import os
 import bson
 import pkg_resources
@@ -49,6 +47,8 @@ from saml2 import server
 
 import logging
 logger = logging.getLogger()
+
+__author__ = 'ft'
 
 PWHASHES = {}
 
