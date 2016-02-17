@@ -63,7 +63,7 @@ class SSOLoginData(object):
         self._req_info = req_info
         self._SAMLRequest = data['SAMLRequest']
         self._RelayState = data.get('RelayState', '')
-        self._FailCount = 0
+        self._FailCount = data.get('FailCount', 0)
         self._binding = binding
 
     def __str__(self):
@@ -277,8 +277,8 @@ class SSOLoginDataCache(object):
 
         if isinstance(_ticket, dict):
             # Ticket was stored in a backend that could not natively store a SSOLoginData instance. Recreate.
-            self.logger.debug('Recreating SSOLoginData from stored ticket state:\n{!s}'.format(_ticket))
             _ticket = self.create_ticket(_ticket, _ticket['binding'], key=_key)
+            self.logger.debug('Re-created SSOLoginData from stored ticket state:\n{!s}'.format(_ticket))
 
         return _ticket
 
@@ -677,9 +677,10 @@ class SSO(Service):
 
     def _redirect_or_post(self, ticket):
         """
-        Commmon code for redirect() and post() endpoints.
+        Common code for redirect() and post() endpoints.
 
-        :param ticket: SSOLoginData instance
+        :type ticket: SSOLoginData
+
         :rtype: string
         """
         _force_authn = self._should_force_authn(ticket)

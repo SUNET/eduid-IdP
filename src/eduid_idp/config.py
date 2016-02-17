@@ -76,7 +76,6 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'actions_auth_shared_secret': 'abcdef',
                     'actions_app_uri': 'http://actions.example.com/',
                     'tou_version': 'version1',
-                    'login_session_secret_key': None,  # used to secure data in redis
                     'redis_sentinel_hosts': [],
                     'redis_sentinel_service_name': None,
                     'redis_host': None,
@@ -519,4 +518,3 @@ class IdPConfig(object):
         The Redis session encrypted application key.
         """
         return self.config.get(self.section, 'session_app_key')
-
