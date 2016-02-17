@@ -121,6 +121,7 @@ import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
+from eduid_idp.loginstate import SSOLoginDataCache
 
 from eduid_userdb.actions import ActionDB
 
@@ -250,8 +251,8 @@ class IdPApplication(object):
         _my_id = self.IDP.config.entityid
         self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        self.IDP.ticket = eduid_idp.login.SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
-                                                            self.config, threading.Lock())
+        self.IDP.ticket = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
+                                            self.config, threading.Lock())
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):

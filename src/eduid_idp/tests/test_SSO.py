@@ -34,6 +34,7 @@
 #
 
 import eduid_idp
+from eduid_idp.loginstate import SSOLoginData
 
 from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
 
@@ -86,7 +87,7 @@ def make_login_ticket(req_class_ref):
                                                      )
     SSO = eduid_idp.login.SSO(sso_session_1, start_response, idp_app)
     req_info = SSO.IDP.parse_authn_request(xmlstr, binding)
-    return eduid_idp.login.SSOLoginData(key, req_info, {'SAMLRequest': xmlstr}, binding)
+    return SSOLoginData(key, req_info, {'SAMLRequest': xmlstr}, binding)
 
 
 # noinspection PyProtectedMember
