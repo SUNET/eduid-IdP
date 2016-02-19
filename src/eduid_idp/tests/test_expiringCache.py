@@ -83,11 +83,6 @@ class TestExpiringCache(TestCase):
         c.add(2, 'two')
         self.assertEqual({1: 'one', 2: 'two'}, c.items())
 
-    def test_key(self):
-        ttl = 30
-        c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl)
-        self.assertNotEqual(c.key('1'), c.key('2'))
-
     def test_delete(self):
         ttl = 30
         c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl)

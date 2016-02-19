@@ -8,10 +8,14 @@
 #          Roland Hedberg
 #
 
+import hmac
 import pprint
+import hashlib
 from cgi import escape
 
 import eduid_idp
+from eduid_common.session.session import derive_key
+
 from saml2.request import AuthnRequest
 from saml2.sigver import verify_redirect_signature
 
@@ -149,6 +153,7 @@ class SSOLoginDataCache(object):
         self.IDP = idp_app
         self.logger = logger
         self.config = config
+        self._keygen_key = derive_key(config.session_app_key, 'session', 'saml2key', 256 / 8)
         if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
             self._cache = eduid_idp.cache.ExpiringCacheCommonSession(name, logger, ttl, config)
         else:
@@ -191,7 +196,7 @@ class SSOLoginDataCache(object):
             raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = self.logger)
         req_info = self._parse_SAMLRequest(data, binding)
         if not key:
-            key = self._cache.key(data["SAMLRequest"])
+            key = self._request_to_key(data["SAMLRequest"])
         ticket = SSOLoginData(key, req_info, data, binding)
         self.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
         return ticket
@@ -217,7 +222,7 @@ class SSOLoginDataCache(object):
         if "key" in info:
             _key = info["key"]
         elif "SAMLRequest" in info:
-            _key = self._cache.key(info["SAMLRequest"])
+            _key = self._request_to_key(info["SAMLRequest"])
             self.logger.debug("No 'key' in info, hashed SAMLRequest into key {!s}".format(_key))
         else:
             raise eduid_idp.error.BadRequest("Missing SAMLRequest, please re-initiate login",
@@ -283,11 +288,6 @@ class SSOLoginDataCache(object):
             xmlstr = eduid_idp.util.maybe_xml_to_string(_req_info.message)
             self.logger.debug("Decoded SAMLRequest into AuthnRequest {!r} :\n\n{!s}\n\n".format(
                 _req_info.message, xmlstr))
-        try:
-            # XXX Temporary debug logging clause. This whole try/except can be removed in the next release.
-            self.logger.debug("Verify request signatures: {!r}".format(self.config.verify_request_signatures))
-        except AttributeError:
-            self.logger.debug("FAILED logging verify request signatures")
 
         if "SigAlg" in info and "Signature" in info:  # Signed request
             issuer = _req_info.message.issuer.text
@@ -299,7 +299,7 @@ class SSOLoginDataCache(object):
                         verified_ok = True
                         break
                 if not verified_ok:
-                    _key = self._cache.key(info["SAMLRequest"])
+                    _key = self._request_to_key(info["SAMLRequest"])
                     self.logger.info("{!s}: SAML request signature verification failure".format(_key))
                     raise eduid_idp.error.BadRequest("SAML request signature verification failure",
                                                      logger = self.logger)
@@ -310,6 +310,16 @@ class SSOLoginDataCache(object):
             # Leif says requests are typically not signed, and that verifying signatures
             # on SAML requests is considered a possible DoS attack vector, so it is typically
             # not done.
-            # XXX implement configuration flag to disable signature verification
             self.logger.debug("No signature in SAMLRequest")
         return _req_info
+
+    def _request_to_key(self, saml):
+        """
+        Generate a unique (not strictly guaranteed) key based on a SAML request.
+
+        :param saml: SAML request
+        :type saml: str | unicode
+        :return: session id
+        :rtype: str | unicode
+        """
+        return hmac.new(self._keygen_key, saml, digestmod=hashlib.sha256).hexdigest()

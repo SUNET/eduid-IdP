@@ -12,7 +12,6 @@
 import time
 import uuid
 from collections import deque
-from hashlib import sha1
 import datetime
 
 import pymongo
@@ -60,15 +59,6 @@ class ExpiringCache(object):
         self.logger = logger
         self.ttl = ttl
         self.name = name
-
-    def key(self, something):
-        """
-        Generate a unique (not strictly guaranteed) key based on `something'.
-
-        :param something: object
-        :return:
-        """
-        return sha1(something).hexdigest()
 
     def add(self, key, info):
         """
