@@ -238,7 +238,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
     This is a MongoDB version of AuthnInfoStore().
     """
 
-    def __init__(self, uri, logger, db_name = 'eduid_idp',
+    def __init__(self, uri, logger, db_name = 'eduid_idp_authninfo',
                  collection_name = 'authn_info',
                  **kwargs):
         AuthnInfoStore.__init__(self, logger)

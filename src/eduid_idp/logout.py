@@ -149,6 +149,8 @@ class SLO(Service):
             self.logger.debug("Logging out SSO session with key: {!s}".format(this))
             try:
                 _data = self.IDP.cache.get_session(this)
+                if not _data:
+                    raise KeyError('Session not found')
                 _sso = eduid_idp.sso_session.from_dict(_data)
                 res = self.IDP.cache.remove_session(this)
                 self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(

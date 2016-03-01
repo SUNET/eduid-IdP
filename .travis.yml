@@ -1,13 +1,15 @@
+sudo: false
 addons:
   apt:
     packages:
-      libxml2-dev
-      libxslt1-dev
-      zlib1g-dev
-      xmlsec1
-      libxml2-utils
-      libffi-dev
-      libssl-dev
+      xmlsec1  # pysaml2 needs to find an xmlsec1 binary
+#      libxml2-dev
+#      libxslt1-dev
+#      zlib1g-dev
+#      xmlsec1
+#      libxml2-utils
+#      libffi-dev
+#      libssl-dev
 language: python
 python:
   - "2.7"
