@@ -531,14 +531,21 @@ class IdPApplication(object):
         })
         res = res.format(**argv)
 
-        if status_code not in [404, 440]:
-            self.logger.error("Error in IdP application",
-                              exc_info = 1, extra={'data': {'request': cherrypy.request,
-                                                            'traceback': traceback,
-                                                            'status': status,
-                                                            'reason': reason,
-                                                            },
-                                                   })
+        # Return before logging the error for errors that are not failures in the IdP
+        # (avoids sentry reports)
+        if status_code in [403, 404, 440]:
+            return res
+
+        if status_code == 400 and str(reason) == 'Bad request, please re-initiate login':
+            return res
+
+        self.logger.error("Error in IdP application",
+                          exc_info = 1, extra={'data': {'request': cherrypy.request,
+                                                        'traceback': traceback,
+                                                        'status': status,
+                                                        'reason': reason,
+                                                        },
+                                               })
         return res
 
 
