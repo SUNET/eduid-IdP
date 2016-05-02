@@ -6,11 +6,11 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.5.1b0'
+version = '0.5.2'
 
 install_requires = [
     'eduid_userdb >= 0.0.4b5',
-    'eduid_common[idp] >= 0.2.0b0',
+    'eduid_common[idp] >= 0.2.1b4',
 
     'pysaml2 == 1.2.0beta5',
     'cherrypy == 3.2.4',
