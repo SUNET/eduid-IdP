@@ -203,15 +203,15 @@ class ExpiringCacheCommonSession(ExpiringCache):
     def __init__(self, name, logger, ttl, config):
         super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
 
-        redis_cfg = {'redis_port': config.redis_port,
-                     'redis_db': config.redis_db,
+        redis_cfg = {'REDIS_PORT': config.redis_port,
+                     'REDIS_DB': config.redis_db,
                      }
         if config.redis_sentinel_hosts:
-            redis_cfg.update({'redis_sentinel_hosts': config.redis_sentinel_hosts,
-                              'redis_sentinel_service_name': config.redis_sentinel_service_name,
+            redis_cfg.update({'REDIS_SENTINEL_HOSTS': config.redis_sentinel_hosts,
+                              'REDIS_SENTINEL_SERVICE_NAME': config.redis_sentinel_service_name,
                               })
         else:
-            redis_cfg['redis_host'] = config.redis_host
+            redis_cfg['REDIS_HOST'] = config.redis_host
         self._redis_cfg = redis_cfg
 
         self._manager = SessionManager(redis_cfg, ttl = ttl, secret = config.session_app_key)
@@ -220,10 +220,10 @@ class ExpiringCacheCommonSession(ExpiringCache):
         return '<{!s}: {!s}>'.format(self.__class__.__name__, unicode(self))
 
     def __unicode__(self):
-        if 'redis_sentinel_hosts' in self._redis_cfg:
-            return u'redis sentinel={!r}'.format(','.join(self._redis_cfg['redis_sentinel_hosts']))
+        if 'REDIS_SENTINEL_HOSTS' in self._redis_cfg:
+            return u'redis sentinel={!r}'.format(','.join(self._redis_cfg['REDIS_SENTINEL_HOSTS']))
         else:
-            return u'redis host={!r}'.format(self._redis_cfg['redis_host'])
+            return u'redis host={!r}'.format(self._redis_cfg['REDIS_HOST'])
 
     def add(self, key, info):
         """
