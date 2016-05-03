@@ -533,11 +533,15 @@ class IdPApplication(object):
 
         # Return before logging the error for errors that are not failures in the IdP
         # (avoids sentry reports)
-        if status_code in [403, 404, 440]:
+        if status_code in [401, 403, 404, 440]:
             return res
 
-        if status_code == 400 and str(reason) == 'Bad request, please re-initiate login':
-            return res
+        if status_code == 400:
+            if str(reason) in [
+                'Bad request, please re-initiate login',
+                'No valid SAMLRequest found',
+            ]:
+                return res
 
         self.logger.error("Error in IdP application",
                           exc_info = 1, extra={'data': {'request': cherrypy.request,

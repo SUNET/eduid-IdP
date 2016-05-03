@@ -14,6 +14,7 @@ from cgi import escape
 import eduid_idp
 from saml2.request import AuthnRequest
 from saml2.sigver import verify_redirect_signature
+from saml2.s_utils import UnravelError
 
 
 class SSOLoginData(object):
@@ -270,7 +271,12 @@ class SSOLoginDataCache(object):
         :rtype: AuthnRequest
         """
         # self.logger.debug("Parsing SAML request : {!r}".format(info["SAMLRequest"]))
-        _req_info = self.IDP.parse_authn_request(info["SAMLRequest"], binding)
+        try:
+            _req_info = self.IDP.parse_authn_request(info['SAMLRequest'], binding)
+        except UnravelError as exc:
+            self.logger.info('Failed parsing SAML request ({!s} bytes)'.format(len(info['SAMLRequest'])))
+            self.logger.debug('Failed parsing SAML request:\n{!s}\nException {!s}'.format(info['SAMLRequest'], exc))
+            raise eduid_idp.error.BadRequest('No valid SAMLRequest found', logger = self.logger)
         if not _req_info:
             # Either there was no request, or pysaml2 found it to be unacceptable.
             # For example, the IssueInstant might have been out of bounds.
