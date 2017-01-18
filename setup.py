@@ -12,7 +12,7 @@ install_requires = [
     'eduid_userdb >= 0.0.4b5',
     'eduid_common[idp] >= 0.2.1b4',
 
-    'pysaml2 == 1.2.0beta5',
+    'pysaml2 == 4.4.0',
     'cherrypy == 3.2.4',
 ]
 
