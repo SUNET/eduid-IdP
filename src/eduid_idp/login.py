@@ -27,6 +27,7 @@ from saml2 import BINDING_HTTP_REDIRECT
 from saml2.authn_context import requested_authn_context
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
+import lxml.etree as etree
 
 
 class MustAuthenticate(Exception):
@@ -67,7 +68,7 @@ class SSO(Service):
         Validate request, and then proceed with creating an AuthnResponse and
         invoking the 'outgoing' SAML2 binding.
 
-        :param ticket: SSOLoginData instance
+        :param ticket: Login process state
         :return: Response
 
         :type ticket: SSOLoginData
@@ -87,7 +88,7 @@ class SSO(Service):
 
         response_authn = self._get_login_response_authn(ticket, user)
 
-        saml_response = self._make_saml_response(resp_args, response_authn, user)
+        saml_response = self._make_saml_response(resp_args, response_authn, user, ticket)
 
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
@@ -107,17 +108,19 @@ class SSO(Service):
 
         return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
 
-    def _make_saml_response(self, resp_args, response_authn, user):
+    def _make_saml_response(self, resp_args, response_authn, user, ticket):
         """
         Create the SAML response using pysaml2 create_authn_response().
 
         :param resp_args: pysaml2 response arguments
         :param response_authn: pysaml2 response authn info
         :param user: IdP user
+        :param ticket: Login process state
 
         :type resp_args: dict
         :type response_authn: dict
         :type user: eduid_idp.idp_user.IdPUser
+        :type ticket: SSOLoginData
 
         :return: SAML response in lxml format
         """
@@ -133,15 +136,43 @@ class SSO(Service):
         saml_response = self.IDP.create_authn_response(attributes, userid = user.eppn,
                                                        authn = response_authn, sign_assertion = True,
                                                        **resp_args)
-        # Only perform expensive parse/pretty-print if debugging
-        if self.config.debug:
-            # saml_response is a compact XML document as string. For debugging, it is very
-            # useful to get that pretty-printed in the logfile directly, so parse the XML
-            # string to an etree again and then pretty-print format the etree into a new string.
-            xmlstr = eduid_idp.util.maybe_xml_to_string(saml_response)
-            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(xmlstr))
+        self._kantara_log_assertion_id(saml_response, ticket)
 
         return saml_response
+
+    def _kantara_log_assertion_id(self, saml_response, ticket):
+        """
+        Log the assertion id, which _might_ be required by Kantara.
+
+        :param saml_response: authn response as a compact XML string
+        :param ticket: Login process state
+
+        :type saml_response: str | unicode
+        :type ticket: SSOLoginData
+
+        :return: None
+        """
+        # saml_response is a
+        printed = False
+        try:
+            parser = etree.XMLParser(remove_blank_text = True)
+            xml = etree.XML(str(saml_response), parser)
+
+            # For debugging, it is very useful to get the full SAML response pretty-printed in the logfile directly
+            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(etree.tostring(xml, pretty_print=True)))
+            printed = True
+
+            attrs = xml.attrib
+            assertion = xml.find('{urn:oasis:names:tc:SAML:2.0:assertion}Assertion')
+            self.logger.info('{!s}: id={!s}, in_response_to={!s}, assertion_id={!s}'.format(
+                ticket.key, attrs['ID'], attrs['InResponseTo'], assertion.get('ID')))
+
+            return etree.tostring(xml, pretty_print = True)
+        except Exception as exc:
+            self.logger.debug("Could not parse message as XML: {!r}".format(exc))
+            if not printed:
+                # Fall back to logging the whole response
+                self.logger.info("{!s}: authn response: {!s}".format(ticket.key, saml_response))
 
     def _fticks_log(self, relying_party, authn_method, user_id):
         """
