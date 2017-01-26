@@ -87,21 +87,52 @@ class SSO(Service):
 
         response_authn = self._get_login_response_authn(ticket, user)
 
-        attributes = user.to_saml_attributes(self.config, self.logger)
+        saml_response = self._make_saml_response(resp_args, response_authn, user)
 
+        # Create the Javascript self-posting form that will take the user back to the SP
+        # with a SAMLResponse
+        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
+            self.binding_out, self.destination, ticket.RelayState))
+        http_args = self.IDP.apply_binding(self.binding_out, str(saml_response), self.destination,
+                                           ticket.RelayState, response = True)
+
+        # INFO-Log the SSO session id and the AL and destination
+        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
+                                                                      response_authn['class_ref'],
+                                                                      self.destination))
+        self._fticks_log(relying_party = resp_args.get('sp_entity_id', self.destination),
+                         authn_method = response_authn['class_ref'],
+                         user_id = str(user.user_id),
+                         )
+
+        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+
+    def _make_saml_response(self, resp_args, response_authn, user):
+        """
+        Create the SAML response using pysaml2 create_authn_response().
+
+        :param resp_args: pysaml2 response arguments
+        :param response_authn: pysaml2 response authn info
+        :param user: IdP user
+
+        :type resp_args: dict
+        :type response_authn: dict
+        :type user: eduid_idp.idp_user.IdPUser
+
+        :return: SAML response in lxml format
+        """
+        attributes = user.to_saml_attributes(self.config, self.logger)
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
                               "Response args:\n{!s},\n\nAuthn:\n{!s}\n".format(
-                              user,
-                              pprint.pformat(attributes),
-                              pprint.pformat(resp_args),
-                              pprint.pformat(response_authn)))
-
+                user,
+                pprint.pformat(attributes),
+                pprint.pformat(resp_args),
+                pprint.pformat(response_authn)))
         saml_response = self.IDP.create_authn_response(attributes, userid = user.eppn,
                                                        authn = response_authn, sign_assertion = True,
                                                        **resp_args)
-
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             # saml_response is a compact XML document as string. For debugging, it is very
@@ -110,25 +141,7 @@ class SSO(Service):
             xmlstr = eduid_idp.util.maybe_xml_to_string(saml_response)
             self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(xmlstr))
 
-        # Create the Javascript self-posting form that will take the user back to the SP
-        # with a SAMLResponse
-        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
-            self.binding_out, self.destination, ticket.RelayState))
-        http_args = self.IDP.apply_binding(self.binding_out, str(saml_response), self.destination,
-                                           ticket.RelayState, response = True)
-        #self.logger.debug("HTTPargs :\n{!s}".format(pprint.pformat(http_args)))
-
-        # INFO-Log the SSO session id and the AL and destination
-        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
-                                                                      response_authn['class_ref'],
-                                                                      self.destination))
-        if self.config.fticks_secret_key:
-            self._fticks_log(relying_party = resp_args.get('sp_entity_id', self.destination),
-                             authn_method = response_authn['class_ref'],
-                             user_id = str(user.user_id),
-                             )
-
-        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+        return saml_response
 
     def _fticks_log(self, relying_party, authn_method, user_id):
         """
@@ -143,6 +156,8 @@ class SSO(Service):
         :type user_id: string
         :return: None
         """
+        if not self.config.fticks_secret_key:
+            return
         # Default format string:
         #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
         _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
