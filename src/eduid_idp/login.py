@@ -588,7 +588,7 @@ def do_verify(idp_app):
     idp_app.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
         query['key'], _sso_session.public_id,
         _sso_session.user_authn_class_ref,
-        _sso_session.user_id))
+        user))
 
     # Now that an SSO session has been created, redirect the users browser back to
     # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'
