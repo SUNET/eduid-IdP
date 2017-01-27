@@ -14,6 +14,7 @@ install_requires = [
 
     'pysaml2 == 4.4.0',
     'cherrypy == 3.2.4',
+    'lxml == 3.7.2',
 ]
 
 testing_extras = [
