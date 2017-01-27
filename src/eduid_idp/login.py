@@ -27,6 +27,7 @@ from saml2 import BINDING_HTTP_REDIRECT
 from saml2.authn_context import requested_authn_context
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
+from saml2.s_utils import UnknownSystemEntity
 import lxml.etree as etree
 
 
@@ -431,6 +432,9 @@ class SSO(Service):
                 return self.perform_login(ticket)
             except MustAuthenticate:
                 _force_authn = True
+            except UnknownSystemEntity as exc:
+                self.logger.info('{!s}: Service provider not known: {!s}'.format(ticket.key, exc))
+                raise eduid_idp.error.ServiceError('SAML_UNKNOWN_SP')
 
         if not self.sso_session:
             self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))

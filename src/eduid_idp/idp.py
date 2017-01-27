@@ -451,7 +451,8 @@ class IdPApplication(object):
 
     def error_page_default(self, status, message, traceback, version):
         """
-        Function called by CherryPy when there is an unhandled exception processing a request.
+        Function called by CherryPy when there is an exception
+        (subclass of cherrypy.HTTPError) processing a request.
 
         Display a 'fail whale' page (error.html), and log the error in a way that makes
         post-mortem analysis in Sentry as easy as possible.
@@ -521,6 +522,12 @@ class IdPApplication(object):
         except (ValueError, AttributeError, IndexError):
             pass
 
+        messages = {'SAML_UNKNOWN_SP': 'SAML error: Unknown Service Provider',
+                    }
+        error_details = ''
+        if reason in messages:
+            error_details = '<p>' + messages[reason] + '</p>'
+
         # apply simplistic HTML formatting to template in 'res'
         argv = eduid_idp.mischttp.get_default_template_arguments(self.config)
         argv.update({
@@ -528,6 +535,7 @@ class IdPApplication(object):
             'error_code': str(status_code),
             'error_reason': str(reason),
             'error_traceback': str(traceback),
+            'error_details': str(error_details),
         })
         res = res.format(**argv)
 
