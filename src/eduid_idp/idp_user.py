@@ -41,6 +41,7 @@ from eduid_userdb import UserDB, User
 
 # default list of SAML attributes to release
 _SAML_ATTRIBUTES = ['displayName',
+                    'eduPersonAssurance',
                     'eduPersonEntitlement',
                     'eduPersonPrincipalName',
                     'eduPersonScopedAffiliation',
