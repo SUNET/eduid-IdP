@@ -43,6 +43,7 @@ from eduid_userdb import UserDB, User
 _SAML_ATTRIBUTES = ['displayName',
                     'eduPersonEntitlement',
                     'eduPersonPrincipalName',
+                    'eduPersonScopedAffiliation',
                     'givenName',
                     'mail',
                     'norEduPersonNIN',
@@ -80,7 +81,8 @@ class IdPUser(User):
             if approved in attributes_in:
                 attributes[approved] = attributes_in.pop(approved)
         logger.debug('Discarded non-attributes:\n{!s}'.format(pprint.pformat(attributes_in)))
-        attributes = _make_scoped_eppn(attributes, config)
+        attributes1 = _make_scoped_eppn(attributes, config)
+        attributes = _add_scoped_affiliation(attributes1, config)
         return attributes
 
 

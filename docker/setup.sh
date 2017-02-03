@@ -40,7 +40,7 @@ echo "#############################################################"
 /opt/eduid/bin/pip install       -i ${PYPI} raven
 # Temporarily install fixed version of pykcs11 until issues with 1.3.1 is fixed
 /opt/eduid/bin/pip install       -i ${PYPI} pykcs11==1.3.0
-/opt/eduid/bin/pip install       -i ${PYPI} pyXMLSecurity[PKCS11]
+/opt/eduid/bin/pip install --pre -i ${PYPI} pyXMLSecurity[PKCS11]
 /opt/eduid/bin/pip install       -i ${PYPI} requests
 /opt/eduid/bin/pip install --pre -i ${PYPI} eduid_action.tou
 

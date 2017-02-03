@@ -6,14 +6,15 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.5.2'
+version = '0.5.3b0'
 
 install_requires = [
     'eduid_userdb >= 0.0.4b5',
     'eduid_common[idp] >= 0.2.1b4',
 
-    'pysaml2 == 1.2.0beta5',
+    'pysaml2 == 4.4.0',
     'cherrypy == 3.2.4',
+    'lxml == 3.7.2',
 ]
 
 testing_extras = [
