@@ -153,7 +153,6 @@ class SSO(Service):
 
         :return: None
         """
-        # saml_response is a
         printed = False
         try:
             parser = etree.XMLParser(remove_blank_text = True)

@@ -172,6 +172,7 @@ def _add_scoped_affiliation(attributes, config):
         attributes[epsa] = config.default_scoped_affiliation
     return attributes
 
+
 def _add_eduperson_assurance(attributes, user):
     """
     Add an eduPersonAssurance attribute indicating the level of id-proofing
