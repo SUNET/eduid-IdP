@@ -41,6 +41,7 @@ from eduid_userdb import UserDB, User
 
 # default list of SAML attributes to release
 _SAML_ATTRIBUTES = ['displayName',
+                    'eduPersonAssurance',
                     'eduPersonEntitlement',
                     'eduPersonPrincipalName',
                     'eduPersonScopedAffiliation',
@@ -82,7 +83,8 @@ class IdPUser(User):
                 attributes[approved] = attributes_in.pop(approved)
         logger.debug('Discarded non-attributes:\n{!s}'.format(pprint.pformat(attributes_in)))
         attributes1 = _make_scoped_eppn(attributes, config)
-        attributes = _add_scoped_affiliation(attributes1, config)
+        attributes2 = _add_scoped_affiliation(attributes1, config)
+        attributes = _add_eduperson_assurance(attributes2, self)
         return attributes
 
 
@@ -168,4 +170,25 @@ def _add_scoped_affiliation(attributes, config):
     epsa = 'eduPersonScopedAffiliation'
     if epsa not in attributes and config.default_scoped_affiliation:
         attributes[epsa] = config.default_scoped_affiliation
+    return attributes
+
+
+def _add_eduperson_assurance(attributes, user):
+    """
+    Add an eduPersonAssurance attribute indicating the level of id-proofing
+    a user has achieved, regardless of current session authentication strength.
+
+    :param attributes: Attributes of a user
+    :param user: The user in question
+
+    :type attributes: dict
+    :type user: IdPUser
+
+    :return: New attributes
+    :rtype: dict
+    """
+    attributes['eduPersonAssurance'] = 'http://www.swamid.se/policy/assurance/al1'
+    _verified_nins = [x for x in user.nins.to_list() if x.is_verified]
+    if _verified_nins:
+        attributes['eduPersonAssurance'] = 'http://www.swamid.se/policy/assurance/al2'
     return attributes
