@@ -33,7 +33,25 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+import os
+import logging
+import datetime
+import pkg_resources
+
+import eduid_idp
+import eduid_userdb
+import eduid_common.authn
+import vccs_client
+
 from eduid_idp.testing import IdPSimpleTestCase
+from eduid_userdb.testing import MongoTestCase
+from eduid_idp.idp import IdPApplication
+
+from bson import ObjectId
+
+logger = logging.getLogger(__name__)
+
+eduid_common.authn.TESTING = True
 
 
 class TestIdPUserDb(IdPSimpleTestCase):
@@ -61,3 +79,64 @@ class TestIdPUserDb(IdPSimpleTestCase):
                 'password': password,
                 }
         return self.authn.verify_username_and_password(data,)
+
+
+class TestAuthentication(MongoTestCase):
+
+    def setUp(self):
+        super(TestAuthentication, self).setUp(celery=None, get_attribute_manager=None)
+
+        # load the IdP configuration
+        datadir = pkg_resources.resource_filename(__name__, 'data')
+        self.config_file = os.path.join(datadir, 'test_config.ini')
+        _defaults = eduid_idp.config._CONFIG_DEFAULTS
+        _defaults['mongo_uri'] = self.tmp_db.get_uri('')
+        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
+        self.config = eduid_idp.config.IdPConfig(self.config_file, debug=True, defaults=_defaults)
+
+        # Create the IdP app
+        self.idp_app = IdPApplication(logger, self.config)
+
+        self.test_user = self.amdb.get_user_by_mail('johnsmith@example.com')
+        assert isinstance(self.test_user, eduid_userdb.User)
+
+    def test_authn_unknown_user(self):
+        data = {'username': 'foo',
+                'password': 'bar',
+                }
+        self.assertFalse(self.idp_app.authn.verify_username_and_password(data))
+
+    def test_authn_known_user_wrong_password(self):
+        assert isinstance(self.test_user, eduid_userdb.User)
+        cred_id = ObjectId()
+        factor = vccs_client.VCCSPasswordFactor('foo', str(cred_id), salt=None)
+        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        data = {'username': self.test_user.mail_addresses.primary.email,
+                'password': 'bar',
+                }
+        self.assertFalse(self.idp_app.authn.verify_username_and_password(data))
+
+    def test_authn_known_user_right_password(self):
+        assert isinstance(self.test_user, eduid_userdb.User)
+        passwords = self.test_user.passwords.to_list()
+        factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
+        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        data = {'username': self.test_user.mail_addresses.primary.email,
+                'password': 'foo',
+                }
+        self.assertTrue(self.idp_app.authn.verify_username_and_password(data))
+
+    def test_authn_expired_credential(self):
+        assert isinstance(self.test_user, eduid_userdb.User)
+        passwords = self.test_user.passwords.to_list()
+        factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
+        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        data = {'username': self.test_user.mail_addresses.primary.email,
+                'password': 'foo',
+                }
+        # Store a successful authentication using this credential three year ago
+        three_years_ago = datetime.datetime.now() - datetime.timedelta(days = 3 * 365)
+        self.idp_app.authn.authn_store.credential_success([passwords[0].key], three_years_ago)
+        with self.assertRaises(eduid_idp.error.Forbidden):
+            self.assertTrue(self.idp_app.authn.verify_username_and_password(data))
+        self.fail()

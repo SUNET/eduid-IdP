@@ -45,6 +45,7 @@ import eduid_idp.error
 
 from eduid_userdb import MongoDB, Password
 from eduid_userdb.exceptions import UserHasNotCompletedSignup
+from eduid_common.authn import get_vccs_client
 
 
 class IdPAuthn(object):
@@ -63,7 +64,7 @@ class IdPAuthn(object):
         self.userdb = userdb
         self.auth_client = auth_client
         if self.auth_client is None:
-            self.auth_client = vccs_client.VCCSClient(base_url = config.vccs_url)
+            self.auth_client = get_vccs_client(config.vccs_url)
         self.authn_store = authn_store
         if self.authn_store is None and config.mongo_uri:
             self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
@@ -191,6 +192,11 @@ class IdPAuthn(object):
                 try:
                     if self.auth_client.authenticate(user_id, [factor]):
                         self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                        # Verify that the credential had been successfully used in the last 18 monthts
+                        # (Kantara AL2_CM_CSM#050).
+                        if self.credential_expired(cred):
+                            self.logger.info('User {!r} credential {!s} has expired'.format(user, cred.key))
+                            raise eduid_idp.error.Forbidden(extra='credential_expired')
                         self.log_authn(user, success=[cred.id], failure=[])
                         return user
                 except vccs_client.VCCSClientHTTPError as exc:
@@ -202,6 +208,27 @@ class IdPAuthn(object):
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
         self.log_authn(user, success=[], failure=[cred.id for cred in user.passwords.to_list()])
         return None
+
+    def credential_expired(self, cred):
+        """
+        Check that a credential hasn't been unused for too long according to Kantara AL2_CM_CSM#050.
+        :param cred: Authentication credential
+
+        :type cred: Password
+        :rtype: bool
+        """
+        if not self.authn_store:  # requires optional configuration
+            self.logger.debug("Can't check if credential {!r} is expired, no authn_store available".format(cred.key))
+            return False
+        last_used = self.authn_store.get_credential_last_used(cred.id)
+        if last_used is None:
+            # Can't disallow this while there is a short-path from signup to dashboard unforch...
+            self.logger.debug('Allowing never-used credential {!r}'.format(cred))
+            return False
+        now = datetime.datetime.utcnow().replace(tzinfo = None)  # thanks for not having timezone.utc, Python2
+        delta = now - last_used.replace(tzinfo = None)
+        self.logger.debug("Credential {} last used {!r} days ago".format(cred.key, delta.days))
+        return delta.days >= int(365 * 1.5)
 
     def log_authn(self, user, success, failure):
         """
@@ -363,6 +390,21 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
         if not data.count():
             return UserAuthnInfo({})
         return UserAuthnInfo(data[0])
+
+    def get_credential_last_used(self, cred_id):
+        """
+        Get the timestamp for when a specific credential was last used successfully.
+
+        :param cred_id: Id of credential
+        :type cred_id: bson.ObjectId
+
+        :return: None | datetime.datetime
+        """
+        # Locate documents written by credential_success() above
+        data = self.collection.find({'_id': cred_id})
+        if not data.count():
+            return None
+        return data[0]['success_ts']
 
 
 class UserAuthnInfo(object):
