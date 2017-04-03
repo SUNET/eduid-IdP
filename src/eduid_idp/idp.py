@@ -481,7 +481,7 @@ class IdPApplication(object):
                  440: 'session_timeout.html',
                  }
         fn = pages.get(status_code)
-        if status == 500 and 'CREDENTIAL_EXPIRED' in message:
+        if status == 403 and 'CREDENTIAL_EXPIRED' in message:
             fn = 'credential_expired.html'
         if fn is None:
             fn = 'error.html'
@@ -554,9 +554,6 @@ class IdPApplication(object):
                 'Bad request, please re-initiate login',
                 'No valid SAMLRequest found',
             ]:
-                return res
-        if status_code == 500:
-            if 'CREDENTIAL_EXPIRED' in reason:
                 return res
 
         self.logger.error("Error in IdP application",

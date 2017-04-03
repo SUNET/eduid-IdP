@@ -142,5 +142,5 @@ class TestAuthentication(MongoTestCase):
         # Do the same thing again to make sure we didn't accidentally update the
         # 'last successful login' timestamp when it was a successful login with an
         # expired credential.
-        with self.assertRaises(eduid_idp.error.ServiceError):
+        with self.assertRaises(eduid_idp.error.Forbidden):
             self.assertTrue(self.idp_app.authn.verify_username_and_password(data))
