@@ -447,7 +447,7 @@ class IdPApplication(object):
         """
         self.logger.debug("handle_error() invoked")
         cherrypy.response.status = 500
-        cherrypy.response.body = self._render_error_page('500', 'Server Internal Error')
+        cherrypy.response.body = self._render_error_page('500', 'Server Internal Error', filename='error.html')
 
     def error_page_default(self, status, message, traceback, version):
         """
@@ -480,10 +480,13 @@ class IdPApplication(object):
                  429: 'toomany.html',
                  440: 'session_timeout.html',
                  }
-        if status_code in pages:
-            res = self._render_error_page(status, message, traceback, filename=pages[status_code])
-        else:
-            res = self._render_error_page(status, message, traceback)
+        fn = pages.get(status_code)
+        if status_code == 403 and 'CREDENTIAL_EXPIRED' in message:
+            fn = 'credential_expired.html'
+        if fn is None:
+            fn = 'error.html'
+
+        res = self._render_error_page(status, message, traceback = traceback, filename = fn)
 
         # CherryPy will call res.encode('utf-8') so we need to decode() it first. My head hurts.
         try:
@@ -493,7 +496,7 @@ class IdPApplication(object):
 
         return res
 
-    def _render_error_page(self, status, reason, traceback=None, filename='error.html'):
+    def _render_error_page(self, status, reason, filename, traceback=None):
         # Look for error page in user preferred language
         """
         Render localized error page `error.html' or a default string based one if
@@ -501,11 +504,13 @@ class IdPApplication(object):
 
         :param status: HTML error code
         :param reason: HTML error message
+        :param filename: HTML error page filename
         :param traceback: traceback of error
         :return: HTML
 
         :type status: string
         :type reason: string
+        :type filename: string
         :type traceback: string
         :rtype: unicode
         """
