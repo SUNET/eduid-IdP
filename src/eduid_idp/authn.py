@@ -196,7 +196,7 @@ class IdPAuthn(object):
                         # (Kantara AL2_CM_CSM#050).
                         if self.credential_expired(cred):
                             self.logger.info('User {!r} credential {!s} has expired'.format(user, cred.key))
-                            raise eduid_idp.error.Forbidden(extra='credential_expired')
+                            raise eduid_idp.error.ServiceError('CREDENTIAL_EXPIRED')
                         self.log_authn(user, success=[cred.id], failure=[])
                         return user
                 except vccs_client.VCCSClientHTTPError as exc:
