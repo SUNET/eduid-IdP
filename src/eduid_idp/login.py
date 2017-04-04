@@ -528,7 +528,6 @@ class SSO(Service):
             "alert_msg": "",
             "sp_entity_id": "",
             "failcount": ticket.FailCount,
-            "password_reset_link": self.config.password_reset_link,
             # SAMLRequest, RelayState and binding are used to re-create the ticket state if not found using `key'
             "SAMLRequest": ticket.SAMLRequest,
             "RelayState": ticket.RelayState,

@@ -367,7 +367,8 @@ def get_default_template_arguments(config):
         'student_link': config.student_link,
         'technicians_link': config.technicians_link,
         'staff_link': config.staff_link,
-        'faq_link': config.faq_link
+        'faq_link': config.faq_link,
+        'password_reset_link': config.password_reset_link,
     }
 
 
