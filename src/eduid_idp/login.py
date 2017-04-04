@@ -433,7 +433,7 @@ class SSO(Service):
                 _force_authn = True
             except UnknownSystemEntity as exc:
                 self.logger.info('{!s}: Service provider not known: {!s}'.format(ticket.key, exc))
-                raise eduid_idp.error.ServiceError('SAML_UNKNOWN_SP')
+                raise eduid_idp.error.BadRequest('SAML_UNKNOWN_SP')
 
         if not self.sso_session:
             self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))
@@ -528,7 +528,6 @@ class SSO(Service):
             "alert_msg": "",
             "sp_entity_id": "",
             "failcount": ticket.FailCount,
-            "password_reset_link": self.config.password_reset_link,
             # SAMLRequest, RelayState and binding are used to re-create the ticket state if not found using `key'
             "SAMLRequest": ticket.SAMLRequest,
             "RelayState": ticket.RelayState,
