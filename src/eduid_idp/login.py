@@ -433,7 +433,7 @@ class SSO(Service):
                 _force_authn = True
             except UnknownSystemEntity as exc:
                 self.logger.info('{!s}: Service provider not known: {!s}'.format(ticket.key, exc))
-                raise eduid_idp.error.ServiceError('SAML_UNKNOWN_SP')
+                raise eduid_idp.error.BadRequest('SAML_UNKNOWN_SP')
 
         if not self.sso_session:
             self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))
