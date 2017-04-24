@@ -1,4 +1,4 @@
-sudo: false
+sudo: required
 addons:
   apt:
     packages:
@@ -15,8 +15,10 @@ python:
   - "2.7"
 # Have Travis CI start a mongodb server for us
 services:
-  - mongodb
+  - docker
 # command to install dependencies
+before_install:
+  - docker pull docker.sunet.se/eduid/mongodb:latest
 install:
   - python setup.py develop
   - pip install nosexcover WebTest==2.0.18
