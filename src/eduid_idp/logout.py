@@ -101,7 +101,8 @@ class SLO(Service):
 
         # look for the subject
         subject = req_info.subject_id()
-        self.logger.debug("Logout subject: {!s}".format(subject.text.strip()))
+        if subject is not None:
+            self.logger.debug("Logout subject: {!s}".format(subject.text.strip()))
         # XXX should verify issuer (a.k.a. sender()) somehow perhaps
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
