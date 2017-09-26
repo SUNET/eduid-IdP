@@ -310,7 +310,7 @@ class IdPApplication(object):
         path = cherrypy.request.path_info.lstrip('/')
         self.logger.debug("<application> PATH: %s" % path)
 
-        static_fn = eduid_idp.mischttp.static_filename(self.config, path)
+        static_fn = eduid_idp.mischttp.static_filename(self.config, path, self.logger)
         if static_fn:
             return eduid_idp.mischttp.static_file(self._my_start_response, static_fn, self.logger)
 

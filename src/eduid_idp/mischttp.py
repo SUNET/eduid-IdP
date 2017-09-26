@@ -145,12 +145,13 @@ def get_request_body():
     return raw_body
 
 
-def static_filename(config, path):
+def static_filename(config, path, logger):
     """
     Check if there is a static file matching 'path'.
 
     :param config: IdP config
     :param path: URL part to check
+    :param logger: Logging logger
     :return: False, None or filename as string
 
     :type config: eduid_idp.config.IdPConfig
@@ -160,6 +161,9 @@ def static_filename(config, path):
     if not isinstance(path, basestring):
         return False
     if not config.static_dir:
+        return False
+    if '..' in str(path):
+        logger.warning("Attempted directory traversal: \'{}\'".format(path))
         return False
     try:
         filename = os.path.join(config.static_dir, path)
