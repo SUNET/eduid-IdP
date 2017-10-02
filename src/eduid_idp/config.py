@@ -36,7 +36,11 @@ Configuration (file) handling for eduID IdP.
 """
 
 import os
-import ConfigParser
+try:
+    import configparser
+except:
+    from six.moves import configparser
+
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'syslog_debug': '0',              # '1' for True, '0' for False
@@ -109,7 +113,7 @@ class IdPConfig(object):
         _defaults['debug'] = str(debug)
         cfgdir = os.path.dirname(filename)
         _defaults['pysaml2_config'] = os.path.join(cfgdir, _defaults['pysaml2_config'])
-        self.config = ConfigParser.ConfigParser(_defaults)
+        self.config = configparser.ConfigParser(_defaults)
         if not self.config.read([filename]):
             raise ValueError("Failed loading config file {!r}".format(filename))
 
