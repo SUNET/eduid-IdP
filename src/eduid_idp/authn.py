@@ -43,7 +43,8 @@ import vccs_client
 import eduid_idp.assurance
 import eduid_idp.error
 
-from eduid_userdb import MongoDB, Password
+from eduid_userdb import MongoDB
+from eduid_userdb.credentials import Password
 from eduid_userdb.exceptions import UserHasNotCompletedSignup
 from eduid_common.authn import get_vccs_client
 
@@ -152,10 +153,11 @@ class IdPAuthn(object):
             # user used in the last successful authentication. This optimization
             # is based on plain assumption, no measurements whatsoever.
             last_creds = authn_info.last_used_credentials()
-            creds = sorted(user.passwords.to_list(), key=lambda x: x.id not in last_creds)
-            if creds != user.passwords.to_list():
+            pw_credentials = user.credentials.filter(Password).to_list()
+            creds = sorted(pw_credentials, key=lambda x: x.credential_id not in last_creds)
+            if creds != pw_credentials:
                 self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
-                    [x.id for x in user.passwords.to_list()],
+                    [x.id for x in pw_credentials],
                     [x.id for x in creds],
                     last_creds))
         else:
@@ -182,12 +184,13 @@ class IdPAuthn(object):
         for cred in credentials:
             if isinstance(cred, Password):
                 try:
-                    factor = vccs_client.VCCSPasswordFactor(password, str(cred.id), str(cred.salt))
+                    factor = vccs_client.VCCSPasswordFactor(password, str(cred.credential_id), str(cred.salt))
                 except ValueError as exc:
-                    self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(username, cred.id, exc))
+                    self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(
+                        username, cred.credential_id, exc))
                     continue
                 self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
-                    username, str(cred.id), factor))
+                    username, str(cred.credential_id), factor))
                 user_id = str(user.user_id)
                 try:
                     if self.auth_client.authenticate(user_id, [factor]):
@@ -197,16 +200,16 @@ class IdPAuthn(object):
                         if self.credential_expired(cred):
                             self.logger.info('User {!r} credential {!s} has expired'.format(user, cred.key))
                             raise eduid_idp.error.Forbidden('CREDENTIAL_EXPIRED')
-                        self.log_authn(user, success=[cred.id], failure=[])
+                        self.log_authn(user, success=[cred.credential_id], failure=[])
                         return user
                 except vccs_client.VCCSClientHTTPError as exc:
                     if exc.http_code == 500:
-                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred.id))
+                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred.credential_id))
                         continue
             else:
                 self.logger.debug("Unknown credential: {!s}".format(cred))
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
-        self.log_authn(user, success=[], failure=[cred.id for cred in user.passwords.to_list()])
+        self.log_authn(user, success=[], failure=[cred.credential_id for cred in user.passwords.to_list()])
         return None
 
     def credential_expired(self, cred):
@@ -220,7 +223,7 @@ class IdPAuthn(object):
         if not self.authn_store:  # requires optional configuration
             self.logger.debug("Can't check if credential {!r} is expired, no authn_store available".format(cred.key))
             return False
-        last_used = self.authn_store.get_credential_last_used(cred.id)
+        last_used = self.authn_store.get_credential_last_used(cred.credential_id)
         if last_used is None:
             # Can't disallow this while there is a short-path from signup to dashboard unforch...
             self.logger.debug('Allowing never-used credential {!r}'.format(cred))
