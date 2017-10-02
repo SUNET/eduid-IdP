@@ -43,5 +43,6 @@ echo "#############################################################"
 /opt/eduid/bin/pip install --pre -i ${PYPI} pyXMLSecurity[PKCS11]
 /opt/eduid/bin/pip install       -i ${PYPI} requests
 /opt/eduid/bin/pip install --pre -i ${PYPI} eduid_action.tou
+/opt/eduid/bin/pip install --pre -i ${PYPI} eduid_action.mfa
 
 /opt/eduid/bin/pip freeze
