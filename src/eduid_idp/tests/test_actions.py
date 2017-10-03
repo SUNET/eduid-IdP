@@ -37,6 +37,7 @@ import os
 import logging
 import pkg_resources
 
+import bson
 import webtest
 import cherrypy
 
@@ -46,6 +47,7 @@ import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
 from eduid_idp.idp import IdPApplication
 
+import eduid_userdb
 from eduid_userdb.testing import MongoTestCase
 
 
@@ -114,7 +116,8 @@ class TestActions(MongoTestCase):
         form = resp.forms['login-form']
 
         # fill in the form and post it to the test env
-        form['username'].value = 'johnsmith@example.com'
+        _email = 'johnsmith@example.com'
+        form['username'].value = _email
         form['password'].value = '123456'
 
         # Patch the VCCSClient so we do not need a vccs server
@@ -125,6 +128,18 @@ class TestActions(MongoTestCase):
             # post the login form to the test env
             resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
+
+        # Register user acceptance for the ToU version in use
+        from eduid_userdb.tou import ToUEvent
+        tou = ToUEvent(version = self.config.tou_version,
+                       application = 'unit test',
+                       created_ts = True,
+                       event_id = bson.ObjectId(),
+                       )
+        user = self.amdb.get_user_by_mail(_email)
+        assert(isinstance(user, eduid_userdb.User))
+        user.tou.add(tou)
+        self.amdb.save(user)
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request

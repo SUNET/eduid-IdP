@@ -20,7 +20,12 @@ import pprint
 import cherrypy
 import pkg_resources
 
-from urlparse import parse_qs
+try:
+    # Python2
+    from urlparse import parse_qs
+except ImportError:
+    # Python3
+    from urllib.parse import parse_qs
 
 import eduid_idp
 

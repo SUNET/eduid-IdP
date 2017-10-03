@@ -9,12 +9,13 @@ README = open(os.path.join(here, 'README')).read()
 version = '0.5.3b0'
 
 install_requires = [
-    'eduid_userdb >= 0.0.4b5',
+    'eduid_userdb >= 0.3.0',
     'eduid_common[idp] >= 0.2.1b4',
 
     'pysaml2 == 4.4.0',
     'cherrypy == 3.2.4',
     'lxml == 3.7.2',
+    'six',
 ]
 
 testing_extras = [
@@ -23,6 +24,8 @@ testing_extras = [
     'WebTest == 2.0.18',
     'mock == 1.0.1',
     'nosexcover == 1.0.8',
+    'eduid_action.tou',
+    'eduid_action.mfa',
 ]
 
 setup(name='eduid_idp',

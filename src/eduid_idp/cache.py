@@ -431,7 +431,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
                 self.sso_sessions.ensure_index('session_id', name = 'session_id_idx', unique = True)
                 self.sso_sessions.ensure_index('username', name = 'username_idx', unique = False)
                 break
-            except pymongo.errors.AutoReconnect, e:
+            except pymongo.errors.AutoReconnect as e:
                 if this == 1:
                     raise
                 self.logger.error('Failed ensuring mongodb index, retrying ({!r})'.format(e))

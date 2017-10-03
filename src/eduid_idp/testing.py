@@ -33,7 +33,6 @@
 #
 
 import os
-import bson
 import pkg_resources
 from unittest import TestCase
 
@@ -56,13 +55,13 @@ PWHASHES = {}
 def _create_passwords(username, factors):
     res = []
     for _f in factors:
-        _this = {'id': bson.ObjectId(_f.credential_id),
+        _this = {'credential_id': str(_f.credential_id),
                  'salt': _f.salt,
                  }
         res.append(_this)
         # remember the hash for the correct password 'out-of-band' since the User
         # object will reject any unknown data in _this
-        PWHASHES[_this['id']] = _f.hash
+        PWHASHES[_this['credential_id']] = _f.hash
     return res
 
 
@@ -114,7 +113,7 @@ class FakeAuthClient(object):
     def authenticate(self, username, factors):
         assert (len(factors) == 1)
         _f = factors[0]
-        _expect = {'id': bson.ObjectId(_f.credential_id),
+        _expect = {'credential_id': str(_f.credential_id),
                    'salt': _f.salt,
                    'hash': _f.hash,
         }
@@ -122,7 +121,8 @@ class FakeAuthClient(object):
             _user = self.userdb.get_user_by_field(field, username, raise_on_missing=False)
             if _user:
                 for _cred in _user.passwords.to_list_of_dicts():
-                    _cred['hash'] = PWHASHES[_cred['id']]  # restore the expected hash from out-of-band memory
+                    # restore the expected hash from out-of-band memory
+                    _cred['hash'] = PWHASHES[_cred['credential_id']]
                     if _cred == _expect:
                         return True
         return False
