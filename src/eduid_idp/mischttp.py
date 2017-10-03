@@ -21,9 +21,11 @@ import cherrypy
 import pkg_resources
 
 try:
+    # Python2
     from urlparse import parse_qs
 except ImportError:
-    from urllib.parse import urlparse
+    # Python3
+    from urllib.parse import parse_qs
 
 import eduid_idp
 
