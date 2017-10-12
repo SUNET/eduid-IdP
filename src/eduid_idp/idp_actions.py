@@ -54,7 +54,7 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     :type user: eduid_idp.idp_user.IdPUser
     :type idp_app: eduid_idp.idp.IdPApplication
-    :type ticket: SSOLoginData
+    :type ticket: eduid_idp.loginstate.SSOLoginData
 
     :rtype: None
     """
@@ -67,12 +67,14 @@ def check_for_pending_actions(idp_app, user, ticket):
     add_idp_initiated_actions(idp_app, user, ticket)
 
     # Check for pending actions
-    if not idp_app.actions_db.has_pending_actions(user.user_id, clean_cache=True):
+    if not idp_app.actions_db.has_pending_actions(user.user_id, session=ticket.key, clean_cache=True):
         idp_app.logger.debug("There are no pending actions for user {!s}".format(user))
         return
 
     # Pending actions found, redirect to the actions app
-    idp_app.logger.debug("There are pending actions for user {!s}".format(user))
+    if idp_app.config.debug:
+        pending_actions = idp_app.actions_db.get_actions(userid = user.user_id, session = ticket.key)
+    idp_app.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
     secret = idp_app.config.actions_auth_shared_secret
