@@ -430,7 +430,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
                         pass
 
     # default language file
-    static_fn = eduid_idp.mischttp.static_filename(config, filename)
+    static_fn = eduid_idp.mischttp.static_filename(config, filename, logger)
     logger.debug("Looking for {!r} at default location (static_dir {!r}): {!r}".format(
         filename, config.static_dir, static_fn))
     if not static_fn:
