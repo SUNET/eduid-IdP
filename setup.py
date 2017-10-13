@@ -24,6 +24,7 @@ testing_extras = [
     'WebTest == 2.0.18',
     'mock == 1.0.1',
     'nosexcover == 1.0.8',
+    'eduid_actions>=0.1.0',
     'eduid_action.tou',
     'eduid_action.mfa',
 ]

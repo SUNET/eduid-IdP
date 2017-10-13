@@ -203,7 +203,7 @@ class TestActions(MongoTestCase):
                 class inner():
                     name = 'dummy'
                     def load(self):
-                        def action_test(idp_app, ticket):
+                        def action_test(idp_app, user, ticket):
                             idp_app.actions_db.add_action(
                                 userid = _user_id,
                                 action_type = 'dummy',

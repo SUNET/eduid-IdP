@@ -34,6 +34,7 @@
 
 
 import os
+import six
 import time
 from pkg_resources import iter_entry_points
 
@@ -54,7 +55,7 @@ def check_for_pending_actions(idp_app, user, ticket):
 
     :type user: eduid_idp.idp_user.IdPUser
     :type idp_app: eduid_idp.idp.IdPApplication
-    :type ticket: SSOLoginData
+    :type ticket: eduid_idp.loginstate.SSOLoginData
 
     :rtype: None
     """
@@ -66,17 +67,24 @@ def check_for_pending_actions(idp_app, user, ticket):
     # Add any actions that may depend on the login data
     add_idp_initiated_actions(idp_app, user, ticket)
 
+    actions = idp_app.actions_db.get_actions(userid = user.user_id, session = ticket.key)
+
     # Check for pending actions
-    if not idp_app.actions_db.has_pending_actions(user.user_id, clean_cache=True):
-        idp_app.logger.debug("There are no pending actions for user {!s}".format(user))
+    pending_actions = [a for a in actions if a.result is None]
+    if not pending_actions:
+        idp_app.logger.debug('There are no pending actions for user {}'.format(user))
         return
 
     # Pending actions found, redirect to the actions app
-    idp_app.logger.debug("There are pending actions for user {!s}".format(user))
+    idp_app.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
     secret = idp_app.config.actions_auth_shared_secret
-    nonce = os.urandom(16).encode('hex')
+    nonce = os.urandom(16)
+    if six.PY2:
+        nonce = nonce.encode('hex')
+    else:
+        nonce = nonce.hex()
     timestamp = '{:x}'.format(int(time.time()))
     auth_token = eduid_idp.util.generate_auth_token(secret, user.user_id, nonce, timestamp)
 
@@ -114,3 +122,4 @@ def add_idp_initiated_actions(idp_app, user, ticket):
             entry_point.load()(idp_app, user, ticket)
         except Exception as exc:
             idp_app.logger.warn('Error executing entry point {!r}: {!s}'.format(entry_point.name, exc))
+            raise
