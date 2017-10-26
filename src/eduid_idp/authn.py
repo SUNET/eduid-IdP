@@ -142,6 +142,7 @@ class IdPAuthn(object):
             return None
         self.logger.debug("Found user {!r}".format(user))
 
+        pw_credentials = user.credentials.filter(Password).to_list()
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
             if authn_info.failures_this_month() > self.config.max_authn_failures_per_month:
@@ -153,63 +154,57 @@ class IdPAuthn(object):
             # user used in the last successful authentication. This optimization
             # is based on plain assumption, no measurements whatsoever.
             last_creds = authn_info.last_used_credentials()
-            pw_credentials = user.credentials.filter(Password).to_list()
-            creds = sorted(pw_credentials, key=lambda x: x.credential_id not in last_creds)
-            if creds != pw_credentials:
-                self.logger.debug("Re-sorted list of credentials:\n{!r} into\n{!r}\nbased on last-used {!r}".format(
-                    [x.id for x in pw_credentials],
-                    [x.id for x in creds],
+            sorted_creds = sorted(pw_credentials, key=lambda x: x.credential_id not in last_creds)
+            if sorted_creds != pw_credentials:
+                self.logger.debug("Re-sorted list of credentials into\n{}\nbased on last-used {!r}".format(
+                    sorted_creds,
                     last_creds))
-        else:
-            creds = user.passwords.to_list()
+                pw_credentials = sorted_creds
 
-        return self._authn_passwords(user, username, password, creds)
+        return self._authn_passwords(user, username, password, pw_credentials)
 
-    def _authn_passwords(self, user, username, password, credentials):
+    def _authn_passwords(self, user, username, password, pw_credentials):
         """
         Perform the final actual authentication of a user based on a list of (password) credentials.
 
         :param user: User object
         :param username: Username provided
         :param password: Password provided
-        :param credentials: Authn credentials to try
+        :param pw_credentials: Password credentials to try
         :return: User | None
 
         :type user: IdPUser
         :type username: string
         :type password: string
-        :type credentials: [Password]
+        :type pw_credentials: [Password]
         :rtype: IdPUser | None
         """
-        for cred in credentials:
-            if isinstance(cred, Password):
-                try:
-                    factor = vccs_client.VCCSPasswordFactor(password, str(cred.credential_id), str(cred.salt))
-                except ValueError as exc:
-                    self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(
-                        username, cred.credential_id, exc))
+        for cred in pw_credentials:
+            try:
+                factor = vccs_client.VCCSPasswordFactor(password, str(cred.credential_id), str(cred.salt))
+            except ValueError as exc:
+                self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(
+                    username, cred.credential_id, exc))
+                continue
+            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
+                username, str(cred.credential_id), factor))
+            user_id = str(user.user_id)
+            try:
+                if self.auth_client.authenticate(user_id, [factor]):
+                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                    # Verify that the credential had been successfully used in the last 18 monthts
+                    # (Kantara AL2_CM_CSM#050).
+                    if self.credential_expired(cred):
+                        self.logger.info('User {!r} credential {!s} has expired'.format(user, cred.key))
+                        raise eduid_idp.error.Forbidden('CREDENTIAL_EXPIRED')
+                    self.log_authn(user, success=[cred.credential_id], failure=[])
+                    return user
+            except vccs_client.VCCSClientHTTPError as exc:
+                if exc.http_code == 500:
+                    self.logger.debug("VCCS credential {!r} might be revoked".format(cred.credential_id))
                     continue
-                self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
-                    username, str(cred.credential_id), factor))
-                user_id = str(user.user_id)
-                try:
-                    if self.auth_client.authenticate(user_id, [factor]):
-                        self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
-                        # Verify that the credential had been successfully used in the last 18 monthts
-                        # (Kantara AL2_CM_CSM#050).
-                        if self.credential_expired(cred):
-                            self.logger.info('User {!r} credential {!s} has expired'.format(user, cred.key))
-                            raise eduid_idp.error.Forbidden('CREDENTIAL_EXPIRED')
-                        self.log_authn(user, success=[cred.credential_id], failure=[])
-                        return user
-                except vccs_client.VCCSClientHTTPError as exc:
-                    if exc.http_code == 500:
-                        self.logger.debug("VCCS credential {!r} might be revoked".format(cred.credential_id))
-                        continue
-            else:
-                self.logger.debug("Unknown credential: {!s}".format(cred))
         self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
-        self.log_authn(user, success=[], failure=[cred.credential_id for cred in user.passwords.to_list()])
+        self.log_authn(user, success=[], failure=[cred.credential_id for cred in pw_credentials])
         return None
 
     def credential_expired(self, cred):
