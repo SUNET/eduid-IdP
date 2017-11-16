@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2013, 2014 NORDUnet A/S. All rights reserved.
+# Copyright (c) 2013, 2014, 2017 NORDUnet A/S. All rights reserved.
 # Copyright 2012 Roland Hedberg. All rights reserved.
 #
 # See the file eduid-IdP/LICENSE.txt for license statement.
@@ -106,6 +106,7 @@ the SSO session using the `idpauthn' cookie sent by the users browser and only s
 
 import os
 import sys
+import time
 import pprint
 import logging
 import argparse
@@ -126,6 +127,8 @@ from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_userdb.actions import ActionDB
 
 from saml2 import server
+
+from bson import ObjectId
 
 # Load Raven (exception logging to Sentry), if available.
 try:
@@ -326,7 +329,7 @@ class IdPApplication(object):
 
         :rtype: string
         """
-        self.logger.debug("Status request")
+        self.logger.debug('Status request')
 
         try:
             parsed = simplejson.loads(request)
@@ -347,9 +350,29 @@ class IdPApplication(object):
 
         user = self.authn.verify_username_and_password(parsed)
         if user:
-            response = {'status': 'OK',
-                        'testuser_name': user.display_name,
-                        }
+            health = self._is_healthy()
+            if health['status'] != 'STATUS_OK':
+                response['reason'] = 'Health check failed: {}'.format(health.get('reason'))
+            else:
+                response = {'status': 'OK',
+                            'testuser_name': user.display_name,
+                            }
+
+        return "{}\n".format(simplejson.dumps(response))
+
+    @cherrypy.expose
+    def healthy(self, request=None):
+        """
+        Check that the backend components we can test cheaply are available.
+
+        :param request: The HTTP POST parameter `request'
+        :return: HTML response with JSON data
+
+        :rtype: string
+        """
+        self.logger.debug("Health check request")
+
+        response = self._is_healthy()
 
         return "{}\n".format(simplejson.dumps(response))
 
@@ -363,6 +386,39 @@ class IdPApplication(object):
         """
         self.logger.debug("Testing 500 Server Internal Error")
         raise AssertionError('Testing 500 Server Internal Error')
+
+    def _is_healthy(self):
+        res = {'status': 'STATUS_FAIL'}
+
+        # Test mongodb
+        cred_id = ObjectId('0000000000ab')
+        previous = self.authn.authn_store.get_credential_last_used(cred_id)
+        self.authn.authn_store.credential_success([cred_id])
+        new = self.authn.authn_store.get_credential_last_used(cred_id)
+        if not previous:
+            self.logger.info('This seems to be the first MongoDB health-check...')
+        elif new <= previous:
+            self.logger.info('MongoDB not healthy: previous = {!r}, new = {!r}'.format(previous, new))
+            res['reason'] = 'Failed writing to authninfo database (MongoDB)'
+            return res
+        res['mongodb_ts'] = new.isoformat()
+
+        # Test Redis
+        now = time.time()
+        _session_id = self.IDP.cache.add_session('health_test', {'ts': now})
+        fetched = self.IDP.cache.get_session(_session_id)
+        self.IDP.cache.remove_session(_session_id)
+        if not fetched:
+            self.logger.info('This seems to be the first Redis health-check...')
+        elif fetched['ts'] != now:
+            self.logger.info('Redis not healthy: now = {!r}, fetched = {!r}'.format(previous, fetched))
+            res['reason'] = 'Failed writing to session store (Redis)'
+            return res
+        res['redis_ts'] = time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(fetched['ts']))
+
+        res['status'] = 'STATUS_OK'
+        res['reason'] = 'Databases tested OK'
+        return res
 
     def _my_start_response(self, status, headers):
         """

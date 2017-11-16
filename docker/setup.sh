@@ -24,7 +24,8 @@ apt-get -y install \
     libxml2-utils \
     libffi-dev \
     libssl-dev \
-    softhsm
+    softhsm \
+    curl
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
