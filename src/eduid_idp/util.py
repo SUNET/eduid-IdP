@@ -50,10 +50,10 @@ def maybe_xml_to_string(message, logger=None):
     :rtype: string
     """
     try:
-        import lxml.etree as etree
-        parser = etree.XMLParser(remove_blank_text=True)
-        xml = etree.XML(str(message), parser)
-        return etree.tostring(xml, pretty_print=True)
+        from defusedxml import ElementTree as DefusedElementTree
+        parser = DefusedElementTree.DefusedXMLParser()
+        xml = DefusedElementTree.XML(str(message), parser)
+        return DefusedElementTree.tostring(xml)
     except Exception as exc:
         if logger is not None:
             logger.debug("Could not parse message as XML: {!r}".format(exc))
