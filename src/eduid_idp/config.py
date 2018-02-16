@@ -53,7 +53,8 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'pysaml2_config': 'idp_conf.py',  # path prepended in IdPConfig.__init__()
                     'fticks_secret_key': None,
                     'fticks_format_string': 'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
-                    'static_dir': None,
+                    'static_dir': None,   # directory for local static files
+                    'static_link': '#',   # URL to static resources that can be used in templates
                     'ssl_adapter': 'builtin',  # one of cherrypy.wsgiserver.ssl_adapters
                     'server_cert': None,  # SSL cert filename
                     'server_key': None,   # SSL key filename
@@ -385,6 +386,14 @@ class IdPConfig(object):
         Default language code to use when looking for web pages ('en').
         """
         return self.config.get(self.section, 'default_language')
+
+    @property
+    def static_link(self):
+        """
+        URL to static resources that can be used in eduid-IdP-html templates.
+        :return:
+        """
+        return self.config.get(self.section, 'static_link')
 
     @property
     def base_url(self):
