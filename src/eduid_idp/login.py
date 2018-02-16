@@ -28,8 +28,7 @@ from saml2.authn_context import requested_authn_context
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
 from saml2.s_utils import UnknownSystemEntity
-import lxml.etree as etree
-
+from defusedxml import ElementTree as DefusedElementTree
 
 class MustAuthenticate(Exception):
     """
@@ -155,11 +154,11 @@ class SSO(Service):
         """
         printed = False
         try:
-            parser = etree.XMLParser(remove_blank_text = True)
-            xml = etree.XML(str(saml_response), parser)
+            parser = DefusedElementTree.DefusedXMLParser()
+            xml = DefusedElementTree.XML(str(saml_response), parser)
 
             # For debugging, it is very useful to get the full SAML response pretty-printed in the logfile directly
-            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(etree.tostring(xml, pretty_print=True)))
+            self.logger.debug("Created AuthNResponse :\n\n{!s}\n\n".format(DefusedElementTree.tostring(xml)))
             printed = True
 
             attrs = xml.attrib
@@ -167,7 +166,7 @@ class SSO(Service):
             self.logger.info('{!s}: id={!s}, in_response_to={!s}, assertion_id={!s}'.format(
                 ticket.key, attrs['ID'], attrs['InResponseTo'], assertion.get('ID')))
 
-            return etree.tostring(xml, pretty_print = True)
+            return DefusedElementTree.tostring(xml)
         except Exception as exc:
             self.logger.debug("Could not parse message as XML: {!r}".format(exc))
             if not printed:
