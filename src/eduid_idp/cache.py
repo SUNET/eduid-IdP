@@ -437,7 +437,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
                 self.logger.error('Failed ensuring mongodb index, retrying ({!r})'.format(e))
 
     def remove_session(self, sid):
-        res = self.sso_sessions.remove({'session_id': sid}, w = 1, getLastError = True)
+        res = self.sso_sessions.remove({'session_id': sid}, w = 'majority')
         try:
             return res['n']  # number of deleted records
         except (KeyError, TypeError):

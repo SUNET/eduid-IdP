@@ -6,7 +6,7 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.5.3b0'
+version = '0.5.3b1'
 
 install_requires = [
     'eduid_userdb >= 0.3.0',
