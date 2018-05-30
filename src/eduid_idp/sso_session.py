@@ -203,6 +203,10 @@ class SSOSession(object):
         age = (int(time.time()) - self.authn_timestamp) / 60
         return age
 
+    @property
+    def authn_credentials(self):
+        return self._data['authn_credentials']
+
     def add_authn_credential(self, data):
         """
         Add information about a credential successfully used in this session.

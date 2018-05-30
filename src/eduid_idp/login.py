@@ -291,6 +291,10 @@ class SSO(Service):
             # reconfiguration of authns in the AUTHN_BROKER.
             raise eduid_idp.error.ServiceError('Unknown stored AuthnContext')
 
+        self.logger.debug('MFA credentials logged in the ticket: {}'.format(ticket.mfa_action_creds))
+        self.logger.debug('Credentials used in this SSO session:\n{}'.format(self.sso_session.authn_credentials))
+        self.logger.debug('User credentials:\n{}'.format(user.credentials.to_list()))
+
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
         req_authn_context = self._get_requested_authn_context(ticket)
