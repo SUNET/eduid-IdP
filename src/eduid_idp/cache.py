@@ -90,6 +90,16 @@ class ExpiringCache(object):
         """
         raise NotImplementedError('get not implemented in subclass')
 
+    def update(self, key, info):
+        """
+        Update entry in the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+        :return: None
+        """
+        raise NotImplementedError('update not implemented in subclass')
+
     def delete(self, key):
         """
         Delete an item from the cache.
@@ -178,11 +188,15 @@ class ExpiringCacheMem(ExpiringCache):
         """
         return self._data.get(key)
 
-    def items(self):
+    def update(self, key, info):
         """
-        Return all items from cache.
+        Update an entry in the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+        :return: None
         """
-        return self._data
+        self._data[key] = info
 
     def delete(self, key):
         """
@@ -197,6 +211,12 @@ class ExpiringCacheMem(ExpiringCache):
         except KeyError:
             self.logger.debug('Failed deleting key {!r} from {!s} cache (entry did not exist)'.format(
                 key, self.name))
+
+    def items(self):
+        """
+        Return all items from cache.
+        """
+        return self._data
 
 
 class ExpiringCacheCommonSession(ExpiringCache):
@@ -233,8 +253,8 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :param key: Lookup key for entry
         :param info: Value to be stored for 'key'
 
-        :type key: str | unciode
-        :type info: dict
+        :type key: str | unicode
+        :type info: SSOLoginData | dict
 
         :return: New session
         :rtype: Session
@@ -266,6 +286,20 @@ class ExpiringCacheCommonSession(ExpiringCache):
             return dict(session)
         except KeyError:
             pass
+
+    def update(self, key, info):
+        """
+        Update entry in the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+
+        :type key: str | unicode
+        :type info: SSOLoginData | dict
+
+        :rtype: None
+        """
+        self.add(key, info)
 
     def delete(self, key):
         """
@@ -317,7 +351,17 @@ class SSOSessionCache(object):
         logout (SLO).
 
         :param username: Username as string
-        :param data: opaque, should be SSOSession
+        :param data: opaque, should be SSOSession converted to dict()
+        :return: Unique session identifier as string
+        """
+        raise NotImplementedError()
+
+    def update_session(self, username, data):
+        """
+        Update a SSO session in the cache.
+
+        :param username: Username as string
+        :param data: opaque, should be SSOSession converted to dict()
         :return: Unique session identifier as string
         """
         raise NotImplementedError()
@@ -327,7 +371,7 @@ class SSOSessionCache(object):
         Lookup an SSO session using the session id (same `sid' previously used with add_session).
 
         :param sid: Unique session identifier as string
-        :return: opaque, should be SSOSession
+        :return: opaque, should be SSOSession converted to dict()
         """
         raise NotImplementedError()
 
@@ -375,6 +419,12 @@ class SSOSessionCacheMem(SSOSessionCache):
                                  'data': data,
                                  })
         return _sid
+
+    def update_session(self, username, data):
+        _sid = self._create_session_id()
+        self.lid2data.update(_sid, {'username': username,
+                                    'data': data,
+                                    })
 
     def get_session(self, sid):
         try:
@@ -453,6 +503,13 @@ class SSOSessionCacheMDB(SSOSessionCache):
         self.sso_sessions.insert(_doc)
         self.expire_old_sessions()
         return _sid
+
+    def update_session(self, username, data):
+        _sid = self._create_session_id()
+        _test_doc = {'session_id': _sid,
+                     'username': username,
+                     }
+        self.sso_sessions.update(_test_doc, {'$set': {'data': data}})
 
     def get_session(self, sid):
         try:
