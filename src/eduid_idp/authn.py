@@ -73,7 +73,8 @@ class AuthnData(object):
         """
         :type value: IdPUser
         """
-        assert isinstance(value, IdPUser)
+        if not isinstance(value, IdPUser):
+            raise ValueError('Invalid user (expect IdPUser, got {})'.format(type(value)))
         self._user = value
 
     @property
@@ -88,7 +89,8 @@ class AuthnData(object):
         """
         :type value: Password | U2F
         """
-        assert isinstance(value, Password) or isinstance(value, U2F)
+        if not isinstance(value, Password) or isinstance(value, U2F):
+            raise ValueError('Invalid/unknown credential (got {})'.format(type(value)))
         self._credential = value
 
     @property
@@ -103,7 +105,8 @@ class AuthnData(object):
         """
         :type value: datetime.datetime
         """
-        assert isinstance(value, datetime.datetime)
+        if not isinstance(value, datetime.datetime):
+            raise ValueError('Invalid timestamp (expect datetime, got {})'.format(type(value)))
         self._timestamp = value.replace(tzinfo = None)  # thanks for not having timezone.utc, Python2
 
     def to_session_dict(self):
