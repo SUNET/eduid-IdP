@@ -91,10 +91,10 @@ class TestActions(MongoTestCase):
         cherrypy.tree.mount(self.idp_app, '/')
 
         # create a webtest testing environment
-        import cookielib
+        from six.moves.http_cookiejar import CookieJar
         self.http = webtest.TestApp(cherrypy.tree,
                                     extra_environ={'wsgi.url_scheme': 'https'},
-                                    cookiejar=cookielib.CookieJar())
+                                    cookiejar=CookieJar())
 
     def tearDown(self):
         # reset the testing environment
