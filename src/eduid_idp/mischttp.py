@@ -20,6 +20,8 @@ import pprint
 import cherrypy
 import pkg_resources
 
+from six import string_types
+
 try:
     # Python2
     from urlparse import parse_qs
@@ -163,7 +165,7 @@ def static_filename(config, path, logger):
     :type path: string
     :rtype: False | None | string
     """
-    if not isinstance(path, basestring):
+    if not isinstance(path, string_types):
         return False
     if not config.static_dir:
         return False
