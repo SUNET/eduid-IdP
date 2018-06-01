@@ -15,6 +15,7 @@ Miscellaneous HTTP related functions.
 
 import os
 import re
+import six
 import base64
 import pprint
 import cherrypy
@@ -440,7 +441,10 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
         logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
         return None
     logger.debug('Using default file for {!r}: {!r}'.format(filename, static_fn))
-    return eduid_idp.mischttp.static_file(start_response, static_fn, logger, status=status)
+    res = eduid_idp.mischttp.static_file(start_response, static_fn, logger, status=status)
+    if six.PY2:
+        return res
+    return res.decode('UTF-8')
 
 
 def get_http_method():
