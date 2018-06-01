@@ -9,7 +9,7 @@ README = open(os.path.join(here, 'README')).read()
 version = '0.5.3b1'
 
 install_requires = [
-    'eduid_userdb >= 0.3.0',
+    'eduid_userdb >= 0.4.0b7',
     'eduid_common[idp] >= 0.2.1b4',
 
     'pysaml2 == 4.4.0',
