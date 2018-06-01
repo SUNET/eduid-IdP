@@ -38,6 +38,9 @@ class SSOLoginData(object):
         self._RelayState = data.get('RelayState', '')
         self._FailCount = data.get('FailCount', 0)
         self._binding = binding
+        # dict to transfer data about credentials successfully used from the MFA plugin
+        # to the IdP code, where it will be transferred to the SSO session
+        self.mfa_action_creds = {}
 
     def __str__(self):
         data = self.to_dict()

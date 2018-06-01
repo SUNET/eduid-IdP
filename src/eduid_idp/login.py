@@ -84,7 +84,8 @@ class SSO(Service):
 
         user = self.sso_session.idp_user
 
-        check_for_pending_actions(self._idp_app, user, ticket)
+        check_for_pending_actions(self._idp_app, user, ticket, self.sso_session)
+        # We won't get here until the user has completed all login actions
 
         response_authn = self._get_login_response_authn(ticket, user)
 
@@ -289,6 +290,10 @@ class SSO(Service):
             # This could happen with SSO sessions refering to old authns during
             # reconfiguration of authns in the AUTHN_BROKER.
             raise eduid_idp.error.ServiceError('Unknown stored AuthnContext')
+
+        self.logger.debug('MFA credentials logged in the ticket: {}'.format(ticket.mfa_action_creds))
+        self.logger.debug('Credentials used in this SSO session:\n{}'.format(self.sso_session.authn_credentials))
+        self.logger.debug('User credentials:\n{}'.format(user.credentials.to_list()))
 
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
@@ -604,9 +609,9 @@ def do_verify(idp_app):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    user = idp_app.authn.get_authn_user(login_data, user_authn)
+    authninfo = idp_app.authn.password_authn(login_data, user_authn)
 
-    if not user:
+    if not authninfo:
         _ticket.FailCount += 1
         idp_app.IDP.ticket.store_ticket(_ticket)
         idp_app.logger.debug("Unknown user or wrong password")
@@ -616,11 +621,13 @@ def do_verify(idp_app):
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
 
     # Create SSO session
-    idp_app.logger.debug("User {!r} authenticated OK using {!r}".format(user, user_authn['class_ref']))
+    user = authninfo.user
+    idp_app.logger.debug("User {} authenticated OK using {!r}".format(user, user_authn['class_ref']))
     _sso_session = SSOSession(user_id = user.user_id,
                               authn_ref = authn_ref,
                               authn_class_ref = user_authn['class_ref'],
                               authn_request_id = _ticket.req_info.message.id,
+                              authn_credentials = [authninfo],
                               )
 
     # This session contains information about the fact that the user was authenticated. It is
