@@ -41,8 +41,10 @@ from pkg_resources import iter_entry_points
 import eduid_idp.util
 import eduid_idp.mischttp
 
+from eduid_idp.authn import AuthnData
 
-def check_for_pending_actions(idp_app, user, ticket):
+
+def check_for_pending_actions(idp_app, user, ticket, sso_session):
     """
     Check whether there are any pending actions for the current user,
     and if there are, redirect to the actions app.
@@ -52,10 +54,12 @@ def check_for_pending_actions(idp_app, user, ticket):
     :param idp_app: IdP application instance
     :param user: the authenticating user
     :param ticket: SSOLoginData instance
+    :param sso_session: SSOSession
 
     :type user: eduid_idp.idp_user.IdPUser
     :type idp_app: eduid_idp.idp.IdPApplication
     :type ticket: eduid_idp.loginstate.SSOLoginData
+    :type sso_session: eduid_idp.sso_session.SSOSession
 
     :rtype: None
     """
@@ -72,6 +76,17 @@ def check_for_pending_actions(idp_app, user, ticket):
     # Check for pending actions
     pending_actions = [a for a in actions if a.result is None]
     if not pending_actions:
+        # eduid_action.mfa.idp.check_authn_result will have added the credential used
+        # to the ticket.mfa_action_creds hash - transfer it to the session
+        update = False
+        for cred, ts in ticket.mfa_action_creds.items():
+            authn = AuthnData(user = user, credential = cred, timestamp = ts)
+            sso_session.add_authn_credential(authn)
+            update = True
+
+        if update:
+            idp_app.IDP.cache.update_session(user.user_id, sso_session.to_dict())
+
         idp_app.logger.debug('There are no pending actions for user {}'.format(user))
         return
 
@@ -119,6 +134,7 @@ def add_idp_initiated_actions(idp_app, user, ticket):
     for entry_point in iter_entry_points('eduid_actions.add_actions'):
         idp_app.logger.debug('Using entry point {!r} to add new actions'.format(entry_point.name))
         try:
+            # load() here is the function eduid_action.mfa.add_mfa_actions()
             entry_point.load()(idp_app, user, ticket)
         except Exception as exc:
             idp_app.logger.warn('Error executing entry point {!r}: {!s}'.format(entry_point.name, exc))

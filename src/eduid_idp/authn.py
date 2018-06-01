@@ -42,16 +42,81 @@ import vccs_client
 
 import eduid_idp.assurance
 import eduid_idp.error
+from eduid_idp.idp_user import IdPUser
 
 from eduid_userdb import MongoDB
-from eduid_userdb.credentials import Password
+from eduid_userdb.credentials import Password, U2F
 from eduid_userdb.exceptions import UserHasNotCompletedSignup
 from eduid_common.authn import get_vccs_client
 
 
+class AuthnData(object):
+    """
+    Data about a successful authentication.
+
+    Returned from functions performing authentication.
+    """
+    def __init__(self, user, credential, timestamp):
+        self.user = user
+        self.credential = credential
+        self.timestamp = timestamp
+
+    @property
+    def user(self):
+        """
+        :rtype: IdPUser
+        """
+        return self._user
+
+    @user.setter
+    def user(self, value):
+        """
+        :type value: IdPUser
+        """
+        if not isinstance(value, IdPUser):
+            raise ValueError('Invalid user (expect IdPUser, got {})'.format(type(value)))
+        self._user = value
+
+    @property
+    def credential(self):
+        """
+        :rtype: Password | U2F
+        """
+        return self._credential
+
+    @credential.setter
+    def credential(self, value):
+        """
+        :type value: Password | U2F
+        """
+        if not isinstance(value, Password) or isinstance(value, U2F):
+            raise ValueError('Invalid/unknown credential (got {})'.format(type(value)))
+        self._credential = value
+
+    @property
+    def timestamp(self):
+        """
+        :rtype: datetime.datetime
+        """
+        return self._timestamp
+
+    @timestamp.setter
+    def timestamp(self, value):
+        """
+        :type value: datetime.datetime
+        """
+        if not isinstance(value, datetime.datetime):
+            raise ValueError('Invalid timestamp (expect datetime, got {})'.format(type(value)))
+        self._timestamp = value.replace(tzinfo = None)  # thanks for not having timezone.utc, Python2
+
+    def to_session_dict(self):
+        return {'cred_id': self.credential.credential_id,
+                'authn_ts': self.timestamp,
+                }
+
+
 class IdPAuthn(object):
     """
-
     :param logger: logging logger
     :param config: IdP configuration data
 
@@ -70,9 +135,9 @@ class IdPAuthn(object):
         if self.authn_store is None and config.mongo_uri:
             self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
 
-    def get_authn_user(self, login_data, user_authn):
+    def password_authn(self, login_data, user_authn):
         """
-        Authenticate someone and, if successful, return the IdPUser object.
+        Authenticate someone using a username and password.
 
         :param login_data: Login credentials (dict with 'username' and 'password')
         :param user_authn: Information about the authentication attempted
@@ -80,18 +145,16 @@ class IdPAuthn(object):
 
         :type login_data: dict
         :type: user_authn: dict
-        :rtype: IdPUser | None
+        :rtype: AuthnData | False | None
         """
         if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME or \
                 user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            user = self.verify_username_and_password(login_data)
-        else:
-            del login_data['password']  # keep out of any exception logs
-            self.logger.info("Authentication for class {!r} not implemented".format(
-                user_authn['class_ref']))
-            raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
-                user_authn['class_ref'], logger=self.logger))
-        return user
+            return self.verify_username_and_password(login_data)
+        del login_data['password']  # keep out of any exception logs
+        self.logger.info("Authentication for class {!r} not implemented".format(
+            user_authn['class_ref']))
+        raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
+            user_authn['class_ref'], logger=self.logger))
 
     def verify_username_and_password(self, data, min_length=0):
         """
@@ -101,21 +164,33 @@ class IdPAuthn(object):
         :return: IdPUser instance or False
 
         :type data: dict
-        :rtype: IdPUser | False
+        :rtype: AuthnData | False
         """
         username = data['username']
         password = data['password']
         del data  # keep sensitive data out of Sentry logs
 
-        user = self._verify_username_and_password2(username, password)
-        if user:
+        try:
+            user = self.userdb.lookup_user(username)
+        except UserHasNotCompletedSignup:
+            # XXX Redirect user to some kind of info page
+            return None
+        if not user:
+            self.logger.info('Unknown user : {!r}'.format(username))
+            # XXX we effectively disclose there was no such user by the quick
+            # response in this case. Maybe send bogus auth request to backends?
+            return None
+        self.logger.debug('Found user {!r}'.format(user))
+
+        cred = self._verify_username_and_password2(user, password)
+        if cred:
             if len(password) >= min_length:
-                return user
+                return AuthnData(user, cred, datetime.datetime.utcnow())
             self.logger.debug("User {!r} authenticated, but denied by password length constraints ({!r})".format(
                 user, min_length))
         return False
 
-    def _verify_username_and_password2(self, username, password):
+    def _verify_username_and_password2(self, user, password):
         """
         Attempt to verify that a password is valid for a specific user.
 
@@ -126,22 +201,10 @@ class IdPAuthn(object):
         :param password: password given by user
         :return: IdPUser on successful authentication
 
-        :type username: string
+        :type user: IdPUser
         :type password: string
-        :rtype: IdPUser | None
+        :rtype: Credential | None
         """
-        try:
-            user = self.userdb.lookup_user(username)
-        except UserHasNotCompletedSignup:
-            # XXX Redirect user to some kind of info page
-            user = None
-        if not user:
-            self.logger.info("Unknown user : {!r}".format(username))
-            # XXX we effectively disclose there was no such user by the quick
-            # response in this case. Maybe send bogus auth request to backends?
-            return None
-        self.logger.debug("Found user {!r}".format(user))
-
         pw_credentials = user.credentials.filter(Password).to_list()
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
@@ -161,49 +224,47 @@ class IdPAuthn(object):
                     last_creds))
                 pw_credentials = sorted_creds
 
-        return self._authn_passwords(user, username, password, pw_credentials)
+        return self._authn_passwords(user, password, pw_credentials)
 
-    def _authn_passwords(self, user, username, password, pw_credentials):
+    def _authn_passwords(self, user, password, pw_credentials):
         """
         Perform the final actual authentication of a user based on a list of (password) credentials.
 
         :param user: User object
-        :param username: Username provided
         :param password: Password provided
         :param pw_credentials: Password credentials to try
-        :return: User | None
+        :return: Credential used, or None if authentication failed
 
         :type user: IdPUser
-        :type username: string
         :type password: string
         :type pw_credentials: [Password]
-        :rtype: IdPUser | None
+        :rtype: Password | None
         """
         for cred in pw_credentials:
             try:
                 factor = vccs_client.VCCSPasswordFactor(password, str(cred.credential_id), str(cred.salt))
             except ValueError as exc:
-                self.logger.info("User {!r} password factor {!s} unusable: {!r}".format(
-                    username, cred.credential_id, exc))
+                self.logger.info("User {} password factor {!s} unusable: {!r}".format(
+                    user, cred.credential_id, exc))
                 continue
-            self.logger.debug("Password-authenticating {!r}/{!r} with VCCS: {!r}".format(
-                username, str(cred.credential_id), factor))
+            self.logger.debug("Password-authenticating {}/{!r} with VCCS: {!r}".format(
+                user, str(cred.credential_id), factor))
             user_id = str(user.user_id)
             try:
                 if self.auth_client.authenticate(user_id, [factor]):
-                    self.logger.debug("VCCS authenticated user {!r} (user_id {!r})".format(user, user_id))
+                    self.logger.debug("VCCS authenticated user {} (user_id {!r})".format(user, user_id))
                     # Verify that the credential had been successfully used in the last 18 monthts
                     # (Kantara AL2_CM_CSM#050).
                     if self.credential_expired(cred):
-                        self.logger.info('User {!r} credential {!s} has expired'.format(user, cred.key))
+                        self.logger.info('User {} credential {!r} has expired'.format(user, cred.key))
                         raise eduid_idp.error.Forbidden('CREDENTIAL_EXPIRED')
                     self.log_authn(user, success=[cred.credential_id], failure=[])
-                    return user
+                    return cred
             except vccs_client.VCCSClientHTTPError as exc:
                 if exc.http_code == 500:
                     self.logger.debug("VCCS credential {!r} might be revoked".format(cred.credential_id))
                     continue
-        self.logger.debug("VCCS username-password authentication FAILED for user {!r}".format(user))
+        self.logger.debug('VCCS username-password authentication FAILED for user {}'.format(user))
         self.log_authn(user, success=[], failure=[cred.credential_id for cred in pw_credentials])
         return None
 
@@ -268,7 +329,7 @@ class AuthnInfoStoreMDB(AuthnInfoStore):
                  **kwargs):
         AuthnInfoStore.__init__(self, logger)
 
-        logger.debug("Setting up AuthnInfoStoreMDB with URI {!r}, db_name {!r}".format(uri, db_name))
+        logger.debug("Setting up AuthnInfoStoreMDB")
         self._db = MongoDB(db_uri = uri, db_name = db_name)
         self.collection = self._db.get_collection(collection_name)
 

@@ -35,6 +35,7 @@
 import time
 import eduid_idp.idp_user
 import eduid_idp.assurance
+from eduid_idp.authn import AuthnData
 
 
 class SSOSession(object):
@@ -52,24 +53,35 @@ class SSOSession(object):
     :param authn_ref: AuthnBroker opaque reference
     :param authn_class_ref: Authn class reference
     :param authn_request_id: SAML request id of request that caused authentication
+    :param authn_credentials: Data about what credentials were used to authn
     :param ts: Authentication timestamp, in UTC
 
     :type user_id: bson.ObjectId | object
     :type authn_ref: object
     :type authn_class_ref: string
     :type authn_request_id: string
+    :type authn_credentials: None | [AuthnData]
     :type ts: int
     """
 
-    def __init__(self, user_id, authn_ref, authn_class_ref, authn_request_id, ts=None):
+    def __init__(self, user_id, authn_ref, authn_class_ref, authn_request_id,
+                 authn_credentials = None, ts=None):
         if ts is None:
             ts = int(time.time())
         self._data = {'user_id': user_id,
                       'authn_ref': authn_ref,
                       'authn_class_ref': authn_class_ref,
                       'authn_request_id': authn_request_id,
+                      'authn_credentials': [],
                       'authn_timestamp': ts,
                       }
+        if authn_credentials is not None:
+            for x in authn_credentials:
+                if isinstance(x, dict):
+                    # reconstructing from storage
+                    self._data['authn_credentials'] += [x]
+                else:
+                    self.add_authn_credential(x)
         # Extra information not serialized
         self._idp_user = None
 
@@ -191,6 +203,22 @@ class SSOSession(object):
         age = (int(time.time()) - self.authn_timestamp) / 60
         return age
 
+    @property
+    def authn_credentials(self):
+        return self._data['authn_credentials']
+
+    def add_authn_credential(self, data):
+        """
+        Add information about a credential successfully used in this session.
+
+        :param data: Authentication data
+        :type data: AuthnData
+        :return: None
+        """
+        if not isinstance(data, AuthnData):
+            raise ValueError('data should be AuthnData (not {})'.format(type(data)))
+        self._data['authn_credentials'] += [data.to_session_dict()]
+
 
 def from_dict(data):
     """
@@ -206,5 +234,6 @@ def from_dict(data):
                       authn_ref = data['authn_ref'],
                       authn_class_ref = data['authn_class_ref'],
                       authn_request_id = data['authn_request_id'],
+                      authn_credentials = data['authn_credentials'],
                       ts = data['authn_timestamp'],
                       )

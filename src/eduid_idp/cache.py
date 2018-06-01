@@ -1,5 +1,6 @@
 #
-# Copyright (c) 2013, 2014, 2016 NORDUnet A/S
+# Copyright (c) 2018 SUNET
+# Copyright (c) 2013, 2014, 2016, 2017 NORDUnet A/S
 # Copyright 2012 Roland Hedberg. All rights reserved.
 # All rights reserved.
 #
@@ -15,11 +16,11 @@ from collections import deque
 from hashlib import sha1
 import datetime
 
-import pymongo
-
 from eduid_idp.loginstate import SSOLoginData
 
 from eduid_common.session.session import SessionManager, Session
+
+from eduid_userdb import MongoDB
 
 
 class NoOpLock(object):
@@ -88,6 +89,16 @@ class ExpiringCache(object):
         :returns: Any data found matching `key', or None.
         """
         raise NotImplementedError('get not implemented in subclass')
+
+    def update(self, key, info):
+        """
+        Update entry in the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+        :return: None
+        """
+        raise NotImplementedError('update not implemented in subclass')
 
     def delete(self, key):
         """
@@ -177,11 +188,15 @@ class ExpiringCacheMem(ExpiringCache):
         """
         return self._data.get(key)
 
-    def items(self):
+    def update(self, key, info):
         """
-        Return all items from cache.
+        Update an entry in the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+        :return: None
         """
-        return self._data
+        self._data[key] = info
 
     def delete(self, key):
         """
@@ -196,6 +211,12 @@ class ExpiringCacheMem(ExpiringCache):
         except KeyError:
             self.logger.debug('Failed deleting key {!r} from {!s} cache (entry did not exist)'.format(
                 key, self.name))
+
+    def items(self):
+        """
+        Return all items from cache.
+        """
+        return self._data
 
 
 class ExpiringCacheCommonSession(ExpiringCache):
@@ -232,8 +253,8 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :param key: Lookup key for entry
         :param info: Value to be stored for 'key'
 
-        :type key: str | unciode
-        :type info: dict
+        :type key: str | unicode
+        :type info: SSOLoginData | dict
 
         :return: New session
         :rtype: Session
@@ -265,6 +286,20 @@ class ExpiringCacheCommonSession(ExpiringCache):
             return dict(session)
         except KeyError:
             pass
+
+    def update(self, key, info):
+        """
+        Update entry in the cache.
+
+        :param key: Lookup key for entry
+        :param info: Value to be stored for 'key'
+
+        :type key: str | unicode
+        :type info: SSOLoginData | dict
+
+        :rtype: None
+        """
+        self.add(key, info)
 
     def delete(self, key):
         """
@@ -316,7 +351,17 @@ class SSOSessionCache(object):
         logout (SLO).
 
         :param username: Username as string
-        :param data: opaque, should be SSOSession
+        :param data: opaque, should be SSOSession converted to dict()
+        :return: Unique session identifier as string
+        """
+        raise NotImplementedError()
+
+    def update_session(self, username, data):
+        """
+        Update a SSO session in the cache.
+
+        :param username: Username as string
+        :param data: opaque, should be SSOSession converted to dict()
         :return: Unique session identifier as string
         """
         raise NotImplementedError()
@@ -326,7 +371,7 @@ class SSOSessionCache(object):
         Lookup an SSO session using the session id (same `sid' previously used with add_session).
 
         :param sid: Unique session identifier as string
-        :return: opaque, should be SSOSession
+        :return: opaque, should be SSOSession converted to dict()
         """
         raise NotImplementedError()
 
@@ -375,6 +420,12 @@ class SSOSessionCacheMem(SSOSessionCache):
                                  })
         return _sid
 
+    def update_session(self, username, data):
+        _sid = self._create_session_id()
+        self.lid2data.update(_sid, {'username': username,
+                                    'data': data,
+                                    })
+
     def get_session(self, sid):
         try:
             this = self.lid2data.get(sid)
@@ -397,6 +448,13 @@ class SSOSessionCacheMem(SSOSessionCache):
         return res
 
 
+class SSOSessionDB(MongoDB):
+    """
+    MongoDB interface using eduid_userdb
+    """
+    pass
+
+
 class SSOSessionCacheMDB(SSOSessionCache):
     """
     This is a MongoDB version of SSOSessionCache().
@@ -412,29 +470,18 @@ class SSOSessionCacheMDB(SSOSessionCache):
         self._expiration_freq = expiration_freq
         self._last_expire_at = None
 
-        if conn is not None:
-            self.connection = conn
-        else:
-            if 'replicaSet=' in uri:
-                if 'socketTimeoutMS' not in kwargs:
-                    kwargs['socketTimeoutMS'] = 5000
-                if 'connectTimeoutMS' not in kwargs:
-                    kwargs['connectTimeoutMS'] = 5000
-                self.connection = pymongo.mongo_replica_set_client.MongoReplicaSetClient(uri, **kwargs)
-            else:
-                self.connection = pymongo.MongoClient(uri, **kwargs)
-        self.db = self.connection[db_name]
-        self.sso_sessions = self.db.sso_sessions
-        for this in xrange(2):
+        self._db = SSOSessionDB(db_uri = uri, db_name = db_name)
+        self.sso_sessions = self._db.get_collection('sso_sessions')
+        for retry in range(2, -1, -1):
             try:
                 self.sso_sessions.ensure_index('created_ts', name = 'created_ts_idx', unique = False)
                 self.sso_sessions.ensure_index('session_id', name = 'session_id_idx', unique = True)
                 self.sso_sessions.ensure_index('username', name = 'username_idx', unique = False)
                 break
-            except pymongo.errors.AutoReconnect as e:
-                if this == 1:
+            except Exception:
+                if not retry:
                     raise
-                self.logger.error('Failed ensuring mongodb index, retrying ({!r})'.format(e))
+                self.logger.error('Failed ensuring mongodb index, retrying ({})'.format(retry))
 
     def remove_session(self, sid):
         res = self.sso_sessions.remove({'session_id': sid}, w = 'majority')
@@ -456,6 +503,13 @@ class SSOSessionCacheMDB(SSOSessionCache):
         self.sso_sessions.insert(_doc)
         self.expire_old_sessions()
         return _sid
+
+    def update_session(self, username, data):
+        _sid = self._create_session_id()
+        _test_doc = {'session_id': _sid,
+                     'username': username,
+                     }
+        self.sso_sessions.update(_test_doc, {'$set': {'data': data}})
 
     def get_session(self, sid):
         try:
