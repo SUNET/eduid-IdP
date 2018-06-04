@@ -392,9 +392,9 @@ class SSOSessionCache(object):
         Create a unique value suitable for use as session identifier.
 
         The uniqueness and unability to guess is security critical!
-        :return: session_id as string()
+        :return: session_id as bytes (to match what cookie decoding yields)
         """
-        return str(uuid.uuid4())
+        return six.b(str(uuid.uuid4()))
 
 
 class SSOSessionCacheMem(SSOSessionCache):

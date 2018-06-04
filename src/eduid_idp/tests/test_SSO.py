@@ -33,13 +33,10 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
-import six
-import base64
-
 import eduid_idp
 from eduid_idp.loginstate import SSOLoginData
-
 from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
+from eduid_idp.util import b64encode
 
 from eduid_userdb.nin import Nin
 from eduid_userdb.exceptions import UserDBValueError
@@ -48,12 +45,6 @@ import saml2.time_util
 from saml2.authn_context import MOBILETWOFACTORCONTRACT
 from saml2.authn_context import PASSWORD
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
-
-def b64encode(source):
-    # thank you https://stackoverflow.com/a/44688988
-    if six.PY3:
-        source = source.encode('utf-8')
-    return base64.b64encode(source).decode('utf-8')
 
 
 def make_SAML_request(class_ref):
