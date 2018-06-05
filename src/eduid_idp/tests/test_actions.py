@@ -37,6 +37,7 @@ import os
 import logging
 import pkg_resources
 
+import six
 import bson
 import webtest
 import cherrypy
@@ -147,7 +148,7 @@ class TestActions(MongoTestCase):
                              in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '200 Ok')
-        self.assertIn('action="https://sp.example.edu/saml2/acs/"', resp.body)
+        self.assertIn(six.b('action="https://sp.example.edu/saml2/acs/"'), resp.body)
 
     def test_action(self):
 
