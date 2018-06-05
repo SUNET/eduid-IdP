@@ -33,7 +33,17 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+import six
+import base64
+
 from hashlib import sha256
+
+
+def b64encode(source):
+    # thank you https://stackoverflow.com/a/44688988
+    if six.PY3:
+        source = source.encode('utf-8')
+    return base64.b64encode(source).decode('utf-8')
 
 
 def maybe_xml_to_string(message, logger=None):
@@ -65,4 +75,8 @@ def generate_auth_token(shared_key, email, nonce, timestamp, generator=sha256):
     The shared_key is a secret between the two systems
     """
     return generator("{0}|{1}|{2}|{3}".format(
-        shared_key, email, nonce, timestamp)).hexdigest()
+        shared_key,
+        email,
+        nonce,
+        timestamp,
+    ).encode('utf-8')).hexdigest()

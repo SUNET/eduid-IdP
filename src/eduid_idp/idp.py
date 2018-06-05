@@ -112,6 +112,7 @@ import logging
 import argparse
 import threading
 
+import six
 import cherrypy
 import simplejson
 
@@ -598,7 +599,7 @@ class IdPApplication(object):
             'error_traceback': str(traceback),
             'error_details': str(error_details),
         })
-        res = res.format(**argv)
+        res = six.b(res.format(**argv))
 
         # Return before logging the error for errors that are not failures in the IdP
         # (avoids sentry reports)

@@ -15,19 +15,17 @@ Miscellaneous HTTP related functions.
 
 import os
 import re
+import six
 import base64
 import pprint
 import cherrypy
 import pkg_resources
 
-try:
-    # Python2
-    from urlparse import parse_qs
-except ImportError:
-    # Python3
-    from urllib.parse import parse_qs
+from six import string_types
+from  six.moves.urllib.parse import parse_qs
 
 import eduid_idp
+from eduid_idp.util import b64encode
 
 from saml2 import BINDING_HTTP_REDIRECT
 
@@ -163,7 +161,7 @@ def static_filename(config, path, logger):
     :type path: string
     :rtype: False | None | string
     """
-    if not isinstance(path, basestring):
+    if not isinstance(path, string_types):
         return False
     if not config.static_dir:
         return False
@@ -267,10 +265,14 @@ def read_cookie(logger):
     logger.debug("Parsing cookie(s): {!s}".format(cookie))
     _authn = cookie.get("idpauthn")
     if _authn:
+        import binascii
         try:
             cookie_val = base64.b64decode(_authn.value)
             logger.debug("idpauthn cookie value={!r}".format(cookie_val))
             return cookie_val
+        except binascii.Error:
+            logger.debug('Invalid idpauthn value: {!r}'.format(_authn.value))
+            raise
         except KeyError:
             return None
     else:
@@ -317,8 +319,10 @@ def set_cookie(name, path, logger, config, value=''):
     :type value: string
     :rtype: bool
     """
+    if six.PY3 and type(value) == bytes:
+        value = value.decode('utf-8')
     cookie = cherrypy.response.cookie
-    cookie[name] = base64.b64encode(str(value))
+    cookie[name] = b64encode(value)
     cookie[name]['path'] = path
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
@@ -425,8 +429,11 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
                         logger.debug('Looking for package {!r}, language {!r}, path: {!r}'.format(
                             package, lang, langfile))
                     try:
-                        res = pkg_resources.resource_stream(package, langfile)
-                        return eduid_idp.mischttp.static_file(start_response, langfile, logger, fp=res, status=status)
+                        _res = pkg_resources.resource_stream(package, langfile)
+                        res = eduid_idp.mischttp.static_file(start_response, langfile, logger, fp=_res, status=status)
+                        if six.PY2:
+                            return res
+                        return res.decode('UTF-8')
                     except IOError:
                         pass
 
@@ -438,7 +445,10 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
         logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
         return None
     logger.debug('Using default file for {!r}: {!r}'.format(filename, static_fn))
-    return eduid_idp.mischttp.static_file(start_response, static_fn, logger, status=status)
+    res = eduid_idp.mischttp.static_file(start_response, static_fn, logger, status=status)
+    if six.PY2:
+        return res
+    return res.decode('UTF-8')
 
 
 def get_http_method():

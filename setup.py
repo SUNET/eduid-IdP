@@ -13,7 +13,7 @@ install_requires = [
     'eduid_common[idp] >= 0.2.1b4',
 
     'pysaml2 == 4.4.0',
-    'cherrypy == 3.2.4',
+    'cherrypy == 15.0',
     'defusedxml >= 0.5.0',
     'six',
 ]

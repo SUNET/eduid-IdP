@@ -37,6 +37,7 @@ import os
 import logging
 import pkg_resources
 
+import six
 import bson
 import webtest
 import cherrypy
@@ -91,10 +92,10 @@ class TestActions(MongoTestCase):
         cherrypy.tree.mount(self.idp_app, '/')
 
         # create a webtest testing environment
-        import cookielib
+        from six.moves.http_cookiejar import CookieJar
         self.http = webtest.TestApp(cherrypy.tree,
                                     extra_environ={'wsgi.url_scheme': 'https'},
-                                    cookiejar=cookielib.CookieJar())
+                                    cookiejar=CookieJar())
 
     def tearDown(self):
         # reset the testing environment
@@ -147,7 +148,7 @@ class TestActions(MongoTestCase):
                              in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '200 Ok')
-        self.assertIn('action="https://sp.example.edu/saml2/acs/"', resp.body)
+        self.assertIn(six.b('action="https://sp.example.edu/saml2/acs/"'), resp.body)
 
     def test_action(self):
 

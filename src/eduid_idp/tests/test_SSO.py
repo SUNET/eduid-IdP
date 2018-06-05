@@ -35,8 +35,8 @@
 
 import eduid_idp
 from eduid_idp.loginstate import SSOLoginData
-
 from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
+from eduid_idp.util import b64encode
 
 from eduid_userdb.nin import Nin
 from eduid_userdb.exceptions import UserDBValueError
@@ -70,7 +70,7 @@ def make_SAML_request(class_ref):
 
 def _transport_encode(data):
     # encode('base64') only works for POST bindings, redirect uses zlib compression too.
-    return ''.join(data.split('\n')).encode('base64')
+    return b64encode(''.join(data.split('\n')))
 
 
 def make_login_ticket(req_class_ref):

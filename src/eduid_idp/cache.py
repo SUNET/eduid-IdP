@@ -16,10 +16,10 @@ from collections import deque
 from hashlib import sha1
 import datetime
 
+import six
+
 from eduid_idp.loginstate import SSOLoginData
-
 from eduid_common.session.session import SessionManager, Session
-
 from eduid_userdb import MongoDB
 
 
@@ -69,7 +69,9 @@ class ExpiringCache(object):
         :param something: object
         :return:
         """
-        return sha1(something).hexdigest()
+        if six.PY2:
+            return sha1(something).hexdigest()
+        return sha1(something.encode('UTF-8')).hexdigest()
 
     def add(self, key, info):
         """
@@ -390,9 +392,9 @@ class SSOSessionCache(object):
         Create a unique value suitable for use as session identifier.
 
         The uniqueness and unability to guess is security critical!
-        :return: session_id as string()
+        :return: session_id as bytes (to match what cookie decoding yields)
         """
-        return str(uuid.uuid4())
+        return six.b(str(uuid.uuid4()))
 
 
 class SSOSessionCacheMem(SSOSessionCache):
