@@ -147,17 +147,16 @@ class IdPAuthn(object):
         :return: User, if authenticated
 
         :type login_data: dict
-        :type: user_authn: dict
+        :type: user_authn: str
         :rtype: AuthnData | False | None
         """
         from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
-        if user_authn['class_ref'] == PASSWORDPROTECTEDTRANSPORT:
+        if user_authn == PASSWORDPROTECTEDTRANSPORT:
             return self.verify_username_and_password(login_data)
         del login_data['password']  # keep out of any exception logs
-        self.logger.info("Authentication for class {!r} not implemented".format(
-            user_authn['class_ref']))
+        self.logger.info("Authentication for class {!r} not implemented".format(user_authn))
         raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
-            user_authn['class_ref'], logger=self.logger))
+            user_authn, logger=self.logger))
 
     def verify_username_and_password(self, data, min_length=0):
         """

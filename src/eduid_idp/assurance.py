@@ -43,19 +43,12 @@ def response_authn(req_authn_ctx, logger):
     Figure out what AuthnContext to assert in a SAML response,
     given the RequestedAuthnContext from the SAML request.
 
-    :param req_authn_ctx: saml2.samlp.RequestedAuthnContext instance
+    :param req_authn_ctx: Requested authn context class
     :param logger: logging logger
     :return: dict with information about the authn context (pysaml2 style)
 
-    :type req_authn_ctx: saml2.samlp.RequestedAuthnContext
+    :type req_authn_ctx: str
     :type logger: logging.Logger
-    :rtype: dict
+    :rtype: str | None
     """
-    try:
-        req_class_ref = req_authn_ctx.authn_context_class_ref[0].text
-    except AttributeError:
-        req_class_ref = None
-
-    res = {}
-    res['class_ref'] = req_class_ref
-    return res
+    return req_authn_ctx

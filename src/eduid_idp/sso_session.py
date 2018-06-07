@@ -178,17 +178,15 @@ class SSOSession(object):
         assert isinstance(user, eduid_idp.idp_user.IdPUser)
         self._idp_user = user
 
-    def get_authn_context(self,logger=None):
+    def get_authn_context(self):
         """
         Look up the authentication context for the SSO session.
 
-        :param broker: pysaml2 AuthnBroker
-        :param logger: logging logger
         :return: authn context or None
 
-        :rtype: dict | None | False
+        :rtype: str| None
         """
-        return {'class_ref': self.user_authn_class_ref}
+        return self.user_authn_class_ref
 
     @property
     def minutes_old(self):
