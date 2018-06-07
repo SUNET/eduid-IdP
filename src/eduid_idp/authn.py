@@ -37,8 +37,6 @@ Module handling authentication of users. Also applies login policies
 such as rate limiting.
 """
 
-from __future__ import absolute_import
-
 import datetime
 import vccs_client
 
@@ -91,7 +89,10 @@ class AuthnData(object):
         """
         :type value: Password | U2F
         """
-        if not isinstance(value, Password) or isinstance(value, U2F):
+        # isinstance is broken here with Python2:
+        #   ValueError: Invalid/unknown credential (got <class 'eduid_userdb.u2f.U2F'>)
+        #if not isinstance(value, Password) or isinstance(value, U2F):
+        if not hasattr(value, 'credential_id'):
             raise ValueError('Invalid/unknown credential (got {})'.format(type(value)))
         self._credential = value
 
