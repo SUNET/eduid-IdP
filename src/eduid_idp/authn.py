@@ -92,7 +92,7 @@ class AuthnData(object):
         # isinstance is broken here with Python2:
         #   ValueError: Invalid/unknown credential (got <class 'eduid_userdb.u2f.U2F'>)
         #if not isinstance(value, Password) or isinstance(value, U2F):
-        if not hasattr(value, 'credential_id'):
+        if not hasattr(value, 'key'):
             raise ValueError('Invalid/unknown credential (got {})'.format(type(value)))
         self._credential = value
 
