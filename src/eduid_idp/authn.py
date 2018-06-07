@@ -37,6 +37,8 @@ Module handling authentication of users. Also applies login policies
 such as rate limiting.
 """
 
+from __future__ import absolute_import
+
 import datetime
 import vccs_client
 
