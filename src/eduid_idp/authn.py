@@ -113,7 +113,7 @@ class AuthnData(object):
         self._timestamp = value.replace(tzinfo = None)  # thanks for not having timezone.utc, Python2
 
     def to_session_dict(self):
-        return {'cred_id': self.credential.credential_id,
+        return {'cred_id': self.credential.key,
                 'authn_ts': self.timestamp,
                 }
 
