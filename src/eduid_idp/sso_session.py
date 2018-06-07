@@ -178,7 +178,7 @@ class SSOSession(object):
         assert isinstance(user, eduid_idp.idp_user.IdPUser)
         self._idp_user = user
 
-    def get_authn_context(self, broker, logger=None):
+    def get_authn_context(self,logger=None):
         """
         Look up the authentication context for the SSO session.
 
@@ -188,10 +188,7 @@ class SSOSession(object):
 
         :rtype: dict | None | False
         """
-        return eduid_idp.assurance.get_authn_context(broker,
-                                                     self.user_authn_ref,
-                                                     class_ref=self.user_authn_class_ref,
-                                                     logger=logger)
+        return {'class_ref': self.user_authn_class_ref}
 
     @property
     def minutes_old(self):

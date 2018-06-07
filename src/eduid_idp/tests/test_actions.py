@@ -51,6 +51,8 @@ from eduid_idp.idp import IdPApplication
 import eduid_userdb
 from eduid_userdb.testing import MongoTestCase
 
+from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
+
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +110,7 @@ class TestActions(MongoTestCase):
         self.actions.remove_action_by_id(self.test_action.action_id)
 
         # make the SAML authn request
-        req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
+        req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
@@ -153,7 +155,7 @@ class TestActions(MongoTestCase):
     def test_action(self):
 
         # make the SAML authn request
-        req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
+        req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
@@ -185,7 +187,7 @@ class TestActions(MongoTestCase):
     def test_add_action(self):
 
         # make the SAML authn request
-        req = make_SAML_request(eduid_idp.assurance.SWAMID_AL1)
+        req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 

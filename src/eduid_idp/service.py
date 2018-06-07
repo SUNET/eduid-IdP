@@ -33,7 +33,6 @@ class Service(object):
         self.start_response = start_response
         self.logger = idp_app.logger
         self.IDP = idp_app.IDP
-        self.AUTHN_BROKER = idp_app.AUTHN_BROKER
         self.config = idp_app.config
         self.sso_session = session
 
