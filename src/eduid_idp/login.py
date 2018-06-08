@@ -58,9 +58,6 @@ class SSO(Service):
 
     def __init__(self, session, start_response, idp_app):
         Service.__init__(self, session, start_response, idp_app)
-        self.binding = ""
-        self.binding_out = None
-        self.destination = None
         self._idp_app = idp_app
 
     def perform_login(self, ticket):
@@ -74,15 +71,17 @@ class SSO(Service):
         :type ticket: SSOLoginData
         :rtype: string
         """
-        assert isinstance(ticket, SSOLoginData)
-        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
-
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        resp_args = self._validate_login_request(ticket)
+        assert isinstance(ticket, SSOLoginData)
+        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
 
         user = self.sso_session.idp_user
+
+        resp_args = self._validate_login_request(ticket)
+        binding_out = resp_args.get('binding_out')
+        destination = resp_args.get('destination')
 
         check_for_pending_actions(self._idp_app, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
@@ -93,21 +92,21 @@ class SSO(Service):
 
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
-        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
-            self.binding_out, self.destination, ticket.RelayState))
-        http_args = self.IDP.apply_binding(self.binding_out, str(saml_response), self.destination,
+        self.logger.debug('Applying binding_out {!r}, destination {!r}, relay_state {!r}'.format(
+            binding_out, destination, ticket.RelayState))
+        http_args = self.IDP.apply_binding(binding_out, str(saml_response), destination,
                                            ticket.RelayState, response = True)
 
         # INFO-Log the SSO session id and the AL and destination
-        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
+        self.logger.info('{!s}: response authn={!s}, dst={!s}'.format(ticket.key,
                                                                       response_authn,
-                                                                      self.destination))
-        self._fticks_log(relying_party = resp_args.get('sp_entity_id', self.destination),
+                                                                      destination))
+        self._fticks_log(relying_party = resp_args.get('sp_entity_id', destination),
                          authn_method = response_authn['class_ref'],
                          user_id = str(user.user_id),
                          )
 
-        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+        return eduid_idp.mischttp.create_html_response(binding_out, http_args, self.start_response, self.logger)
 
     def _make_saml_response(self, resp_args, response_authn, user, ticket):
         """
@@ -223,11 +222,21 @@ class SSO(Service):
         :type ticket: SSOLoginData
         :rtype: dict
         """
-        self.logger.debug("Validate login request :\n{!s}".format(str(ticket)))
+        assert isinstance(ticket, SSOLoginData)
+        self.logger.debug("Validate login request :\n{!s}".format(ticket))
+        self.logger.debug("AuthnRequest from ticket: {!r}".format(ticket.req_info.message))
         try:
-            if not self._verify_request(ticket):
-                raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(ticket.req_info.message)
+
+            # not sure if we need to call pick_binding again (already done in response_args()),
+            # but it is what we've always done
+            binding_out, destination = self.IDP.pick_binding('assertion_consumer_service',
+                                                             entity_id=ticket.req_info.message.issuer.text)
+            self.logger.debug('Binding: {}, destination: {}'.format(binding_out, destination))
+
+            resp_args['binding_out'] = binding_out
+            resp_args['destination'] = destination
+            return resp_args
         except UnknownPrincipal as excp:
             self.logger.info("{!s}: Unknown service provider: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
@@ -235,31 +244,6 @@ class SSO(Service):
             self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know how to reply to the SP that referred you here",
                                              logger = self.logger)
-        return resp_args
-
-    def _verify_request(self, ticket):
-        """
-        Verify that a login request looks OK to this IdP, and figure out
-        the outgoing binding and destination to use later.
-
-        :param ticket: SSOLoginData instance
-        :return: True on success
-        Status is True if query is OK, and Response is either a Response() or None
-        if Status is True.
-
-        :type ticket: SSOLoginData
-        :rtype: bool
-        """
-        assert isinstance(ticket, SSOLoginData)
-        self.logger.debug("verify_request acting on previously parsed ticket.req_info {!s}".format(ticket.req_info))
-
-        self.logger.debug("AuthnRequest {!r}".format(ticket.req_info.message))
-
-        self.binding_out, self.destination = self.IDP.pick_binding("assertion_consumer_service",
-                                                                   entity_id = ticket.req_info.message.issuer.text)
-
-        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
-        return True
 
     def _get_login_response_authn(self, ticket, user):
         """
