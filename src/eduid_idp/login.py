@@ -268,13 +268,6 @@ class SSO(Service):
         :type user: IdPUser
         :rtype: dict
         """
-        session_authn = self.sso_session.get_authn_context()
-        self.logger.debug("User authenticated using Authn {!r}".format(session_authn))
-        if not session_authn:
-            # This could happen with SSO sessions refering to old authns during
-            # reconfiguration of authns in the AUTHN_BROKER.
-            raise eduid_idp.error.ServiceError('Unknown stored AuthnContext')
-
         self.logger.debug('MFA credentials logged in the ticket: {}'.format(ticket.mfa_action_creds))
         self.logger.debug('Credentials used in this SSO session:\n{}'.format(self.sso_session.authn_credentials))
         self.logger.debug('User credentials:\n{}'.format(user.credentials.to_list()))
@@ -553,8 +546,6 @@ def do_verify(idp_app):
     user = authninfo.user
     idp_app.logger.debug("User {} authenticated OK using {!r}".format(user, authn_ref))
     _sso_session = SSOSession(user_id = user.user_id,
-                              authn_ref = authn_ref,
-                              authn_class_ref = authn_ref,
                               authn_request_id = _ticket.req_info.message.id,
                               authn_credentials = [authninfo],
                               )
@@ -570,7 +561,7 @@ def do_verify(idp_app):
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
     idp_app.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
         query['key'], _sso_session.public_id,
-        _sso_session.user_authn_class_ref,
+        authn_ref,
         user))
 
     # Now that an SSO session has been created, redirect the users browser back to
