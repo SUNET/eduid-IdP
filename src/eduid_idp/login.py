@@ -292,7 +292,9 @@ class SSO(Service):
         #    # The level of authentication was not sufficient for the requested AuthnContext.
         #    raise MustAuthenticate()
 
-        resp_authn = eduid_idp.assurance.response_authn(req_authn_context, self.logger)
+        resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
+            req_authn_context, user, self.sso_session, self.logger)
+        # XXX ACTUALLY ADD THE EXTRA ATTRIBUTES
         self.logger.debug("Response Authn context class: {!r}".format(resp_authn))
 
         try:

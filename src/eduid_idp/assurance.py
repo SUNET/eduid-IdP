@@ -37,8 +37,64 @@
 Assurance Level functionality.
 """
 
+class MissingSingleFactor(Exception):
+    pass
 
-def response_authn(req_authn_ctx, logger):
+class MissingMultiFactor(Exception):
+    pass
+
+class MissingAuthentication(Exception):
+    pass
+
+
+
+class AuthnState(object):
+
+    def __init__(self, user, sso_session, logger):
+        """
+
+        :param user:
+        :param sso_session:
+
+        :type user: eduid_idp.idp_user.IdPUser
+        :type sso_session: eduid_idp.sso_session.SSOSession
+        """
+        self.logger = logger
+
+        # authn_credentials is a list of dicts created by AuthnData.to_session_dict(), e.g.:
+        # {'cred_id': self.credential.key,
+        #  'authn_ts': self.timestamp,
+        # }
+        self.password_used = False
+        self.u2f_used = False
+        self._creds = []
+
+        for this in sso_session.authn_credentials:
+            cred = user.credentials.find(this['cred_id'])
+            self.logger.debug('Adding used credential: {}'.format(cred))
+            self._creds += [this]
+            # until we can go to Python3 and have some... working type checks please
+            if 'Password' in str(cred):
+                self.password_used = True
+            elif 'U2F' in str(cred):
+                self.u2f_used = True
+
+
+    @property
+    def is_singlefactor(self):
+        return self.password_used or self.u2f_used
+
+    @property
+    def is_multifactor(self):
+        return self.password_used and self.u2f_used
+
+    @property
+    def is_swamid_mfa_hi(self):
+        # XXX look through self._creds to see if there is any 'MFA-HI' tokens there
+        return False
+
+
+def response_authn(req_authn_ctx, user, sso_session, logger):
     """
     Figure out what AuthnContext to assert in a SAML response,
     given the RequestedAuthnContext from the SAML request.
@@ -48,7 +104,51 @@ def response_authn(req_authn_ctx, logger):
     :return: dict with information about the authn context (pysaml2 style)
 
     :type req_authn_ctx: str
+    :type user: eduid_idp.idp_user.IdPUser
+    :type sso_session: eduid_idp.sso_session.SSOSession
     :type logger: logging.Logger
     :rtype: str | None
     """
-    return req_authn_ctx
+    authn = AuthnState(user, sso_session, logger)
+
+    cc = {'REFEDS_MFA':  'https://refeds.org/profile/mfa',
+          'REFEDS_SFA':  'https://refeds.org/profile/sfa',
+          'FIDO_U2F':    'https://fidoalliance.org/specs/id-fido-u2f-ce-transports',
+          'PASSWORD_PT': 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
+          }
+
+    attributes = {}
+    response_authn = None
+
+    if req_authn_ctx == cc['REFEDS_MFA']:
+        if not authn.is_multifactor:
+            raise MissingMultiFactor()
+        if authn.is_swamid_mfa_hi:
+            attributes['eduPersonAssurance'] = 'http://www.swamid.se/policy/authentication/swamid-al2-mfa-hi'
+        response_authn = cc['REFEDS_MFA']
+
+    elif req_authn_ctx == cc['REFEDS_SFA']:
+        if not authn.is_singlefactor:
+            raise MissingSingleFactor()
+        response_authn = cc['REFEDS_SFA']
+
+    elif req_authn_ctx == cc['FIDO_U2F']:
+        if not authn.password_used and authn.u2f_used:
+            raise MissingMultiFactor()
+        response_authn = cc['FIDO_U2F']
+
+    elif req_authn_ctx == cc['PASSWORD_PT']:
+        if authn.password_used:
+            response_authn = cc['PASSWORD_PT']
+
+    else:
+        # Handle both unknown and empty req_authn_ctx the same
+        if authn.password_used and authn.u2f_used:
+            response_authn = cc['FIDO_U2F']
+        elif authn.password_used:
+            response_authn = cc['PASSWORD_PT']
+
+    if not response_authn:
+        raise MissingAuthentication()
+
+    return response_authn, attributes
