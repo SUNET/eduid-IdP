@@ -79,6 +79,10 @@ class AuthnState(object):
             elif 'U2F' in str(cred):
                 self.u2f_used = True
 
+        self.is_swamid_al2 = False
+        if user.nins.verified.to_list():
+            self.is_swamid_al2 = True
+
 
     @property
     def is_singlefactor(self):
@@ -90,6 +94,8 @@ class AuthnState(object):
 
     @property
     def is_swamid_mfa_hi(self):
+        if not self.is_swamid_al2:
+            return False
         # XXX look through self._creds to see if there is any 'MFA-HI' tokens there
         return False
 
@@ -117,14 +123,16 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
           'PASSWORD_PT': 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
           }
 
+    SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'
+    SWAMID_AL2 = 'http://www.swamid.se/policy/assurance/al2'
+    SWAMID_AL2_MFA_HI = 'http://www.swamid.se/policy/authentication/swamid-al2-mfa-hi'
+
     attributes = {}
     response_authn = None
 
     if req_authn_ctx == cc['REFEDS_MFA']:
         if not authn.is_multifactor:
             raise MissingMultiFactor()
-        if authn.is_swamid_mfa_hi:
-            attributes['eduPersonAssurance'] = 'http://www.swamid.se/policy/authentication/swamid-al2-mfa-hi'
         response_authn = cc['REFEDS_MFA']
 
     elif req_authn_ctx == cc['REFEDS_SFA']:
@@ -150,5 +158,12 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
 
     if not response_authn:
         raise MissingAuthentication()
+
+    if authn.is_swamid_mfa_hi and req_authn_ctx in [cc['REFEDS_SFA'], cc['REFEDS_MFA']]:
+        attributes['eduPersonAssurance'] = [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI]
+    elif authn.is_swamid_al2:
+        attributes['eduPersonAssurance'] = [SWAMID_AL1, SWAMID_AL2]
+    else:
+        attributes['eduPersonAssurance'] = [SWAMID_AL1]
 
     return response_authn, attributes

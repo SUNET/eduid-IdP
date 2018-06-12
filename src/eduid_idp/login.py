@@ -125,6 +125,14 @@ class SSO(Service):
         :return: SAML response in lxml format
         """
         attributes = user.to_saml_attributes(self.config, self.logger)
+        for k,v in response_authn.pop('authn_attributes', {}).items():
+            if k in attributes:
+                self.logger.debug('Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(
+                    k, attributes[k], v
+                ))
+            else:
+                self.logger.debug('Adding attribute {} with value from authn process: {}'.format(k, v))
+            attributes[k] = v
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
@@ -287,7 +295,7 @@ class SSO(Service):
 
         resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
             req_authn_context, user, self.sso_session, self.logger)
-        # XXX ACTUALLY ADD THE EXTRA ATTRIBUTES
+
         self.logger.debug("Response Authn context class: {!r}".format(resp_authn))
 
         try:
@@ -298,6 +306,7 @@ class SSO(Service):
 
         return dict(class_ref = resp_authn,
                     authn_instant = self.sso_session.authn_timestamp,
+                    authn_attributes = extra_attributes,
         )
 
     def _get_requested_authn_context(self, ticket):

@@ -49,6 +49,9 @@ from saml2.authn_context import MOBILETWOFACTORCONTRACT
 from saml2.authn_context import PASSWORD
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
+SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'
+SWAMID_AL2 = 'http://www.swamid.se/policy/assurance/al2'
+
 cc = {'REFEDS_MFA': 'https://refeds.org/profile/mfa',
       'REFEDS_SFA': 'https://refeds.org/profile/sfa',
       'FIDO_U2F': 'https://fidoalliance.org/specs/id-fido-u2f-ce-transports',
@@ -152,7 +155,7 @@ class TestSSO(IdPSimpleTestCase):
 
     # ------------------------------------------------------------------------
 
-    def _get_login_response_authn(self, req_class_ref, credentials, user=None):
+    def _get_login_response_authn(self, req_class_ref, credentials=[], user=None):
         if user is None:
             user = self.get_user_set_nins('test1@eduid.se', [])
         ticket = make_login_ticket(req_class_ref=req_class_ref)
@@ -168,12 +171,27 @@ class TestSSO(IdPSimpleTestCase):
                 this = user.credentials.filter(Password).to_list()[0]
             elif this == 'u2f':
                 this = user.credentials.filter(U2F).to_list()[0]
-            data = AuthnData(user, this, datetime.datetime.now())
-            sso_session_1.add_authn_credential(data)
+            if isinstance(this, AuthnData):
+                sso_session_1.add_authn_credential(this)
+            else:
+                data = AuthnData(user, this, datetime.datetime.now())
+                sso_session_1.add_authn_credential(data)
         _SSO = eduid_idp.login.SSO(sso_session_1, self.start_response, self.idp_app)
         return _SSO._get_login_response_authn(ticket, user)
 
     # ------------------------------------------------------------------------
+
+    def test__get_login_response_UNSPECIFIED1(self):
+        """
+        Test login with password and U2F, request REFEDS SFA.
+
+        Expect the response Authn to be REFEDS SFA.
+        """
+
+        out = self._get_login_response_authn(req_class_ref = cc['REFEDS_MFA'],
+                                             credentials = ['pw', 'u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
 
     def test__get_login_response_3(self):
         """
@@ -196,6 +214,18 @@ class TestSSO(IdPSimpleTestCase):
 
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['pw'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
+
+    def test__get_login_response_UNSPECIFIED2(self):
+        """
+        Test login with U2F, request REFEDS SFA.
+
+        Expect the response Authn to be REFEDS SFA.
+        """
+
+        out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
+                                             credentials = ['u2f'],
                                              )
         self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
 
@@ -247,7 +277,7 @@ class TestSSO(IdPSimpleTestCase):
 
     def test__get_login_response_9(self):
         """
-        Test login with password and U2F, request unknown context class.
+        Test login with password, request unknown context class.
 
         Expect the response Authn to be password-protected-transport.
         """
@@ -255,4 +285,27 @@ class TestSSO(IdPSimpleTestCase):
                                              credentials = ['pw'],
                                              )
         self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
+
+
+    def test__get_login_response_assurance_AL1(self):
+        """
+        Make sure eduPersonAssurace is SWAMID AL1 with no verified nin.
+        """
+        out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
+                                             credentials = ['pw'],
+                                             )
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1])
+
+    def test__get_login_response_assurance_AL2(self):
+        """
+        Make sure eduPersonAssurace is SWAMID AL2 with a verified nin.
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        out = self._get_login_response_authn(user = user,
+                                             req_class_ref = 'urn:no-such-class',
+                                             credentials = ['pw'],
+                                             )
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
 
