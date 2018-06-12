@@ -22,6 +22,7 @@ from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.loginstate import SSOLoginData
+from eduid_idp.assurance import AssuranceException
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2.s_utils import UnknownPrincipal
@@ -282,19 +283,15 @@ class SSO(Service):
 
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
+
         req_authn_context = self._get_requested_authn_context(ticket)
 
-        # XXX loop though the list of all authn_context_class_ref!
-        #auth_levels = self._get_acceptable_auth_levels(req_authn_context)
-        #try:
-        #    response_authn = eduid_idp.assurance.response_authn(req_authn_context, session_authn, auth_levels,
-        #                                                        self.logger)
-        #except eduid_idp.error.Forbidden:
-        #    # The level of authentication was not sufficient for the requested AuthnContext.
-        #    raise MustAuthenticate()
-
-        resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
-            req_authn_context, user, self.sso_session, self.logger)
+        try:
+            resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
+                req_authn_context, user, self.sso_session, self.logger)
+        except AssuranceException as exc:
+            self.logger.info('Assurance not possible: {!s}'.format(exc))
+            raise MustAuthenticate()
 
         self.logger.debug("Response Authn context class: {!r}".format(resp_authn))
 
@@ -529,6 +526,9 @@ def do_verify(idp_app):
 
     _ticket = idp_app.IDP.ticket.get_ticket(query)
 
+    authn_ref = _ticket.req_info.message.requested_authn_context.authn_context_class_ref[0].text
+    idp_app.logger.debug("Authenticating with {!r}".format(authn_ref))
+
     if not password or 'username' not in query:
         raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
 
@@ -549,7 +549,7 @@ def do_verify(idp_app):
 
     # Create SSO session
     user = authninfo.user
-    idp_app.logger.debug("User {} authenticated OK using {!r}".format(user, authn_ref))
+    idp_app.logger.debug("User {} authenticated OK".format(user, authn_ref))
     _sso_session = SSOSession(user_id = user.user_id,
                               authn_request_id = _ticket.req_info.message.id,
                               authn_credentials = [authninfo],

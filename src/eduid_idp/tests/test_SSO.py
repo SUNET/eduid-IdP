@@ -45,8 +45,6 @@ from eduid_userdb.nin import Nin
 from eduid_userdb.credentials import U2F, Password, u2f_from_dict
 import saml2.time_util
 
-from saml2.authn_context import MOBILETWOFACTORCONTRACT
-from saml2.authn_context import PASSWORD
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
 SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'

@@ -37,13 +37,16 @@
 Assurance Level functionality.
 """
 
-class MissingSingleFactor(Exception):
+class AssuranceException(Exception):
     pass
 
-class MissingMultiFactor(Exception):
+class MissingSingleFactor(AssuranceException):
     pass
 
-class MissingAuthentication(Exception):
+class MissingMultiFactor(AssuranceException):
+    pass
+
+class MissingAuthentication(AssuranceException):
     pass
 
 
