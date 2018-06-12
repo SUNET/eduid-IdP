@@ -78,7 +78,7 @@ class TestIdPUserDb(IdPSimpleTestCase):
         data = {'username': username,
                 'password': password,
                 }
-        return self.authn.verify_username_and_password(data,)
+        return self.authn.password_authn(data)
 
 
 class TestAuthentication(MongoTestCase):
@@ -104,7 +104,7 @@ class TestAuthentication(MongoTestCase):
         data = {'username': 'foo',
                 'password': 'bar',
                 }
-        self.assertFalse(self.idp_app.authn.verify_username_and_password(data))
+        self.assertFalse(self.idp_app.authn.password_authn(data))
 
     def test_authn_known_user_wrong_password(self):
         assert isinstance(self.test_user, eduid_userdb.User)
@@ -114,7 +114,7 @@ class TestAuthentication(MongoTestCase):
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'bar',
                 }
-        self.assertFalse(self.idp_app.authn.verify_username_and_password(data))
+        self.assertFalse(self.idp_app.authn.password_authn(data))
 
     def test_authn_known_user_right_password(self):
         assert isinstance(self.test_user, eduid_userdb.User)
@@ -124,7 +124,7 @@ class TestAuthentication(MongoTestCase):
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'foo',
                 }
-        self.assertTrue(self.idp_app.authn.verify_username_and_password(data))
+        self.assertTrue(self.idp_app.authn.password_authn(data))
 
     def test_authn_expired_credential(self):
         assert isinstance(self.test_user, eduid_userdb.User)
@@ -138,9 +138,9 @@ class TestAuthentication(MongoTestCase):
         three_years_ago = datetime.datetime.now() - datetime.timedelta(days = 3 * 365)
         self.idp_app.authn.authn_store.credential_success([passwords[0].key], three_years_ago)
         with self.assertRaises(eduid_idp.error.Forbidden):
-            self.assertTrue(self.idp_app.authn.verify_username_and_password(data))
+            self.assertTrue(self.idp_app.authn.password_authn(data))
         # Do the same thing again to make sure we didn't accidentally update the
         # 'last successful login' timestamp when it was a successful login with an
         # expired credential.
         with self.assertRaises(eduid_idp.error.Forbidden):
-            self.assertTrue(self.idp_app.authn.verify_username_and_password(data))
+            self.assertTrue(self.idp_app.authn.password_authn(data))
