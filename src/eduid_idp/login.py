@@ -529,10 +529,6 @@ def do_verify(idp_app):
 
     _ticket = idp_app.IDP.ticket.get_ticket(query)
 
-    authn_ref = _ticket.req_info.message.requested_authn_context.authn_context_class_ref[0].text
-
-    idp_app.logger.debug("Authenticating with {!r}".format(authn_ref))
-
     if not password or 'username' not in query:
         raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
 
@@ -540,7 +536,7 @@ def do_verify(idp_app):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    authninfo = idp_app.authn.password_authn(login_data, authn_ref)
+    authninfo = idp_app.authn.password_authn(login_data)
 
     if not authninfo:
         _ticket.FailCount += 1
