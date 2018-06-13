@@ -50,27 +50,22 @@ class SSOSession(object):
     has taken place, what AuthnContext the SP requested and so on).
 
     :param user_id: User id, typically MongoDB _id
-    :param authn_ref: AuthnBroker opaque reference
-    :param authn_class_ref: Authn class reference
     :param authn_request_id: SAML request id of request that caused authentication
     :param authn_credentials: Data about what credentials were used to authn
     :param ts: Authentication timestamp, in UTC
 
     :type user_id: bson.ObjectId | object
     :type authn_ref: object
-    :type authn_class_ref: string
     :type authn_request_id: string
     :type authn_credentials: None | [AuthnData]
     :type ts: int
     """
 
-    def __init__(self, user_id, authn_ref, authn_class_ref, authn_request_id,
+    def __init__(self, user_id, authn_request_id,
                  authn_credentials = None, ts=None):
         if ts is None:
             ts = int(time.time())
         self._data = {'user_id': user_id,
-                      'authn_ref': authn_ref,
-                      'authn_class_ref': authn_class_ref,
                       'authn_request_id': authn_request_id,
                       'authn_credentials': [],
                       'authn_timestamp': ts,
@@ -86,11 +81,10 @@ class SSOSession(object):
         self._idp_user = None
 
     def __repr__(self):
-        return '<{cl} instance at {addr}: uid={uid!s}, class={clref!s}, ts={ts!s}>'.format(
+        return '<{cl} instance at {addr}: uid={uid!s}, ts={ts!s}>'.format(
             cl = self.__class__.__name__,
             addr = hex(id(self)),
             uid = str(self._data['user_id']),
-            clref = self._data['authn_class_ref'],
             ts = self._data['authn_timestamp'],
         )
 
@@ -130,26 +124,6 @@ class SSOSession(object):
         return "{!s}.{!s}".format(str(self._data['user_id']), self._data['authn_timestamp'])
 
     @property
-    def user_authn_class_ref(self):
-        """
-        Return the (internal) name of the AL-level of authentication performed
-        SSO session was created.
-
-        E.g. u'eduid.se:level:1'
-        """
-        return self._data['authn_class_ref']
-
-    @property
-    def user_authn_ref(self):
-        """
-        Return the (internal) name of the authentication mechanism the user used
-        when SSO session was created.
-
-        E.g. u'eduid.se:level:1:100'
-        """
-        return self._data['authn_ref']
-
-    @property
     def user_authn_request_id(self):
         """
         Return the ID of the SAML request that caused the creation of the SSO session.
@@ -178,21 +152,6 @@ class SSOSession(object):
         assert isinstance(user, eduid_idp.idp_user.IdPUser)
         self._idp_user = user
 
-    def get_authn_context(self, broker, logger=None):
-        """
-        Look up the authentication context for the SSO session.
-
-        :param broker: pysaml2 AuthnBroker
-        :param logger: logging logger
-        :return: authn context or None
-
-        :rtype: dict | None | False
-        """
-        return eduid_idp.assurance.get_authn_context(broker,
-                                                     self.user_authn_ref,
-                                                     class_ref=self.user_authn_class_ref,
-                                                     logger=logger)
-
     @property
     def minutes_old(self):
         """
@@ -205,6 +164,13 @@ class SSOSession(object):
 
     @property
     def authn_credentials(self):
+        """
+        Get the data about what credentials have been used (at what time) during
+        this SSO session.
+
+        :return: Used credentials information
+        :rtype: [AuthnData]
+        """
         return self._data['authn_credentials']
 
     def add_authn_credential(self, data):
@@ -231,8 +197,6 @@ def from_dict(data):
     :rtype: SSOSession
     """
     return SSOSession(user_id = data['user_id'],
-                      authn_ref = data['authn_ref'],
-                      authn_class_ref = data['authn_class_ref'],
                       authn_request_id = data['authn_request_id'],
                       authn_credentials = data['authn_credentials'],
                       ts = data['authn_timestamp'],

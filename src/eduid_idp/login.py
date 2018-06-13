@@ -22,13 +22,14 @@ from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.loginstate import SSOLoginData
+from eduid_idp.assurance import AssuranceException
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_HTTP_REDIRECT
-from saml2.authn_context import requested_authn_context
 from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
 from saml2.s_utils import UnknownSystemEntity
 from defusedxml import ElementTree as DefusedElementTree
+
 
 class MustAuthenticate(Exception):
     """
@@ -58,9 +59,6 @@ class SSO(Service):
 
     def __init__(self, session, start_response, idp_app):
         Service.__init__(self, session, start_response, idp_app)
-        self.binding = ""
-        self.binding_out = None
-        self.destination = None
         self._idp_app = idp_app
 
     def perform_login(self, ticket):
@@ -74,15 +72,17 @@ class SSO(Service):
         :type ticket: SSOLoginData
         :rtype: string
         """
-        assert isinstance(ticket, SSOLoginData)
-        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
-
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        resp_args = self._validate_login_request(ticket)
+        assert isinstance(ticket, SSOLoginData)
+        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
 
         user = self.sso_session.idp_user
+
+        resp_args = self._validate_login_request(ticket)
+        binding_out = resp_args.get('binding_out')
+        destination = resp_args.get('destination')
 
         check_for_pending_actions(self._idp_app, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
@@ -93,28 +93,28 @@ class SSO(Service):
 
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
-        self.logger.debug("Applying binding_out {!r}, destination {!r}, relay_state {!r}".format(
-            self.binding_out, self.destination, ticket.RelayState))
-        http_args = self.IDP.apply_binding(self.binding_out, str(saml_response), self.destination,
+        self.logger.debug('Applying binding_out {!r}, destination {!r}, relay_state {!r}'.format(
+            binding_out, destination, ticket.RelayState))
+        http_args = self.IDP.apply_binding(binding_out, str(saml_response), destination,
                                            ticket.RelayState, response = True)
 
         # INFO-Log the SSO session id and the AL and destination
-        self.logger.info("{!s}: response authn={!s}, dst={!s}".format(ticket.key,
-                                                                      response_authn['class_ref'],
-                                                                      self.destination))
-        self._fticks_log(relying_party = resp_args.get('sp_entity_id', self.destination),
+        self.logger.info('{!s}: response authn={!s}, dst={!s}'.format(ticket.key,
+                                                                      response_authn,
+                                                                      destination))
+        self._fticks_log(relying_party = resp_args.get('sp_entity_id', destination),
                          authn_method = response_authn['class_ref'],
                          user_id = str(user.user_id),
                          )
 
-        return eduid_idp.mischttp.create_html_response(self.binding_out, http_args, self.start_response, self.logger)
+        return eduid_idp.mischttp.create_html_response(binding_out, http_args, self.start_response, self.logger)
 
     def _make_saml_response(self, resp_args, response_authn, user, ticket):
         """
         Create the SAML response using pysaml2 create_authn_response().
 
         :param resp_args: pysaml2 response arguments
-        :param response_authn: pysaml2 response authn info
+        :param response_authn: Response authn context class information
         :param user: IdP user
         :param ticket: Login process state
 
@@ -126,6 +126,14 @@ class SSO(Service):
         :return: SAML response in lxml format
         """
         attributes = user.to_saml_attributes(self.config, self.logger)
+        for k,v in response_authn.pop('authn_attributes', {}).items():
+            if k in attributes:
+                self.logger.debug('Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(
+                    k, attributes[k], v
+                ))
+            else:
+                self.logger.debug('Adding attribute {} with value from authn process: {}'.format(k, v))
+            attributes[k] = v
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
@@ -223,11 +231,21 @@ class SSO(Service):
         :type ticket: SSOLoginData
         :rtype: dict
         """
-        self.logger.debug("Validate login request :\n{!s}".format(str(ticket)))
+        assert isinstance(ticket, SSOLoginData)
+        self.logger.debug("Validate login request :\n{!s}".format(ticket))
+        self.logger.debug("AuthnRequest from ticket: {!r}".format(ticket.req_info.message))
         try:
-            if not self._verify_request(ticket):
-                raise eduid_idp.error.ServiceError(logger = self.logger)  # not reached
             resp_args = self.IDP.response_args(ticket.req_info.message)
+
+            # not sure if we need to call pick_binding again (already done in response_args()),
+            # but it is what we've always done
+            binding_out, destination = self.IDP.pick_binding('assertion_consumer_service',
+                                                             entity_id=ticket.req_info.message.issuer.text)
+            self.logger.debug('Binding: {}, destination: {}'.format(binding_out, destination))
+
+            resp_args['binding_out'] = binding_out
+            resp_args['destination'] = destination
+            return resp_args
         except UnknownPrincipal as excp:
             self.logger.info("{!s}: Unknown service provider: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know the SP that referred you here", logger = self.logger)
@@ -235,31 +253,6 @@ class SSO(Service):
             self.logger.info("{!s}: Unsupported SAML binding: {!s}".format(ticket.key, excp))
             raise eduid_idp.error.BadRequest("Don't know how to reply to the SP that referred you here",
                                              logger = self.logger)
-        return resp_args
-
-    def _verify_request(self, ticket):
-        """
-        Verify that a login request looks OK to this IdP, and figure out
-        the outgoing binding and destination to use later.
-
-        :param ticket: SSOLoginData instance
-        :return: True on success
-        Status is True if query is OK, and Response is either a Response() or None
-        if Status is True.
-
-        :type ticket: SSOLoginData
-        :rtype: bool
-        """
-        assert isinstance(ticket, SSOLoginData)
-        self.logger.debug("verify_request acting on previously parsed ticket.req_info {!s}".format(ticket.req_info))
-
-        self.logger.debug("AuthnRequest {!r}".format(ticket.req_info.message))
-
-        self.binding_out, self.destination = self.IDP.pick_binding("assertion_consumer_service",
-                                                                   entity_id = ticket.req_info.message.issuer.text)
-
-        self.logger.debug("Binding: %s, destination: %s" % (self.binding_out, self.destination))
-        return True
 
     def _get_login_response_authn(self, ticket, user):
         """
@@ -284,83 +277,34 @@ class SSO(Service):
         :type user: IdPUser
         :rtype: dict
         """
-        session_authn = self.sso_session.get_authn_context(self.AUTHN_BROKER, logger=self.logger)
-        self.logger.debug("User authenticated using Authn {!r}".format(session_authn))
-        if not session_authn:
-            # This could happen with SSO sessions refering to old authns during
-            # reconfiguration of authns in the AUTHN_BROKER.
-            raise eduid_idp.error.ServiceError('Unknown stored AuthnContext')
-
         self.logger.debug('MFA credentials logged in the ticket: {}'.format(ticket.mfa_action_creds))
         self.logger.debug('Credentials used in this SSO session:\n{}'.format(self.sso_session.authn_credentials))
         self.logger.debug('User credentials:\n{}'.format(user.credentials.to_list()))
 
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
+
         req_authn_context = self._get_requested_authn_context(ticket)
 
-        # XXX loop though the list of all authn_context_class_ref!
-        auth_levels = self._get_acceptable_auth_levels(req_authn_context)
         try:
-            response_authn = eduid_idp.assurance.response_authn(req_authn_context, session_authn, auth_levels,
-                                                                self.logger)
-        except eduid_idp.error.Forbidden:
-            # The level of authentication was not sufficient for the requested AuthnContext.
+            resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
+                req_authn_context, user, self.sso_session, self.logger)
+        except AssuranceException as exc:
+            self.logger.info('Assurance not possible: {!s}'.format(exc))
             raise MustAuthenticate()
 
-        self.logger.debug("Response Authn: {!r}".format(response_authn))
-
-        # Apply application logic to determine if this IdP is willing to assert the response_authn
-        # AuthnContext for this particular user.
-        if not eduid_idp.assurance.permitted_authn(user, response_authn, self.logger):
-            # XXX should return a login failure SAML response instead of an error in the IdP here.
-            # The SP could potentially help the user much better than the IdP here.
-            raise eduid_idp.error.Forbidden("Authn not permitted".format())
+        self.logger.debug("Response Authn context class: {!r}".format(resp_authn))
 
         try:
             self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(
-                response_authn['class_ref'], req_authn_context.authn_context_class_ref[0].text))
+                resp_authn, req_authn_context))
         except AttributeError:
-            self.logger.debug("Asserting AuthnContext {!r} (none requested)".format(response_authn['class_ref']))
+            self.logger.debug("Asserting AuthnContext {!r} (none requested)".format(resp_authn))
 
-        response_authn['authn_instant'] = self.sso_session.authn_timestamp
-
-        return response_authn
-
-    def _get_acceptable_auth_levels(self, req_authn_context):
-        """
-        Use the AUTHN_BROKER to decide what authentication levels are acceptable given a
-        RequestedAuthnContext.
-
-        The return value is a list of our `internal' levels, e.g.
-
-            ['eduid.se:level:1', 'eduid.se:level:2', 'eduid.se:level:3']
-               if 'http://www.swamid.se/policy/assurance/al1' is requested
-
-            ['eduid.se:level:2', 'eduid.se:level:3']
-               if 'http://www.swamid.se/policy/assurance/al2' is requested
-
-        :param req_authn_context: Requested Authn Context
-        :return: List with names of acceptable authn levels
-
-        :type req_authn_context: saml2.samlp.RequestedAuthnContext
-        :rtype: [string]
-        """
-        authn_ctx = eduid_idp.assurance.canonical_req_authn_context(req_authn_context, self.logger)
-        auth_info = self.AUTHN_BROKER.pick(authn_ctx)
-        auth_levels = []
-        if authn_ctx and len(auth_info):
-            # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
-            # filter out the `reference' values (canonical class_ref strings)
-            levels_dict = {}
-            # Turn references (e.g. 'eduid:level:1:100') into base levels (e.g. 'eduid:level:1')
-            for (method, reference) in auth_info:
-                this = self.AUTHN_BROKER[reference]
-                levels_dict[this['class_ref']] = 1
-            auth_levels = sorted(levels_dict.keys())
-        self.logger.debug("Acceptable Authn levels considering requested AuthnContext "
-                          "(picked by AuthnBroker): {!r}".format(auth_levels))
-        return auth_levels
+        return dict(class_ref = resp_authn,
+                    authn_instant = self.sso_session.authn_timestamp,
+                    authn_attributes = extra_attributes,
+        )
 
     def _get_requested_authn_context(self, ticket):
         """
@@ -371,9 +315,13 @@ class SSO(Service):
         :return: Requested Authn Context
 
         :type ticket: SSOLoginData
-        :rtype: RequestedAuthnContext
+        :rtype: str | None
         """
+        res = None
         req_authn_context = ticket.req_info.message.requested_authn_context
+        if req_authn_context and req_authn_context.authn_context_class_ref:
+            res = req_authn_context.authn_context_class_ref[0].text
+
         try:
             attributes = self.IDP.metadata.entity_attributes(ticket.req_info.message.issuer.text)
         except KeyError:
@@ -381,15 +329,13 @@ class SSO(Service):
         if 'http://www.swamid.se/assurance-requirement' in attributes:
             # XXX don't just pick the first one from the list - choose the most applicable one somehow.
             new_authn = attributes['http://www.swamid.se/assurance-requirement'][0]
-            requested = None
-            if req_authn_context and req_authn_context.authn_context_class_ref:
-                requested = req_authn_context.authn_context_class_ref[0].text
             self.logger.debug("Entity {!r} has AuthnCtx preferences in metadata. Overriding {!r} -> {!r}".format(
                 ticket.req_info.message.issuer.text,
-                requested,
+                res,
                 new_authn))
-            req_authn_context = requested_authn_context(new_authn)
-        return req_authn_context
+            res = new_authn
+
+        return res
 
     def redirect(self):
         """ This is the HTTP-redirect endpoint.
@@ -445,8 +391,7 @@ class SSO(Service):
             self.logger.info("{!s}: force_authn sso_session={!s}".format(
                 ticket.key, self.sso_session.public_id))
 
-        req_authn_context = self._get_requested_authn_context(ticket)
-        return self._not_authn(ticket, req_authn_context)
+        return self._not_authn(ticket)
 
     def _should_force_authn(self, ticket):
         """
@@ -472,37 +417,25 @@ class SSO(Service):
                 ticket.req_info.message.id))
         return False
 
-    def _not_authn(self, ticket, requested_authn_context):
+    def _not_authn(self, ticket):
         """
         Authenticate user. Either, the user hasn't logged in yet,
         or the service provider forces re-authentication.
         :param ticket: SSOLoginData instance
-        :param requested_authn_context: saml2.samlp.RequestedAuthnContext instance
         :returns: HTTP response
 
         :type ticket: SSOLoginData
-        :type requested_authn_context: saml2.samlp.RequestedAuthnContext
         :rtype: string
         """
         assert isinstance(ticket, SSOLoginData)
         redirect_uri = eduid_idp.mischttp.geturl(self.config, query = False)
 
-        self.logger.debug("Do authentication, requested auth context : {!r}".format(requested_authn_context))
+        req_authn_context = self._get_requested_authn_context(ticket)
+        self.logger.debug("Do authentication, requested auth context : {!r}".format(req_authn_context))
 
-        authn_ctx = eduid_idp.assurance.canonical_req_authn_context(requested_authn_context, self.logger)
-        auth_info = self.AUTHN_BROKER.pick(authn_ctx)
+        return self._show_login_page(ticket, req_authn_context, redirect_uri)
 
-        if authn_ctx and len(auth_info):
-            # `method' is just a no-op (true) value in the way eduid_idp uses the AuthnBroker -
-            # filter out the `reference' values (canonical class_ref strings)
-            auth_levels = [reference for (method, reference) in auth_info]
-            self.logger.debug("Acceptable Authn levels (picked by AuthnBroker) : {!r}".format(auth_levels))
-
-            return self._show_login_page(ticket, auth_levels, redirect_uri)
-
-        raise eduid_idp.error.Unauthorized("No usable authentication method", logger = self.logger)
-
-    def _show_login_page(self, ticket, auth_levels, redirect_uri):
+    def _show_login_page(self, ticket, requested_authn_context, redirect_uri):
         """
         Display the login form for all authentication methods.
 
@@ -511,11 +444,12 @@ class SSO(Service):
         to render the login page for this method.
 
         :param ticket: Login session state (not SSO session state)
-        :param auth_levels: list of strings with auth level names that would be valid for this request
+        :param requested_authn_context: Requested authentication context class
         :param redirect_uri: string with URL to proceed to after authentication
         :return: HTTP response
 
         :type ticket: SSOLoginData
+        :type requested_authn_context: str
 
         :rtype: string
         """
@@ -527,7 +461,7 @@ class SSO(Service):
             "username": "",
             "password": "",
             "key": ticket.key,
-            "authn_reference": auth_levels[0],
+            "authn_reference": requested_authn_context,
             "redirect_uri": redirect_uri,
             "alert_msg": "",
             "sp_entity_id": "",
@@ -592,15 +526,8 @@ def do_verify(idp_app):
 
     _ticket = idp_app.IDP.ticket.get_ticket(query)
 
-    user_authn = None
-    authn_ref = query.get('authn_reference')
-    if authn_ref:
-        user_authn = eduid_idp.assurance.get_authn_context(idp_app.AUTHN_BROKER, authn_ref)
-    if not user_authn:
-        raise eduid_idp.error.Unauthorized("Bad authentication reference", logger = idp_app.logger)
-
-    idp_app.logger.debug("Authenticating with {!r} (from authn_reference={!r})".format(
-        user_authn['class_ref'], authn_ref))
+    authn_ref = _ticket.req_info.message.requested_authn_context.authn_context_class_ref[0].text
+    idp_app.logger.debug("Authenticating with {!r}".format(authn_ref))
 
     if not password or 'username' not in query:
         raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
@@ -609,7 +536,7 @@ def do_verify(idp_app):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    authninfo = idp_app.authn.password_authn(login_data, user_authn)
+    authninfo = idp_app.authn.password_authn(login_data)
 
     if not authninfo:
         _ticket.FailCount += 1
@@ -622,10 +549,8 @@ def do_verify(idp_app):
 
     # Create SSO session
     user = authninfo.user
-    idp_app.logger.debug("User {} authenticated OK using {!r}".format(user, user_authn['class_ref']))
+    idp_app.logger.debug("User {} authenticated OK".format(user, authn_ref))
     _sso_session = SSOSession(user_id = user.user_id,
-                              authn_ref = authn_ref,
-                              authn_class_ref = user_authn['class_ref'],
                               authn_request_id = _ticket.req_info.message.id,
                               authn_credentials = [authninfo],
                               )
@@ -641,7 +566,7 @@ def do_verify(idp_app):
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
     idp_app.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
         query['key'], _sso_session.public_id,
-        _sso_session.user_authn_class_ref,
+        authn_ref,
         user))
 
     # Now that an SSO session has been created, redirect the users browser back to

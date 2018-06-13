@@ -138,36 +138,13 @@ class IdPAuthn(object):
         if self.authn_store is None and config.mongo_uri:
             self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
 
-    def password_authn(self, login_data, user_authn):
+    def password_authn(self, data):
         """
         Authenticate someone using a username and password.
 
         :param login_data: Login credentials (dict with 'username' and 'password')
-        :param user_authn: Information about the authentication attempted
-        :return: User, if authenticated
-
         :type login_data: dict
-        :type: user_authn: dict
         :rtype: AuthnData | False | None
-        """
-        if user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_1_NAME or \
-                user_authn['class_ref'] == eduid_idp.assurance.EDUID_INTERNAL_2_NAME:
-            return self.verify_username_and_password(login_data)
-        del login_data['password']  # keep out of any exception logs
-        self.logger.info("Authentication for class {!r} not implemented".format(
-            user_authn['class_ref']))
-        raise eduid_idp.error.ServiceError("Authentication for class {!r} not implemented".format(
-            user_authn['class_ref'], logger=self.logger))
-
-    def verify_username_and_password(self, data, min_length=0):
-        """
-        :param data: dict() with POST parameters
-        :param min_length: Minimum required length of password
-
-        :return: IdPUser instance or False
-
-        :type data: dict
-        :rtype: AuthnData | False
         """
         username = data['username']
         password = data['password']
@@ -186,12 +163,10 @@ class IdPAuthn(object):
         self.logger.debug('Found user {!r}'.format(user))
 
         cred = self._verify_username_and_password2(user, password)
-        if cred:
-            if len(password) >= min_length:
-                return AuthnData(user, cred, datetime.datetime.utcnow())
-            self.logger.debug("User {!r} authenticated, but denied by password length constraints ({!r})".format(
-                user, min_length))
-        return False
+        if not cred:
+            return False
+
+        return AuthnData(user, cred, datetime.datetime.utcnow())
 
     def _verify_username_and_password2(self, user, password):
         """

@@ -33,18 +33,35 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+import datetime
+
 import eduid_idp
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
 from eduid_idp.util import b64encode
+from eduid_idp.authn import AuthnData
 
 from eduid_userdb.nin import Nin
-from eduid_userdb.exceptions import UserDBValueError
+from eduid_userdb.credentials import U2F, Password, u2f_from_dict
 import saml2.time_util
 
-from saml2.authn_context import MOBILETWOFACTORCONTRACT
-from saml2.authn_context import PASSWORD
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
+
+SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'
+SWAMID_AL2 = 'http://www.swamid.se/policy/assurance/al2'
+
+cc = {'REFEDS_MFA': 'https://refeds.org/profile/mfa',
+      'REFEDS_SFA': 'https://refeds.org/profile/sfa',
+      'FIDO_U2F': 'https://fidoalliance.org/specs/id-fido-u2f-ce-transports',
+      'PASSWORD_PT': 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
+      }
+
+_U2F = u2f_from_dict({
+    'version': 'U2F_V2',
+    'app_id': 'unit test',
+    'keyhandle': 'firstU2FElement',
+    'public_key': 'foo',
+})
 
 
 def make_SAML_request(class_ref):
@@ -81,8 +98,6 @@ def make_login_ticket(req_class_ref):
     start_response = lambda: False
     idp_app = FakeIdPApp()
     sso_session_1 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-                                                     authn_ref='eduid.se:level:1:100',
-                                                     authn_class_ref='eduid.se:level:1',
                                                      authn_request_id='some-unique-id-1'
                                                      )
     SSO = eduid_idp.login.SSO(sso_session_1, start_response, idp_app)
@@ -96,27 +111,21 @@ class TestSSO(IdPSimpleTestCase):
     def setUp(self):
         super(TestSSO, self).setUp()
 
-        start_response = lambda: False
-        idp_app = FakeIdPApp()
+        self.start_response = lambda: False
+        self.idp_app = FakeIdPApp()
 
-        sso_session_1 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-                                                         authn_ref='eduid.se:level:1:100',
-                                                         authn_class_ref='eduid.se:level:1',
-                                                         authn_request_id='some-unique-id-1'
-                                                         )
-        self.SSO_AL1 = eduid_idp.login.SSO(sso_session_1, start_response, idp_app)
-        sso_session_2 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-                                                         authn_ref='eduid.se:level:2:200',
-                                                         authn_class_ref='eduid.se:level:2',
-                                                         authn_request_id='some-unique-id-2'
-                                                         )
-        self.SSO_AL2 = eduid_idp.login.SSO(sso_session_2, start_response, idp_app)
-        sso_session_3 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-                                                         authn_ref='eduid.se:level:3:300',
-                                                         authn_class_ref='eduid.se:level:3',
-                                                         authn_request_id='some-unique-id-3'
-                                                         )
-        self.SSO_AL3 = eduid_idp.login.SSO(sso_session_3, start_response, idp_app)
+        #sso_session_1 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
+        #                                                 authn_request_id='some-unique-id-1'
+        #                                                 )
+        #self.SSO_AL1 = eduid_idp.login.SSO(sso_session_1, start_response, idp_app)
+        #sso_session_2 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
+        #                                                 authn_request_id='some-unique-id-2'
+        #                                                 )
+        #self.SSO_AL2 = eduid_idp.login.SSO(sso_session_2, start_response, idp_app)
+        #sso_session_3 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
+        #                                                 authn_request_id='some-unique-id-3'
+        #                                                 )
+        #self.SSO_AL3 = eduid_idp.login.SSO(sso_session_3, start_response, idp_app)
 
     # ------------------------------------------------------------------------
     def get_user_set_nins(self, eppn, ninlist):
@@ -144,170 +153,157 @@ class TestSSO(IdPSimpleTestCase):
 
     # ------------------------------------------------------------------------
 
-    def test__get_login_response_authn_1(self):
-        """
-        Test login with AL2, request plain AL1.
+    def _get_login_response_authn(self, req_class_ref, credentials=[], user=None):
+        if user is None:
+            user = self.get_user_set_nins('test1@eduid.se', [])
+        ticket = make_login_ticket(req_class_ref=req_class_ref)
 
-        Expect the response Authn to be AL1.
-        :return:
-        """
-        ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL1)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL2._get_login_response_authn(ticket, user)
-        self.assertEqual(eduid_idp.assurance.SWAMID_AL1, out['class_ref'])
-
-    def test__get_login_response_authn_2a(self):
-        """
-        Test login with AL2, request plain AL2.
-
-        Expect the response Authn to be AL2.
-        :return:
-        """
-        ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL2)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL2._get_login_response_authn(ticket, user)
-        self.assertEqual(eduid_idp.assurance.SWAMID_AL2, out['class_ref'])
-
-    def test__get_login_response_authn_2b(self):
-        """
-        Test login with AL2, request plain AL2 but with user that has no NIN.
-
-        Expect a Forbidden exception.
-        """
-        ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL2)
-        # No NIN 1
-        user = self.get_user_set_nins('test1@eduid.se', [])
-        with self.assertRaises(eduid_idp.error.Forbidden):
-            self.SSO_AL2._get_login_response_authn(ticket, user)
-        # No NIN 2
-        user = self.get_user_set_nins('test1@eduid.se', [])
-        with self.assertRaises(eduid_idp.error.Forbidden):
-            self.SSO_AL2._get_login_response_authn(ticket, user)
-        # Invalid NIN
-        with self.assertRaises(UserDBValueError):
-            self.get_user_set_nins('test1@eduid.se', [False])
-
-    def test__get_login_response_authn_3(self):
-        """
-        Test login with AL2, request plain AL3.
-
-        Expect MustAuthenticate exception.
-        """
-        ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL3)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        with self.assertRaises(eduid_idp.login.MustAuthenticate):
-            self.SSO_AL2._get_login_response_authn(ticket, user)
+        sso_session_1 = eduid_idp.sso_session.SSOSession(user_id=user.eppn,
+                                                         authn_request_id='some-unique-id-1'
+                                                         )
+        if 'u2f' in credentials and not user.credentials.filter(U2F).to_list():
+            # add a U2F credential to the user
+            user.credentials.add(_U2F)
+        for this in credentials:
+            if this == 'pw':
+                this = user.credentials.filter(Password).to_list()[0]
+            elif this == 'u2f':
+                this = user.credentials.filter(U2F).to_list()[0]
+            if isinstance(this, AuthnData):
+                sso_session_1.add_authn_credential(this)
+            else:
+                data = AuthnData(user, this, datetime.datetime.now())
+                sso_session_1.add_authn_credential(data)
+        _SSO = eduid_idp.login.SSO(sso_session_1, self.start_response, self.idp_app)
+        return _SSO._get_login_response_authn(ticket, user)
 
     # ------------------------------------------------------------------------
 
-    def test__get_login_response_authn_4_1(self):
+    def test__get_login_response_UNSPECIFIED1(self):
         """
-        Test login with AL1, request AL1 equivalent PASSWORD.
+        Test login with password and U2F, request REFEDS SFA.
 
-        Expect the response Authn to be AL1.
-        PASSWORD is special in that it is mapped to AL1/AL2/AL3 in the response.
+        Expect the response Authn to be REFEDS SFA.
         """
-        ticket = make_login_ticket(req_class_ref = PASSWORD)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL1._get_login_response_authn(ticket, user)
-        self.assertEqual(eduid_idp.assurance.SWAMID_AL1, out['class_ref'])
 
-    def test__get_login_response_authn_4_2(self):
+        out = self._get_login_response_authn(req_class_ref = cc['REFEDS_MFA'],
+                                             credentials = ['pw', 'u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
+
+    def test__get_login_response_3(self):
         """
-        Test login with AL2, request AL1 equivalent PASSWORD.
+        Test login with password and U2F, request REFEDS SFA.
 
-        Expect the response Authn to be AL1.
-        PASSWORD is special in that it is mapped to AL1/AL2/AL3 in the response.
+        Expect the response Authn to be REFEDS SFA.
         """
-        ticket = make_login_ticket(req_class_ref = PASSWORD)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL2._get_login_response_authn(ticket, user)
-        self.assertEqual(eduid_idp.assurance.SWAMID_AL2, out['class_ref'])
 
-    def test__get_login_response_authn_4_3(self):
+        out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
+                                             credentials = ['pw', 'u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
+
+    def test__get_login_response_4(self):
         """
-        Test login with AL3, request AL1 equivalent PASSWORD.
+        Test login with password, request REFEDS SFA.
 
-        We would have expected the response Authn to be AL3, but AL3 policy is not
-        implemented yet so it should result in Forbidden for now.
-
-        PASSWORD is special in that it is mapped to AL1/AL2/AL3 in the response.
+        Expect the response Authn to be REFEDS SFA.
         """
-        ticket = make_login_ticket(req_class_ref = PASSWORD)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        with self.assertRaises(eduid_idp.error.Forbidden):
-            self.SSO_AL3._get_login_response_authn(ticket, user)
-        #self.assertEqual(eduid_idp.assurance.SWAMID_AL3, out['class_ref'])
 
-    # ------------------------------------------------------------------------
+        out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
+                                             credentials = ['pw'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
 
-    def test__get_login_response_authn_5_1(self):
+    def test__get_login_response_UNSPECIFIED2(self):
         """
-        Test login with AL1, request AL1 equivalent PASSWORDPROTECTEDTRANSPORT.
+        Test login with U2F, request REFEDS SFA.
 
-        Expect the response Authn to be the requested PASSWORDPROTECTEDTRANSPORT.
+        Expect the response Authn to be REFEDS SFA.
         """
-        ticket = make_login_ticket(req_class_ref = PASSWORDPROTECTEDTRANSPORT)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL1._get_login_response_authn(ticket, user)
-        self.assertEqual(PASSWORDPROTECTEDTRANSPORT, out['class_ref'])
 
-    def test__get_login_response_authn_5_2(self):
+        out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
+                                             credentials = ['u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
+
+    def test__get_login_response_5(self):
         """
-        Test login with AL2, request AL1 equivalent PASSWORDPROTECTEDTRANSPORT.
+        Test login with password and U2F, request FIDO U2F.
 
-        Expect the response Authn to be the requested PASSWORDPROTECTEDTRANSPORT.
+        Expect the response Authn to be FIDO U2F.
         """
-        ticket = make_login_ticket(req_class_ref = PASSWORDPROTECTEDTRANSPORT)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL2._get_login_response_authn(ticket, user)
-        self.assertEqual(PASSWORDPROTECTEDTRANSPORT, out['class_ref'])
 
-    def test__get_login_response_authn_6_1(self):
+        out = self._get_login_response_authn(req_class_ref = cc['FIDO_U2F'],
+                                             credentials = ['pw', 'u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['FIDO_U2F'])
+
+    def test__get_login_response_6(self):
         """
-        Test login with AL1, request unknown context.
+        Test login with password and U2F, request plain password-protected-transport.
 
-        Expect the response Authn to be AL1 (default response for unknown requested authn contexts is auth level).
+        Expect the response Authn to be password-protected-transport.
         """
-        ticket = make_login_ticket(req_class_ref = 'http://www.example.edu/assurance/UNKNOWN')
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL1._get_login_response_authn(ticket, user)
-        self.assertEqual(eduid_idp.assurance.SWAMID_AL1, out['class_ref'])
 
-    def test__get_login_response_authn_6_2(self):
+        out = self._get_login_response_authn(req_class_ref = PASSWORDPROTECTEDTRANSPORT,
+                                             credentials = ['pw', 'u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
+
+    def test__get_login_response_7(self):
         """
-        Test login with AL2, request unknown context.
+        Test login with password, request plain password-protected-transport.
 
-        Expect the response Authn to be AL2 (default response for unknown requested authn contexts is auth level).
+        Expect the response Authn to be password-protected-transport.
         """
-        ticket = make_login_ticket(req_class_ref = 'http://www.example.edu/assurance/UNKNOWN')
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        out = self.SSO_AL2._get_login_response_authn(ticket, user)
-        self.assertEqual(eduid_idp.assurance.SWAMID_AL2, out['class_ref'])
+        out = self._get_login_response_authn(req_class_ref = PASSWORDPROTECTEDTRANSPORT,
+                                             credentials = ['pw'],
+                                             )
+        self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
 
-    # ------------------------------------------------------------------------
-
-    def test__get_login_response_authn_7_1(self):
+    def test__get_login_response_8(self):
         """
-        Test login with AL1, request plain AL2.
+        Test login with password, request unknown context class.
 
-        Expect MustAuthenticate exception.
+        Expect the response Authn to be FIDO U2F.
         """
-        ticket = make_login_ticket(req_class_ref = eduid_idp.assurance.SWAMID_AL2)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        with self.assertRaises(eduid_idp.login.MustAuthenticate):
-            self.SSO_AL1._get_login_response_authn(ticket, user)
+        out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
+                                             credentials = ['pw', 'u2f'],
+                                             )
+        self.assertEqual(out['class_ref'], cc['FIDO_U2F'])
 
-    def test__get_login_response_authn_7_2(self):
+    def test__get_login_response_9(self):
         """
-        Test login with AL1, request AL2 equivalent MOBILETWOFACTORCONTRACT.
+        Test login with password, request unknown context class.
 
-        Expect MustAuthenticate exception.
+        Expect the response Authn to be password-protected-transport.
         """
-        ticket = make_login_ticket(req_class_ref = MOBILETWOFACTORCONTRACT)
-        user = self.get_user_set_nins('test1@eduid.se', ['123456780123'])
-        with self.assertRaises(eduid_idp.login.MustAuthenticate):
-            self.SSO_AL1._get_login_response_authn(ticket, user)
+        out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
+                                             credentials = ['pw'],
+                                             )
+        self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
 
-    # ------------------------------------------------------------------------
+
+    def test__get_login_response_assurance_AL1(self):
+        """
+        Make sure eduPersonAssurace is SWAMID AL1 with no verified nin.
+        """
+        out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
+                                             credentials = ['pw'],
+                                             )
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1])
+
+    def test__get_login_response_assurance_AL2(self):
+        """
+        Make sure eduPersonAssurace is SWAMID AL2 with a verified nin.
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        out = self._get_login_response_authn(user = user,
+                                             req_class_ref = 'urn:no-such-class',
+                                             credentials = ['pw'],
+                                             )
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
 

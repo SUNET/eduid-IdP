@@ -252,8 +252,6 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
-        _my_id = self.IDP.config.entityid
-        self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker(_my_id)
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
         self.IDP.ticket = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
                                             self.config, threading.Lock())

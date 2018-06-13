@@ -151,7 +151,6 @@ class FakeIdPApp(IdPApplication):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.AUTHN_BROKER = eduid_idp.assurance.init_AuthnBroker('unittest-idp.example.edu')
         datadir = pkg_resources.resource_filename(__name__, 'tests/data')
         config_file = os.path.join(datadir, 'test_SSO_conf.py')
         self.IDP = server.Server(config_file=config_file)
