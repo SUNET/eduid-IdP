@@ -123,6 +123,10 @@ class FakeAuthClient(object):
                 for _cred in _user.passwords.to_list_of_dicts():
                     # restore the expected hash from out-of-band memory
                     _cred['hash'] = PWHASHES[_cred['credential_id']]
+                    # remove keys in _cred that are not in _expect
+                    _delete_keys = [x for x in _cred.keys() if x not in _expect]
+                    for k in _delete_keys:
+                        del _cred[k]
                     if _cred == _expect:
                         return True
         return False
