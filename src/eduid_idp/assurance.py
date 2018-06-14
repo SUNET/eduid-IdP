@@ -33,6 +33,8 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+from eduid_userdb.credentials import METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
+
 """
 Assurance Level functionality.
 """
@@ -70,22 +72,44 @@ class AuthnState(object):
         # }
         self.password_used = False
         self.u2f_used = False
+        self.swamid_al2_used = False
+        self.swamid_al2_hi_used = False
         self._creds = []
 
         for this in sso_session.authn_credentials:
             cred = user.credentials.find(this['cred_id'])
+            if not cred:
+                self.logger.warning('Could not find credential {!r} on user {}'.format(this['cred_id'], user))
+                continue
             self.logger.debug('Adding used credential: {}'.format(cred))
-            self._creds += [this]
+            self._creds += [cred]
             # until we can go to Python3 and have some... working type checks please
             if 'Password' in str(cred):
                 self.password_used = True
             elif 'U2F' in str(cred):
                 self.u2f_used = True
 
+        if self.password_used:
+            # second pass for second factor
+            for cred in [x for x in self._creds if 'Password' not in str(x)]:
+                if cred.is_verified:
+                    if cred.proofing_method == METHOD_SWAMID_AL2_MFA:
+                        self.swamid_al2_used = True
+                    elif cred.proofing_method == METHOD_SWAMID_AL2_MFA_HI:
+                        self.swamid_al2_hi_used = True
         self.is_swamid_al2 = False
         if user.nins.verified.to_list():
             self.is_swamid_al2 = True
 
+    def __str__(self):
+        return '<AuthnState: creds={}, pw={}, u2f={}, nin is al2={}, token is (al2={}, al2_hi={})>'.format(
+            len(self._creds),
+            self.password_used,
+            self.u2f_used,
+            self.is_swamid_al2,
+            self.swamid_al2_used,
+            self.swamid_al2_hi_used,
+        )
 
     @property
     def is_singlefactor(self):
@@ -94,13 +118,6 @@ class AuthnState(object):
     @property
     def is_multifactor(self):
         return self.password_used and self.u2f_used
-
-    @property
-    def is_swamid_mfa_hi(self):
-        if not self.is_swamid_al2:
-            return False
-        # XXX look through self._creds to see if there is any 'MFA-HI' tokens there
-        return False
 
 
 def response_authn(req_authn_ctx, user, sso_session, logger):
@@ -119,10 +136,11 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     :rtype: str | None
     """
     authn = AuthnState(user, sso_session, logger)
+    logger.debug('Authn will be evaluated based on: {!s}'.format(authn))
 
     cc = {'REFEDS_MFA':  'https://refeds.org/profile/mfa',
           'REFEDS_SFA':  'https://refeds.org/profile/sfa',
-          'FIDO_U2F':    'https://fidoalliance.org/specs/id-fido-u2f-ce-transports',
+          'FIDO_U2F':    'https://www.swamid.se/specs/id-fido-u2f-ce-transports',
           'PASSWORD_PT': 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
           }
 
@@ -162,10 +180,11 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     if not response_authn:
         raise MissingAuthentication()
 
-    if authn.is_swamid_mfa_hi and req_authn_ctx in [cc['REFEDS_SFA'], cc['REFEDS_MFA']]:
-        attributes['eduPersonAssurance'] = [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI]
-    elif authn.is_swamid_al2:
-        attributes['eduPersonAssurance'] = [SWAMID_AL1, SWAMID_AL2]
+    if authn.is_swamid_al2:
+        if authn.swamid_al2_hi_used and req_authn_ctx in [cc['REFEDS_SFA'], cc['REFEDS_MFA']]:
+            attributes['eduPersonAssurance'] = [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI]
+        else:
+            attributes['eduPersonAssurance'] = [SWAMID_AL1, SWAMID_AL2]
     else:
         attributes['eduPersonAssurance'] = [SWAMID_AL1]
 

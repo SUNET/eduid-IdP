@@ -42,17 +42,18 @@ from eduid_idp.util import b64encode
 from eduid_idp.authn import AuthnData
 
 from eduid_userdb.nin import Nin
-from eduid_userdb.credentials import U2F, Password, u2f_from_dict
+from eduid_userdb.credentials import U2F, Password, u2f_from_dict, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
 import saml2.time_util
 
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
 SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'
 SWAMID_AL2 = 'http://www.swamid.se/policy/assurance/al2'
+SWAMID_AL2_MFA_HI = 'http://www.swamid.se/policy/authentication/swamid-al2-mfa-hi'
 
 cc = {'REFEDS_MFA': 'https://refeds.org/profile/mfa',
       'REFEDS_SFA': 'https://refeds.org/profile/sfa',
-      'FIDO_U2F': 'https://fidoalliance.org/specs/id-fido-u2f-ce-transports',
+      'FIDO_U2F': 'https://www.swamid.se/specs/id-fido-u2f-ce-transports',
       'PASSWORD_PT': 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
       }
 
@@ -61,6 +62,26 @@ _U2F = u2f_from_dict({
     'app_id': 'unit test',
     'keyhandle': 'firstU2FElement',
     'public_key': 'foo',
+})
+
+_U2F_SWAMID_AL2 = u2f_from_dict({
+    'version': 'U2F_V2',
+    'app_id': 'unit test',
+    'keyhandle': 'U2F SWAMID AL2',
+    'public_key': 'foo',
+    'verified': True,
+    'proofing_method': METHOD_SWAMID_AL2_MFA,
+    'proofing_version': 'testing',
+})
+
+_U2F_SWAMID_AL2_HI = u2f_from_dict({
+    'version': 'U2F_V2',
+    'app_id': 'unit test',
+    'keyhandle': 'U2F SWAMID AL2 HI',
+    'public_key': 'foo',
+    'verified': True,
+    'proofing_method': METHOD_SWAMID_AL2_MFA_HI,
+    'proofing_version': 'testing',
 })
 
 
@@ -179,13 +200,46 @@ class TestSSO(IdPSimpleTestCase):
 
     # ------------------------------------------------------------------------
 
+    def test__get_login_response_1(self):
+        """
+        Test login with password and SWAMID AL2-HI U2F, request REFEDS MFA.
+
+        Expect the response Authn to be REFEDS MFA, and assurance attribute to include SWAMID MFA HI.
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        user.credentials.add(_U2F_SWAMID_AL2_HI)
+        out = self._get_login_response_authn(user = user,
+                                             req_class_ref = cc['REFEDS_MFA'],
+                                             credentials = ['pw', _U2F_SWAMID_AL2_HI],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
+
+
+    def test__get_login_response_2(self):
+        """
+        Test login with password and SWAMID AL2 U2F, request REFEDS MFA.
+
+        Expect the response Authn to be REFEDS MFA.
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        user.credentials.add(_U2F_SWAMID_AL2)
+        out = self._get_login_response_authn(user = user,
+                                             req_class_ref = cc['REFEDS_MFA'],
+                                             credentials = ['pw', _U2F_SWAMID_AL2],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+
+
     def test__get_login_response_UNSPECIFIED1(self):
         """
         Test login with password and U2F, request REFEDS SFA.
 
         Expect the response Authn to be REFEDS SFA.
         """
-
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_MFA'],
                                              credentials = ['pw', 'u2f'],
                                              )
@@ -197,7 +251,6 @@ class TestSSO(IdPSimpleTestCase):
 
         Expect the response Authn to be REFEDS SFA.
         """
-
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['pw', 'u2f'],
                                              )
@@ -209,7 +262,6 @@ class TestSSO(IdPSimpleTestCase):
 
         Expect the response Authn to be REFEDS SFA.
         """
-
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['pw'],
                                              )
@@ -221,7 +273,6 @@ class TestSSO(IdPSimpleTestCase):
 
         Expect the response Authn to be REFEDS SFA.
         """
-
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['u2f'],
                                              )
@@ -233,7 +284,6 @@ class TestSSO(IdPSimpleTestCase):
 
         Expect the response Authn to be FIDO U2F.
         """
-
         out = self._get_login_response_authn(req_class_ref = cc['FIDO_U2F'],
                                              credentials = ['pw', 'u2f'],
                                              )
@@ -245,7 +295,6 @@ class TestSSO(IdPSimpleTestCase):
 
         Expect the response Authn to be password-protected-transport.
         """
-
         out = self._get_login_response_authn(req_class_ref = PASSWORDPROTECTEDTRANSPORT,
                                              credentials = ['pw', 'u2f'],
                                              )
