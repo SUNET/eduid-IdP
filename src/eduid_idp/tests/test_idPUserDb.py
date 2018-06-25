@@ -64,7 +64,7 @@ class TestIdPUserDb(IdPSimpleTestCase):
         _this = self.idp_userdb.lookup_user('test2@eduid.se')
         self.assertEqual(_this.mail_addresses.primary.email, 'test2@example.com')
 
-    def test_verify_username_and_password(self):
+    def test_password_authn(self):
         self.assertTrue(self._test_authn('test@example.com', 'foo'))
         self.assertTrue(self._test_authn('test@example.com', 'bar'))
         self.assertTrue(self._test_authn('test2@example.com', 'baz'))

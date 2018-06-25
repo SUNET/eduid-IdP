@@ -347,8 +347,9 @@ class IdPApplication(object):
 
         response = {'status': 'FAIL'}
 
-        user = self.authn.verify_username_and_password(parsed)
-        if user:
+        authn = self.authn.password_authn(parsed)
+        if authn:
+            user = authn.user
             health = self._is_healthy()
             if health['status'] != 'STATUS_OK':
                 response['reason'] = 'Health check failed: {}'.format(health.get('reason'))
