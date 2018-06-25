@@ -39,7 +39,9 @@ import pprint
 
 from six import string_types
 
+import eduid_idp
 from eduid_userdb import UserDB, User
+from eduid_userdb.exceptions import MultipleUsersReturned
 
 # default list of SAML attributes to release
 _SAML_ATTRIBUTES = ['displayName',
@@ -120,7 +122,11 @@ class IdPUserDb(object):
         _user = None
         if isinstance(username, string_types):
             if '@' in username:
-                _user = self.userdb.get_user_by_mail(username.lower(), raise_on_missing=False)
+                try:
+                    _user = self.userdb.get_user_by_mail(username.lower(), raise_on_missing=False)
+                except MultipleUsersReturned as e:
+                    self.logger.error(e.message)
+                    raise eduid_idp.error.ServiceError('Internal error')
             if not _user:
                 _user = self.userdb.get_user_by_eppn(username.lower(), raise_on_missing=False)
         if not _user:
