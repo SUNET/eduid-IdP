@@ -87,6 +87,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'redis_port': '6379',
                     'redis_db': '0',
                     'session_app_key': None,
+                    'action_plugins': [],
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -531,3 +532,21 @@ class IdPConfig(object):
         The Redis session encrypted application key.
         """
         return self.config.get(self.section, 'session_app_key')
+
+    @property
+    def action_plugins(self):
+        """
+        The plugins for pre-authentication actions that need to be loaded
+
+        :return: list of plugin names
+
+        :rtype: list[string]
+        """
+        if self._parsed_plugin_names:
+            return self._parsed_plugin_names
+        value = self.config.get(self.section, 'action_plugins')
+        res = []
+        if value:
+            res = [x.strip() for x in value.split(',')]
+        self._parsed_plugin_names = res
+        return res
