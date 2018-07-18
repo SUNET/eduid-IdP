@@ -110,6 +110,7 @@ class IdPConfig(object):
         self._parsed_content_packages = None
         self._parsed_status_test_usernames = None
         self._parsed_redis_sentinel_hosts = None
+        self._parsed_plugin_names = None
         self.section = _CONFIG_SECTION
         _defaults = defaults or _CONFIG_DEFAULTS
         _defaults['debug'] = str(debug)
