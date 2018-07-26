@@ -198,6 +198,6 @@ def from_dict(data):
     """
     return SSOSession(user_id = data['user_id'],
                       authn_request_id = data['authn_request_id'],
-                      authn_credentials = data['authn_credentials'],
+                      authn_credentials = data.get('authn_credentials'),
                       ts = data['authn_timestamp'],
                       )

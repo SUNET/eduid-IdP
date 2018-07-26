@@ -526,7 +526,9 @@ def do_verify(idp_app):
 
     _ticket = idp_app.IDP.ticket.get_ticket(query)
 
-    authn_ref = _ticket.req_info.message.requested_authn_context.authn_context_class_ref[0].text
+    authn_ref = None
+    if _ticket.req_info.message.requested_authn_context:
+        authn_ref = _ticket.req_info.message.requested_authn_context.authn_context_class_ref[0].text
     idp_app.logger.debug("Authenticating with {!r}".format(authn_ref))
 
     if not password or 'username' not in query:
@@ -549,7 +551,7 @@ def do_verify(idp_app):
 
     # Create SSO session
     user = authninfo.user
-    idp_app.logger.debug("User {} authenticated OK".format(user, authn_ref))
+    idp_app.logger.debug("User {} authenticated OK".format(user))
     _sso_session = SSOSession(user_id = user.user_id,
                               authn_request_id = _ticket.req_info.message.id,
                               authn_credentials = [authninfo],
