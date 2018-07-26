@@ -25,4 +25,5 @@ extra_jobs:
       github_push: false
       cron: null
     upstream:
+      - eduid-docker-pythonenv
       - eduid-IdP
