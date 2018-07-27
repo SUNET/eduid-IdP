@@ -9,6 +9,8 @@ triggers:
 slack:
   room: "eduid-builds"
 python_module: eduid_idp
+pre_build_script:
+  - apt-get install -y xmlsec1
 clean_workspace: true
 publish_over_ssh:
   - pypi.sunet.se
