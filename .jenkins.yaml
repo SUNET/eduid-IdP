@@ -26,6 +26,7 @@ extra_jobs:
     triggers:
       github_push: false
       cron: null
+    pre_build_script: ~
     upstream:
       - eduid-docker-pythonenv
       - eduid-IdP
