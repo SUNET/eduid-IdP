@@ -36,6 +36,7 @@
 import os
 import six
 import time
+from pkg_resources import iter_entry_points
 from importlib import import_module
 
 import eduid_idp.util
@@ -124,6 +125,9 @@ def add_idp_initiated_actions(idp_app, user, ticket):
     These functions take the IdP app, the user, and the login data (ticket)
     and add actions that depend on those.
 
+    Also iterate over add_actions entry points and execute them (for backwards
+    compatibility).
+
     :param idp_app: IdP application instance
     :param user: the authenticating user
     :param ticket: the SSO login data
@@ -144,4 +148,13 @@ def add_idp_initiated_actions(idp_app, user, ticket):
             getattr(plugin_module, 'add_actions')(idp_app, user, ticket)
         except Exception as exc:
             idp_app.logger.warn('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
+            raise
+
+    for entry_point in iter_entry_points('eduid_actions.add_actions'):
+        idp_app.logger.debug('Using entry point {!r} to add new actions'.format(entry_point.name))
+        try:
+            # load() here is the function eduid_action.mfa.add_mfa_actions()
+            entry_point.load()(idp_app, user, ticket)
+        except Exception as exc:
+            idp_app.logger.warn('Error executing entry point {!r}: {!s}'.format(entry_point.name, exc))
             raise
