@@ -37,6 +37,7 @@ import os
 import six
 import time
 from pkg_resources import iter_entry_points
+from importlib import import_module
 
 import eduid_idp.util
 import eduid_idp.mischttp
@@ -119,18 +120,36 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
 
 def add_idp_initiated_actions(idp_app, user, ticket):
     """
-    Iterate over add_actions entry points and execute them.
-    These entry points take the IdP app and the login data (ticket)
+    Load the configured action plugins and execute their `add_actions`
+    functions.
+    These functions take the IdP app, the user, and the login data (ticket)
     and add actions that depend on those.
+
+    Also iterate over add_actions entry points and execute them (for backwards
+    compatibility).
 
     :param idp_app: IdP application instance
     :param user: the authenticating user
     :param ticket: the SSO login data
 
-    :type user: eduid_idp.idp_user.IdPUser
     :type idp_app: eduid_idp.idp.IdPApplication
+    :type user: eduid_idp.idp_user.IdPUser
     :type ticket: eduid_idp.login.SSOLoginData
     """
+    for plugin_name in idp_app.config.action_plugins:
+        try:
+            plugin_module = import_module('eduid_action.{}.idp'.format(plugin_name))
+        except ImportError:
+            idp_app.logger.warn('Configured plugin {} missing from sys.path'.format(plugin_name))
+            continue
+        idp_app.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
+        try:
+            # load() here is the function eduid_action.mfa.add_mfa_actions()
+            getattr(plugin_module, 'add_actions')(idp_app, user, ticket)
+        except Exception as exc:
+            idp_app.logger.warn('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
+            raise
+
     for entry_point in iter_entry_points('eduid_actions.add_actions'):
         idp_app.logger.debug('Using entry point {!r} to add new actions'.format(entry_point.name))
         try:
