@@ -89,7 +89,7 @@ class SSO(Service):
 
         response_authn = self._get_login_response_authn(ticket, user)
 
-        saml_response = self._make_saml_response(resp_args, response_authn, user, ticket)
+        saml_response = self._make_saml_response(resp_args, response_authn, user, ticket, self.sso_session)
 
         # Create the Javascript self-posting form that will take the user back to the SP
         # with a SAMLResponse
@@ -109,7 +109,7 @@ class SSO(Service):
 
         return eduid_idp.mischttp.create_html_response(binding_out, http_args, self.start_response, self.logger)
 
-    def _make_saml_response(self, resp_args, response_authn, user, ticket):
+    def _make_saml_response(self, resp_args, response_authn, user, ticket, sso_session):
         """
         Create the SAML response using pysaml2 create_authn_response().
 
@@ -126,6 +126,9 @@ class SSO(Service):
         :return: SAML response in lxml format
         """
         attributes = user.to_saml_attributes(self.config, self.logger)
+        # Add a list of credentials used in a private attribute that will only be
+        # released to the eduID authn component
+        attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
         for k,v in response_authn.pop('authn_attributes', {}).items():
             if k in attributes:
                 self.logger.debug('Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(
