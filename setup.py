@@ -23,10 +23,8 @@ testing_extras = [
     'coverage == 3.6',
     'WebTest == 2.0.18',
     'mock == 1.0.1',
-    'nosexcover == 1.0.8',
-    'eduid_actions>=0.1.0',
-    'eduid_action.tou',
-    'eduid_action.mfa >= 0.0.7',
+    'nosexcover >= 1.0.8',
+    'eduid_action>=0.2.0',
 ]
 
 setup(name='eduid_idp',
