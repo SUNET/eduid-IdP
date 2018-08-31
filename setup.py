@@ -24,7 +24,7 @@ testing_extras = [
     'WebTest == 2.0.18',
     'mock == 1.0.1',
     'nosexcover >= 1.0.8',
-    'eduid_action[testing]>=0.2.0',
+    'eduid_action>=0.2.0',
 ]
 
 setup(name='eduid_idp',
