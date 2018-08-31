@@ -23,7 +23,7 @@ testing_extras = [
     'coverage == 3.6',
     'WebTest == 2.0.18',
     'mock == 1.0.1',
-    'nosexcover == 1.0.8',
+    'nosexcover >= 1.0.8',
     'eduid_action[testing]>=0.2.0',
 ]
 
