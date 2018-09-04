@@ -146,7 +146,7 @@ class SSO(Service):
                 pprint.pformat(resp_args),
                 pprint.pformat(response_authn)))
         saml_response = self.IDP.create_authn_response(attributes, userid = user.eppn,
-                                                       authn = response_authn, sign_assertion = True,
+                                                       authn = response_authn, sign_response = True,
                                                        **resp_args)
         self._kantara_log_assertion_id(saml_response, ticket)
 
