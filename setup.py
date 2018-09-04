@@ -11,8 +11,7 @@ version = '0.5.4'
 install_requires = [
     'eduid_userdb >= 0.4.0b9',
     'eduid_common[idp] >= 0.2.1b4',
-
-    'pysaml2 == 4.6.0',
+    'pysaml2 == 4.6.1',
     'cherrypy == 15.0',
     'defusedxml >= 0.5.0',
     'six',
