@@ -205,6 +205,15 @@ class IdPApplication(object):
         if config.mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
             self.actions_db = ActionDB(config.mongo_uri)
             self.logger.info("configured to redirect users with pending actions")
+
+            from importlib import import_module
+            for plugin_name in self.config.action_plugins:
+                try:
+                    import_module('eduid_action.{}.idp'.format(plugin_name))
+                    self.logger.info("    Found {} plugin".format(plugin_name))
+                except ImportError:
+                    self.logger.info("    DID NOT find {} plugin".format(plugin_name))
+
         else:
             self.logger.debug("NOT configured to redirect users with pending actions")
 
