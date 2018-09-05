@@ -200,40 +200,20 @@ class TestActions(MongoTestCase):
 
         _user_id = self.test_user.user_id
 
-        # Patch pkg_resources.iter_entry_points
-        def mock_iep(name):
-            if name == 'eduid_actions.add_actions':
-                class inner():
-                    name = 'dummy'
-                    def load(self):
-                        def action_test(idp_app, user, ticket):
-                            idp_app.actions_db.add_action(
-                                userid = _user_id,
-                                action_type = 'dummy',
-                                preference = 100,
-                                session = ticket.key)
-                        return action_test
-                return [inner()]
-            else:
-                import pkg_resources
-                return [ep for ep in pkg_resources.iter_entry_points(name)]
 
-        from eduid_idp import idp_actions
-        with patch.object(idp_actions, 'iter_entry_points', mock_iep):
+        # Patch the VCCSClient so we do not need a vccs server
+        from vccs_client import VCCSClient
+        with patch.object(VCCSClient, 'authenticate'):
+            VCCSClient.authenticate.return_value = True
 
-            # Patch the VCCSClient so we do not need a vccs server
-            from vccs_client import VCCSClient
-            with patch.object(VCCSClient, 'authenticate'):
-                VCCSClient.authenticate.return_value = True
-
-                # post the login form to the test env
-                resp = form.submit()
-                self.assertEqual(resp.status, '302 Found')
-
-            # get the redirect url. set the cookies manually,
-            # for some reason webtest doesn't set them in the request
-            cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                                 in self.http.cookies.items()])
-            resp = self.http.get(resp.location, headers={'Cookie': cookies})
+            # post the login form to the test env
+            resp = form.submit()
             self.assertEqual(resp.status, '302 Found')
-            self.assertIn(self.config.actions_app_uri, resp.location)
+
+        # get the redirect url. set the cookies manually,
+        # for some reason webtest doesn't set them in the request
+        cookies = '; '.join(['{}={}'.format(k, v) for k, v
+                             in self.http.cookies.items()])
+        resp = self.http.get(resp.location, headers={'Cookie': cookies})
+        self.assertEqual(resp.status, '302 Found')
+        self.assertIn(self.config.actions_app_uri, resp.location)
