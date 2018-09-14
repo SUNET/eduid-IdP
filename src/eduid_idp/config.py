@@ -116,7 +116,7 @@ class IdPConfig(object):
         _defaults['debug'] = str(debug)
         cfgdir = os.path.dirname(filename)
         _defaults['pysaml2_config'] = os.path.join(cfgdir, _defaults['pysaml2_config'])
-        self.config = configparser.ConfigParser(_defaults)
+        self.config = configparser.RawConfigParser(_defaults)
         if not self.config.read([filename]):
             raise ValueError("Failed loading config file {!r}".format(filename))
 
