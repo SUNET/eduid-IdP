@@ -293,7 +293,7 @@ class SSO(Service):
             resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
                 req_authn_context, user, self.sso_session, self.logger)
         except AssuranceException as exc:
-            self.logger.info('Assurance not possible: {!s}'.format(exc))
+            self.logger.info('Assurance not possible: {!r}'.format(exc))
             raise MustAuthenticate()
 
         self.logger.debug("Response Authn context class: {!r}".format(resp_authn))

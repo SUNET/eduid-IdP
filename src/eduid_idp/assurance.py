@@ -48,6 +48,9 @@ class MissingSingleFactor(AssuranceException):
 class MissingMultiFactor(AssuranceException):
     pass
 
+class WrongMultiFactor(AssuranceException):
+    pass
+
 class MissingAuthentication(AssuranceException):
     pass
 
@@ -119,6 +122,10 @@ class AuthnState(object):
     def is_multifactor(self):
         return self.password_used and self.u2f_used
 
+    @property
+    def is_swamid_al2_mfa(self):
+        return self.swamid_al2_used or self.swamid_al2_hi_used
+
 
 def response_authn(req_authn_ctx, user, sso_session, logger):
     """
@@ -154,6 +161,8 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     if req_authn_ctx == cc['REFEDS_MFA']:
         if not authn.is_multifactor:
             raise MissingMultiFactor()
+        if not authn.is_swamid_al2_mfa:
+            raise WrongMultiFactor()
         response_authn = cc['REFEDS_MFA']
 
     elif req_authn_ctx == cc['REFEDS_SFA']:
