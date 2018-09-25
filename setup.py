@@ -18,11 +18,11 @@ install_requires = [
 ]
 
 testing_extras = [
-    'nose == 1.2.1',
-    'coverage == 3.6',
-    'WebTest == 2.0.18',
-    'mock == 1.0.1',
-    'nosexcover >= 1.0.8',
+    'nose == 1.3.7',
+    'coverage == 4.5.1',
+    'WebTest == 2.0.30',
+    'mock == 2.0.0',
+    'nosexcover >= 1.0.11',
     'eduid_action>=0.2.0',
 ]
 
