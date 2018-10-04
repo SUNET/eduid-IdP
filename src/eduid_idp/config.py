@@ -35,6 +35,7 @@
 Configuration (file) handling for eduID IdP.
 """
 
+import six
 import os
 try:
     import configparser
@@ -465,7 +466,11 @@ class IdPConfig(object):
         Secret shared with the actions app to convince it
         that the redirected user is authenticated.
         """
-        return self.config.get(self.section, 'actions_auth_shared_secret')
+        secret = self.config.get(self.section, 'actions_auth_shared_secret')
+        if isinstance(secret, six.text_type):
+            secret = secret.encode('ascii')
+        if len(secret) != 32:
+            raise ValueError('Authn shared secret must be exactly 32 bytes long')
 
     @property
     def actions_app_uri(self):
