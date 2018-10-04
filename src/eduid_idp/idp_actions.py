@@ -37,6 +37,8 @@ import os
 import six
 import time
 from importlib import import_module
+import nacl.utils
+import nacl.secret
 
 import eduid_idp.util
 import eduid_idp.mischttp
@@ -94,14 +96,21 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
     idp_app.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
-    secret = idp_app.config.actions_auth_shared_secret
-    nonce = os.urandom(16)
-    if six.PY2:
-        nonce = nonce.encode('hex')
-    else:
-        nonce = nonce.hex()
+    eppn = user.eppn
+    shared_key = idp_app.config.actions_auth_shared_secret
+    if not isinstance(shared_key, six.binary_type):
+        shared_key = shared_key.encode('ascii')
     timestamp = '{:x}'.format(int(time.time()))
-    auth_token = eduid_idp.util.generate_auth_token(secret, user.eppn, nonce, timestamp)
+    nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
+    token_data = '{0}|{1}'.format(timestamp, eppn).encode('ascii')
+    box = nacl.secret.SecretBox(shared_key)
+    encrypted = box.encrypt(token_data, nonce)
+    if six.PY2:
+        auth_token = encrypted.encode('hex')
+        hex_nonce = nonce.encode('hex')
+    else:
+        auth_token = encrypted.hex()
+        hex_nonce = nonce.hex()
 
     actions_uri = idp_app.config.actions_app_uri
     idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
@@ -111,7 +120,7 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
             uri = actions_uri,
             eppn = user.eppn,
             auth_token = auth_token,
-            nonce = nonce,
+            nonce = hex_nonce,
             ts = timestamp,
             session = actions_session)
     raise eduid_idp.mischttp.Redirect(uri)
