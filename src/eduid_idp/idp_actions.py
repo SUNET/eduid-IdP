@@ -71,7 +71,7 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
     # Add any actions that may depend on the login data
     add_idp_initiated_actions(idp_app, user, ticket)
 
-    actions = idp_app.actions_db.get_actions(userid = user.user_id, session = ticket.key)
+    actions = idp_app.actions_db.get_actions(user.user_id, session = ticket.key)
 
     # Check for pending actions
     pending_actions = [a for a in actions if a.result is None]
