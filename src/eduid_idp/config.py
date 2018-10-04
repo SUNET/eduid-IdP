@@ -471,6 +471,7 @@ class IdPConfig(object):
             secret = secret.encode('ascii')
         if len(secret) != 32:
             raise ValueError('Authn shared secret must be exactly 32 bytes long')
+        return secret
 
     @property
     def actions_app_uri(self):
