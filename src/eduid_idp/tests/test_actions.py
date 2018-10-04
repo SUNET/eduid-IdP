@@ -82,7 +82,7 @@ class TestActions(MongoTestCase):
         # setup some test data
         _email = 'johnsmith@example.com'
         self.test_user = self.amdb.get_user_by_mail(_email)
-        self.test_action = self.actions.add_action(eppn_or_userid = self.test_user.eppn,
+        self.test_action = self.actions.add_action(self.test_user.user_id,
                                                    action_type = 'dummy',
                                                    preference = 100,
                                                    params = {})
