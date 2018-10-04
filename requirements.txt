@@ -1,4 +1,4 @@
-eduid_userdb>=0.0.4b7
+eduid_userdb>=0.4.0b15
 eduid_common[idp]>=0.2.1b4
 pysaml2==4.6.1
 cherrypy==3.2.4
