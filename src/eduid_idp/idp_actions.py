@@ -101,15 +101,15 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
     else:
         nonce = nonce.hex()
     timestamp = '{:x}'.format(int(time.time()))
-    auth_token = eduid_idp.util.generate_auth_token(secret, str(user.user_id), nonce, timestamp)
+    auth_token = eduid_idp.util.generate_auth_token(secret, user.eppn, nonce, timestamp)
 
     actions_uri = idp_app.config.actions_app_uri
     idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
     actions_session = ticket.key
-    uri = '{uri!s}?userid={user_id!s}&token={auth_token!s}&nonce={nonce!s}&ts={ts!s}&session={session!s}'.format(
+    uri = '{uri!s}?eppn={eppn!s}&token={auth_token!s}&nonce={nonce!s}&ts={ts!s}&session={session!s}'.format(
             uri = actions_uri,
-            user_id = user.user_id,
+            eppn = user.eppn,
             auth_token = auth_token,
             nonce = nonce,
             ts = timestamp,
