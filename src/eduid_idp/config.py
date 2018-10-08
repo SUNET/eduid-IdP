@@ -42,6 +42,8 @@ try:
 except:
     from six.moves import configparser
 
+import nacl.secret
+
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'syslog_debug': '0',              # '1' for True, '0' for False
@@ -469,8 +471,9 @@ class IdPConfig(object):
         secret = self.config.get(self.section, 'actions_auth_shared_secret')
         if isinstance(secret, six.text_type):
             secret = secret.encode('ascii')
-        if len(secret) != 32:
-            raise ValueError('Authn shared secret must be exactly 32 bytes long')
+        if len(secret) != nacl.secret.SecretBox.KEY_SIZE:
+            raise ValueError('Authn shared secret must be exactly {} bytes long'.format(
+                                  nacl.secret.SecretBox.KEY_SIZE))
         return secret
 
     @property
