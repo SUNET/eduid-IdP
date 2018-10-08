@@ -104,7 +104,7 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
     nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
     token_data = '{0}|{1}'.format(timestamp, eppn).encode('ascii')
     box = nacl.secret.SecretBox(shared_key)
-    encrypted = box.encrypt(token_data, nonce)
+    encrypted = box.encrypt(token_data)
     if six.PY2:
         auth_token = encrypted.encode('hex')
         hex_nonce = nonce.encode('hex')
