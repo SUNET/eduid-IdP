@@ -79,7 +79,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',  # VCCS backend URL
                     'insecure_cookies': '0',  # Set to 1 to not set HTTP Cookie 'secure' flag
-                    'actions_auth_shared_secret': 's9Wwg13haLFk4y4joWU7MFdAmfe7SdjY',  # exactly 32 bytes long
+                    'actions_auth_shared_secret': '',  # must be exactly 32 bytes long
                     'actions_app_uri': 'http://actions.example.com/',
                     'tou_version': 'version1',
                     'redis_sentinel_hosts': [],
