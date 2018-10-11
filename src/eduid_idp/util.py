@@ -68,15 +68,3 @@ def maybe_xml_to_string(message, logger=None):
         if logger is not None:
             logger.debug("Could not parse message as XML: {!r}".format(exc))
         return str(message)
-
-
-def generate_auth_token(shared_key, email, nonce, timestamp, generator=sha256):
-    """
-    The shared_key is a secret between the two systems
-    """
-    return generator("{0}|{1}|{2}|{3}".format(
-        shared_key,
-        email,
-        nonce,
-        timestamp,
-    ).encode('utf-8')).hexdigest()
