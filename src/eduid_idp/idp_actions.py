@@ -73,10 +73,12 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
     # Add any actions that may depend on the login data
     add_idp_initiated_actions(idp_app, user, ticket)
 
-    actions = idp_app.actions_db.get_actions(user.eppn, session = ticket.key)
+    actions_eppn = idp_app.actions_db.get_actions(user.eppn, session = ticket.key)
+    actions_userid = idp_app.actions_db.get_actions(user.user_id, session = ticket.key)
 
     # Check for pending actions
-    pending_actions = [a for a in actions if a.result is None]
+    pending_actions = [a for a in actions_eppn if a.result is None]
+    pending_actions += [a for a in actions_userid if a.result is None]
     if not pending_actions:
         # eduid_action.mfa.idp.check_authn_result will have added the credential used
         # to the ticket.mfa_action_creds hash - transfer it to the session
