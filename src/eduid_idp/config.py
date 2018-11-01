@@ -35,11 +35,14 @@
 Configuration (file) handling for eduID IdP.
 """
 
+import six
 import os
 try:
     import configparser
 except:
     from six.moves import configparser
+
+import nacl.secret
 
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
@@ -78,7 +81,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',  # VCCS backend URL
                     'insecure_cookies': '0',  # Set to 1 to not set HTTP Cookie 'secure' flag
-                    'actions_auth_shared_secret': 'abcdef',
+                    'actions_auth_shared_secret': '',  # must be exactly 32 bytes long
                     'actions_app_uri': 'http://actions.example.com/',
                     'tou_version': 'version1',
                     'redis_sentinel_hosts': [],
@@ -465,7 +468,13 @@ class IdPConfig(object):
         Secret shared with the actions app to convince it
         that the redirected user is authenticated.
         """
-        return self.config.get(self.section, 'actions_auth_shared_secret')
+        secret = self.config.get(self.section, 'actions_auth_shared_secret')
+        if isinstance(secret, six.text_type):
+            secret = secret.encode('ascii')
+        if len(secret) != nacl.secret.SecretBox.KEY_SIZE:
+            raise ValueError('Authn shared secret must be exactly {} bytes long'.format(
+                                  nacl.secret.SecretBox.KEY_SIZE))
+        return secret
 
     @property
     def actions_app_uri(self):

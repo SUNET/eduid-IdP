@@ -6,11 +6,11 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.5.4'
+version = '0.5.5'
 
 install_requires = [
-    'eduid_userdb >= 0.4.0b9',
-    'eduid_common[idp] >= 0.2.1b4',
+    'eduid_userdb >= 0.4.0b15',
+    'eduid_common[idp] >= 0.3.5b8',
     'pysaml2 == 4.6.1',
     'cherrypy == 15.0',
     'defusedxml >= 0.5.0',
@@ -23,7 +23,7 @@ testing_extras = [
     'WebTest == 2.0.30',
     'mock == 2.0.0',
     'nosexcover >= 1.0.11',
-    'eduid_action>=0.2.0',
+    'eduid_action>=0.2.1b2',
 ]
 
 setup(name='eduid_idp',

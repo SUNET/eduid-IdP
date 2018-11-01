@@ -82,7 +82,7 @@ class TestActions(MongoTestCase):
         # setup some test data
         _email = 'johnsmith@example.com'
         self.test_user = self.amdb.get_user_by_mail(_email)
-        self.test_action = self.actions.add_action(userid = self.test_user.user_id,
+        self.test_action = self.actions.add_action(self.test_user.eppn,
                                                    action_type = 'dummy',
                                                    preference = 100,
                                                    params = {})
@@ -197,9 +197,6 @@ class TestActions(MongoTestCase):
         # fill in the form and post it to the test env
         form['username'].value = 'johnsmith@example.com'
         form['password'].value = '123456'
-
-        _user_id = self.test_user.user_id
-
 
         # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient

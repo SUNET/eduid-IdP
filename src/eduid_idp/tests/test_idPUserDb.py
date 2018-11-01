@@ -92,6 +92,7 @@ class TestAuthentication(MongoTestCase):
         _defaults = eduid_idp.config._CONFIG_DEFAULTS
         _defaults['mongo_uri'] = self.tmp_db.get_uri('')
         _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
+        _defaults['actions_auth_shared_secret'] = 's9Wwg13haLFk4y4joWU7MFdAmfe7SdjY'
         self.config = eduid_idp.config.IdPConfig(self.config_file, debug=True, defaults=_defaults)
 
         # Create the IdP app
