@@ -70,7 +70,7 @@ class TestActions(MongoTestCase):
         datadir = pkg_resources.resource_filename(__name__, 'data')
         self.config_file = os.path.join(datadir, 'test_actions.ini')
         _defaults = eduid_idp.config._CONFIG_DEFAULTS
-        _defaults['mongo_uri'] = self.tmp_db.get_uri('')
+        _defaults['mongo_uri'] = self.tmp_db.uri
         _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
         self.config = eduid_idp.config.IdPConfig(self.config_file, debug=False, defaults=_defaults)
 

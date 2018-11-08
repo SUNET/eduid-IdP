@@ -9,7 +9,7 @@ README = open(os.path.join(here, 'README')).read()
 version = '0.5.5'
 
 install_requires = [
-    'eduid_userdb >= 0.4.0b15',
+    'eduid_userdb >= 0.4.0',
     'eduid_common[idp] >= 0.3.5b8',
     'pysaml2 == 4.6.1',
     'cherrypy == 15.0',
