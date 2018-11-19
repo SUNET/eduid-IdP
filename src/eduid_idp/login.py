@@ -29,6 +29,7 @@ from saml2.s_utils import UnknownPrincipal
 from saml2.s_utils import UnsupportedBinding
 from saml2.s_utils import UnknownSystemEntity
 from defusedxml import ElementTree as DefusedElementTree
+from eduid_common.api.utils import verify_relay_state
 
 
 class MustAuthenticate(Exception):
@@ -549,6 +550,10 @@ def do_verify(idp_app):
         idp_app.logger.debug("Unknown user or wrong password")
         _referer = eduid_idp.mischttp.get_request_header().get('Referer')
         if _referer:
+            safe_domain = idp_app.config.safe_relay_domain
+            url_scheme = idp_app.config.preferred_url_scheme
+            _referer = verify_relay_state(_referer, logger=idp_app.logger,
+                                          safe_domain=safe_domain, url_scheme=url_scheme)
             raise eduid_idp.mischttp.Redirect(str(_referer))
         raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
 
