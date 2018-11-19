@@ -518,7 +518,7 @@ def do_verify(idp_app):
 
     :type idp_app: idp.IdPApplication
     """
-    query = eduid_idp.mischttp.get_post()
+    query = eduid_idp.mischttp.get_post(idp_app.logger)
     # extract password to keep it away from as much code as possible
     password = query.get('password')
     _loggable = query.copy()

@@ -43,7 +43,7 @@ class Service(object):
         :return: query parameters as dict
         :rtype: dict
         """
-        return eduid_idp.mischttp.parse_query_string()
+        return eduid_idp.mischttp.parse_query_string(self.logger)
 
     def unpack_post(self):
         """
@@ -52,7 +52,7 @@ class Service(object):
         :return: query parameters as dict
         :rtype: dict
         """
-        info = eduid_idp.mischttp.get_post()
+        info = eduid_idp.mischttp.get_post(self.logger)
         self.logger.debug("unpack_post:: %s" % info)
         try:
             return dict([(k, v) for k, v in info.items()])
