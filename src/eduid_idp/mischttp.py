@@ -116,8 +116,11 @@ def get_post(logger):
 
     When the method is POST the query string will be sent in the HTTP request body.
 
+    :param logger: A logger object
+
     :return: query string
 
+    :type logger: logging.Logger
     :rtype: dict
     """
     body_params = cherrypy.request.body_params
@@ -358,8 +361,11 @@ def parse_query_string(logger):
 
     NOTE: Only the first header value for each header is included in the result.
 
+    :param logger: A logger object
+
     :return: parsed query string
 
+    :type logger: logging.Logger
     :rtype: dict
     """
     query = None
