@@ -33,17 +33,14 @@
 #
 
 
-import os
 import six
-import time
 from importlib import import_module
-import nacl.utils
-import nacl.secret
 
 import eduid_idp.util
 import eduid_idp.mischttp
 
 from eduid_idp.authn import AuthnData
+from eduid_common.authn.utils import generate_auth_token
 
 
 def check_for_pending_actions(idp_app, user, ticket, sso_session):
@@ -98,31 +95,20 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
     idp_app.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
-    eppn = user.eppn
-    shared_key = idp_app.config.actions_auth_shared_secret
-    if not isinstance(shared_key, six.binary_type):
-        shared_key = shared_key.encode('ascii')
-    timestamp = '{:x}'.format(int(time.time()))
-    nonce = nacl.utils.random(nacl.secret.SecretBox.NONCE_SIZE)
-    token_data = '{0}|{1}'.format(timestamp, eppn).encode('ascii')
-    box = nacl.secret.SecretBox(shared_key)
-    encrypted = box.encrypt(token_data)
-    if six.PY2:
-        auth_token = encrypted.encode('hex')
-        hex_nonce = nonce.encode('hex')
-    else:
-        auth_token = encrypted.hex()
-        hex_nonce = nonce.hex()
+    shared_key = idp_app.config.actions_auth_shared_secret.decode('utf-8')
+    auth_token, timestamp = generate_auth_token(shared_key, 'idp_actions', user.eppn)
 
     actions_uri = idp_app.config.actions_app_uri
     idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
+    # XXX this leaves the ticket.key vulnerable to manipulation -
+    # better move it inside the secret box when we can remove the backwards compat HMAC code
+    # from the receiving end
     actions_session = ticket.key
-    uri = '{uri!s}?eppn={eppn!s}&token={auth_token!s}&nonce={nonce!s}&ts={ts!s}&session={session!s}'.format(
+    uri = '{uri!s}?eppn={eppn!s}&token={auth_token!s}&ts={ts!s}&session={session!s}'.format(
             uri = actions_uri,
             eppn = user.eppn,
             auth_token = auth_token,
-            nonce = hex_nonce,
             ts = timestamp,
             session = actions_session)
     raise eduid_idp.mischttp.Redirect(uri)
