@@ -125,10 +125,12 @@ def get_post(logger):
     san = Sanitizer()
     for k, v in body_params.items():
         try:
-            safe_k = san.sanitize_input(k, logger=logger)
+            safe_k = san.sanitize_input(k, logger=logger,
+                                        content_type='text/plain')
             if safe_k != k:
                 raise BadRequest()
-            safe_v = san.sanitize_input(v, logger=logger)
+            safe_v = san.sanitize_input(v, logger=logger,
+                                        content_type='text/plain')
         except SanitationProblem as sp:
             logger.info("There was a problem sanitizing inputs: {!r}".format(sp))
             raise BadRequest()
@@ -367,10 +369,12 @@ def parse_query_string(logger):
         san = Sanitizer()
         for k, v in parse_qs(_qs).items():
             try:
-                safe_k = san.sanitize_input(k, logger=logger)
+                safe_k = san.sanitize_input(k, logger=logger,
+                                            content_type='text/plain')
                 if safe_k != k:
                     raise BadRequest()
-                safe_v = san.sanitize_input(v[0], logger=logger)
+                safe_v = san.sanitize_input(v[0], logger=logger,
+                                            content_type='text/plain')
             except SanitationProblem as sp:
                 logger.info("There was a problem sanitizing inputs: {!r}".format(sp))
                 raise BadRequest()
