@@ -92,7 +92,7 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'session_app_key': None,
                     'action_plugins': [],
                     'safe_relay_domain': '',
-                    'preferred_url_scheme': 'http',
+                    'preferred_url_scheme': 'https',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
