@@ -55,7 +55,7 @@ def create_html_response(binding, http_args, start_response, logger):
     :type http_args: dict
     :type start_response: function
     :type logger: logging.Logger
-    :rtype: string
+    :rtype: bytes
     """
     if binding == BINDING_HTTP_REDIRECT:
         # XXX This URL extraction code is untested in practice, but it appears
