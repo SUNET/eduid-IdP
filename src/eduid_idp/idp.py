@@ -486,7 +486,7 @@ class IdPApplication(object):
             _data = self.IDP.cache.get_session(_session_id)
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
-            query = eduid_idp.mischttp.parse_query_string()
+            query = eduid_idp.mischttp.parse_query_string(self.logger)
             if query:
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:

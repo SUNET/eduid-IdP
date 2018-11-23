@@ -26,6 +26,8 @@ from  six.moves.urllib.parse import parse_qs
 
 import eduid_idp
 from eduid_idp.util import b64encode
+from eduid_idp.error import BadRequest
+from eduid_common.api.sanitation import Sanitizer, SanitationProblem
 
 from saml2 import BINDING_HTTP_REDIRECT
 
@@ -108,17 +110,35 @@ def geturl(config, query = True, path = True):
     return ''.join(url)
 
 
-def get_post():
+def get_post(logger):
     """
     Return the parsed query string equivalent from a HTML POST request.
 
     When the method is POST the query string will be sent in the HTTP request body.
 
+    :param logger: A logger object
+
     :return: query string
 
+    :type logger: logging.Logger
     :rtype: dict
     """
-    return cherrypy.request.body_params
+    body_params = cherrypy.request.body_params
+    query = dict()
+    san = Sanitizer()
+    for k, v in body_params.items():
+        try:
+            safe_k = san.sanitize_input(k, logger=logger,
+                                        content_type='text/plain')
+            if safe_k != k:
+                raise BadRequest()
+            safe_v = san.sanitize_input(v, logger=logger,
+                                        content_type='text/plain')
+        except SanitationProblem as sp:
+            logger.info("There was a problem sanitizing inputs: {!r}".format(sp))
+            raise BadRequest()
+        query[safe_k] = safe_v
+    return query
 
 
 def get_request_header():
@@ -331,7 +351,7 @@ def set_cookie(name, path, logger, config, value=''):
     return True
 
 
-def parse_query_string():
+def parse_query_string(logger):
     """
     Parse HTML request query string into a dict like
 
@@ -341,14 +361,30 @@ def parse_query_string():
 
     NOTE: Only the first header value for each header is included in the result.
 
+    :param logger: A logger object
+
     :return: parsed query string
 
+    :type logger: logging.Logger
     :rtype: dict
     """
     query = None
     if cherrypy.request.query_string:
         _qs = cherrypy.request.query_string
-        query = dict([(k, v[0]) for k, v in parse_qs(_qs).items()])
+        query = dict()
+        san = Sanitizer()
+        for k, v in parse_qs(_qs).items():
+            try:
+                safe_k = san.sanitize_input(k, logger=logger,
+                                            content_type='text/plain')
+                if safe_k != k:
+                    raise BadRequest()
+                safe_v = san.sanitize_input(v[0], logger=logger,
+                                            content_type='text/plain')
+            except SanitationProblem as sp:
+                logger.info("There was a problem sanitizing inputs: {!r}".format(sp))
+                raise BadRequest()
+            query[safe_k] = safe_v
     return query
 
 
