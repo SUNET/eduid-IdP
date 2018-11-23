@@ -55,7 +55,7 @@ def create_html_response(binding, http_args, start_response, logger):
     :type http_args: dict
     :type start_response: function
     :type logger: logging.Logger
-    :rtype: string
+    :rtype: bytes
     """
     if binding == BINDING_HTTP_REDIRECT:
         # XXX This URL extraction code is untested in practice, but it appears
@@ -83,6 +83,8 @@ def create_html_response(binding, http_args, start_response, logger):
             status, pprint.pformat(http_args)))
 
     start_response(status, headers)
+    if not isinstance(message, six.binary_type):
+        message = message.encode('utf-8')
     return message
 
 
