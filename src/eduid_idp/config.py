@@ -92,8 +92,6 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'redis_db': '0',
                     'session_app_key': None,
                     'action_plugins': [],
-                    'safe_relay_domain': '',
-                    'preferred_url_scheme': 'https',
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -563,17 +561,3 @@ class IdPConfig(object):
             res = [x.strip() for x in value.split(',')]
         self._parsed_plugin_names = res
         return res
-
-    @property
-    def safe_relay_domain(self):
-        """
-        Only redirect to this domain (or subdomains)
-        """
-        return self.config.get(self.section, 'safe_relay_domain')
-
-    @property
-    def preferred_url_scheme(self):
-        """
-        Only redirect to urls under this scheme
-        """
-        return self.config.get(self.section, 'preferred_url_scheme')
