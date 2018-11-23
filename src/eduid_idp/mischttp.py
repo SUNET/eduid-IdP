@@ -83,6 +83,8 @@ def create_html_response(binding, http_args, start_response, logger):
             status, pprint.pformat(http_args)))
 
     start_response(status, headers)
+    if six.PY2:
+        message = bytes(message)
     return message
 
 
