@@ -22,7 +22,7 @@ from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.loginstate import SSOLoginData
-from eduid_idp.assurance import AssuranceException
+from eduid_idp.assurance import AssuranceException, WrongMultiFactor, MissingMultiFactor
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2.s_utils import UnknownPrincipal
@@ -292,6 +292,12 @@ class SSO(Service):
         try:
             resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
                 req_authn_context, user, self.sso_session, self.logger)
+        except WrongMultiFactor as exc:
+            self.logger.info('Assurance not possible: {!r}'.format(exc))
+            raise eduid_idp.error.Forbidden('SWAMID_MFA_REQUIRED')
+        except MissingMultiFactor as exc:
+            self.logger.info('Assurance not possible: {!r}'.format(exc))
+            raise eduid_idp.error.Forbidden('MFA_REQUIRED')
         except AssuranceException as exc:
             self.logger.info('Assurance not possible: {!r}'.format(exc))
             raise MustAuthenticate()

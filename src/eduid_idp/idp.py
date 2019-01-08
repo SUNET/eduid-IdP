@@ -546,8 +546,13 @@ class IdPApplication(object):
                  440: 'session_timeout.html',
                  }
         fn = pages.get(status_code)
-        if status_code == 403 and 'CREDENTIAL_EXPIRED' in message:
-            fn = 'credential_expired.html'
+        if status_code == 403:
+            if 'CREDENTIAL_EXPIRED' in message:
+                fn = 'credential_expired.html'
+            elif 'SWAMID_MFA_REQUIRED' in message:
+                fn = 'swamid_mfa_required.html'
+            elif 'MFA_REQUIRED' in message:
+                fn = 'mfa_required.html'
         if fn is None:
             fn = 'error.html'
 
