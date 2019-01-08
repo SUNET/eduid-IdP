@@ -40,7 +40,7 @@ from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
 from eduid_idp.util import b64encode
 from eduid_idp.authn import AuthnData
-from eduid_idp.login import MustAuthenticate
+from eduid_idp.error import Forbidden
 
 from eduid_userdb.nin import Nin
 from eduid_userdb.credentials import U2F, Password, u2f_from_dict, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
@@ -241,7 +241,7 @@ class TestSSO(IdPSimpleTestCase):
 
         Expect a failure because a self-registered U2F token is not acceptable as REFEDS MFA.
         """
-        with self.assertRaises(MustAuthenticate):
+        with self.assertRaises(Forbidden):
             self._get_login_response_authn(req_class_ref=cc['REFEDS_MFA'],
                                            credentials=['pw', 'u2f'],
                                            )
