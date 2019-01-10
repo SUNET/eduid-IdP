@@ -1,5 +1,5 @@
 builders:
-  - python
+  - script
 upstream:
   - eduid-userdb
   - eduid-common
@@ -15,6 +15,14 @@ clean_workspace: true
 publish_over_ssh:
   - pypi.sunet.se
 
+script:
+  - "python3 -m venv venv"
+  - ". venv/bin/activate"
+  - "pip install -U setuptools"
+  - "pip install --index-url https://pypi.sunet.se -r test_requirements.txt"
+  - "nosetests"
+  - "python setup.py sdist bdist_wheel --universal"
+
 extra_jobs:
   - name: eduid-IdP-docker
     builders:
@@ -28,5 +36,5 @@ extra_jobs:
       cron: null
     pre_build_script: ~
     upstream:
-      - eduid-docker-pythonenv
+      - eduid-docker-python3env
       - eduid-IdP
