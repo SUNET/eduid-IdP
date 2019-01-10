@@ -18,7 +18,7 @@ publish_over_ssh:
 script:
   - "python3 -m venv venv"
   - ". venv/bin/activate"
-  - "pip install -U setuptools"
+  - "pip install --upgrade setuptools pip"
   - "pip install --index-url https://pypi.sunet.se -r test_requirements.txt"
   - "nosetests"
   - "python setup.py sdist bdist_wheel --universal"
