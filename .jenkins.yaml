@@ -16,7 +16,7 @@ publish_over_ssh:
   - pypi.sunet.se
 
 script:
-  - "python3 -m venv venv"
+  - "virtualenv -p python3 venv"
   - ". venv/bin/activate"
   - "pip install --upgrade setuptools pip wheel"
   - "pip install --index-url https://pypi.sunet.se -r test_requirements.txt"
