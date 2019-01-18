@@ -540,7 +540,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
         :return: True if expiration was performed, False otherwise
         """
         _ts = time.time() - self._ttl
-        if not force:
+        if not force and self._last_expire_at is not None:
             if self._last_expire_at > _ts - self._expiration_freq:
                 return False
         self._last_expire_at = _ts
