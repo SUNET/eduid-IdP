@@ -400,7 +400,7 @@ class IdPApplication(object):
         res = {'status': 'STATUS_FAIL'}
 
         # Test mongodb
-        cred_id = ObjectId('0000000000ab')
+        cred_id = ObjectId(b'0000000000ab')
         previous = self.authn.authn_store.get_credential_last_used(cred_id)
         self.authn.authn_store.credential_success([cred_id])
         new = self.authn.authn_store.get_credential_last_used(cred_id)

@@ -64,7 +64,7 @@ remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
 class TestActions(MongoTestCase):
 
     def setUp(self):
-        super(TestActions, self).setUp(celery=None, get_attribute_manager=None)
+        super(TestActions, self).setUp()
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
