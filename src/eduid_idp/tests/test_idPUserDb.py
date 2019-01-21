@@ -84,7 +84,7 @@ class TestIdPUserDb(IdPSimpleTestCase):
 class TestAuthentication(MongoTestCase):
 
     def setUp(self):
-        super(TestAuthentication, self).setUp(celery=None, get_attribute_manager=None)
+        super(TestAuthentication, self).setUp()
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
