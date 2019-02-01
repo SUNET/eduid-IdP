@@ -240,7 +240,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         self._manager = SessionManager(redis_cfg, ttl = ttl, secret = config.session_app_key)
 
     def __repr__(self):
-        return '<{!s}: {!s}>'.format(self.__class__.__name__, unicode(self))
+        return '<{!s}: {!s}>'.format(self.__class__.__name__, six.text_type(self))
 
     def __unicode__(self):
         if 'REDIS_SENTINEL_HOSTS' in self._redis_cfg:
