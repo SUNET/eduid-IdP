@@ -62,9 +62,9 @@ def maybe_xml_to_string(message, logger=None):
     try:
         from defusedxml import ElementTree as DefusedElementTree
         parser = DefusedElementTree.DefusedXMLParser()
-        xml = DefusedElementTree.XML(str(message), parser)
+        xml = DefusedElementTree.XML(message, parser)
         return DefusedElementTree.tostring(xml)
     except Exception as exc:
         if logger is not None:
-            logger.debug("Could not parse message as XML: {!r}".format(exc))
-        return str(message)
+            logger.debug("Could not parse message of type {!r} as XML: {!r}".format(type(message), exc))
+        return message
