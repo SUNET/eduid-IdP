@@ -57,9 +57,10 @@ def maybe_xml_to_string(message, logger=None):
     :return: something ready for logging
     :rtype: string
     """
-    if six.PY3:
+    if isinstance(message, six.binary_type):
         # message is returned as binary from pysaml2 in python3
         message = message.decode('utf-8')
+    message = str(message)
     try:
         from defusedxml import ElementTree as DefusedElementTree
         parser = DefusedElementTree.DefusedXMLParser()
