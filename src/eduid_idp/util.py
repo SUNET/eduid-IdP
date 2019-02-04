@@ -36,8 +36,6 @@
 import six
 import base64
 
-from hashlib import sha256
-
 
 def b64encode(source):
     # thank you https://stackoverflow.com/a/44688988
@@ -59,6 +57,9 @@ def maybe_xml_to_string(message, logger=None):
     :return: something ready for logging
     :rtype: string
     """
+    if six.PY3:
+        # message is returned as binary from pysaml2 in python3
+        message = message.decode('utf-8')
     try:
         from defusedxml import ElementTree as DefusedElementTree
         parser = DefusedElementTree.DefusedXMLParser()
