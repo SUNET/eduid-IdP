@@ -15,6 +15,7 @@ import uuid
 from collections import deque
 from hashlib import sha1
 import datetime
+from binascii import unhexlify
 
 import six
 
@@ -266,7 +267,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
             data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
         else:
             data = info
-        _session_id = bytes(key.decode('hex'))
+        _session_id = unhexlify(key)
         session = self._manager.get_session(session_id = _session_id, data = data)
         session.commit()
         return session
@@ -282,7 +283,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :returns: The previously added session
         :rtype: Session | None
         """
-        _session_id = bytes(key.decode('hex'))
+        _session_id = unhexlify(key)
         try:
             session = self._manager.get_session(session_id = _session_id)
             return dict(session)
@@ -313,7 +314,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :return: True on success
         """
-        _session_id = bytes(key.decode('hex'))
+        _session_id = unhexlify(key)
         session = self._manager.get_session(session_id = _session_id)
         if not session:
             return False
