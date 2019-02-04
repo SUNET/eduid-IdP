@@ -203,7 +203,8 @@ class SSO(Service):
         # Default format string:
         #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
         _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        _anon_userid = hmac.new(self.config.fticks_secret_key, msg=user_id, digestmod=sha256).hexdigest()
+        _anon_userid = hmac.new(self.config.fticks_secret_key.encode('ascii'),
+                                msg=user_id.encode('ascii'), digestmod=sha256).hexdigest()
         msg = self.config.fticks_format_string.format(ts=_timestamp,
                                                       rp=relying_party,
                                                       ap=self.IDP.config.entityid,
