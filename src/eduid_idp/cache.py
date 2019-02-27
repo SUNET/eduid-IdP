@@ -17,10 +17,12 @@ from hashlib import sha1
 import datetime
 from binascii import unhexlify
 
+from typing import Union
+
 import six
 
 from eduid_idp.loginstate import SSOLoginData
-from eduid_common.session.session import SessionManager, Session
+from eduid_common.session.session import SessionManager, RedisEncryptedSession
 from eduid_userdb import MongoDB
 
 
@@ -249,7 +251,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         else:
             return u'redis host={!r}'.format(self._redis_cfg['REDIS_HOST'])
 
-    def add(self, key, info):
+    def add(self, key: str, info: Union[SSOLoginData, dict]) -> RedisEncryptedSession:
         """
         Add entry to the cache.
 
@@ -260,7 +262,6 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :type info: SSOLoginData | dict
 
         :return: New session
-        :rtype: Session
         """
         if isinstance(info, SSOLoginData):
             data = info.to_dict()
@@ -272,7 +273,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         session.commit()
         return session
 
-    def get(self, key):
+    def get(self, key) -> RedisEncryptedSession:
         """
         Fetch data from cache based on `key'.
 
@@ -281,12 +282,11 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :type key: str | unicode
 
         :returns: The previously added session
-        :rtype: Session | None
         """
         _session_id = unhexlify(key)
         try:
             session = self._manager.get_session(session_id = _session_id)
-            return dict(session)
+            return session
         except KeyError:
             pass
 
@@ -374,7 +374,7 @@ class SSOSessionCache(object):
         Lookup an SSO session using the session id (same `sid' previously used with add_session).
 
         :param sid: Unique session identifier as string
-        :return: opaque, should be SSOSession converted to dict()
+        :return: opaque
         """
         raise NotImplementedError()
 
