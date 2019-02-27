@@ -33,7 +33,6 @@
 #
 
 
-import six
 from importlib import import_module
 
 import eduid_idp.util

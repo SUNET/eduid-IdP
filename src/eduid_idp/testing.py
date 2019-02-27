@@ -160,6 +160,7 @@ class FakeIdPApp(IdPApplication):
         self.IDP = server.Server(config_file=config_file)
         self.config = {}
         self.IDP.metadata = FakeMetadata()
+        self.sessions = None
 
 
 class IdPSimpleTestCase(TestCase):

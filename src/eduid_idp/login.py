@@ -59,6 +59,7 @@ class SSO(Service):
 
     def __init__(self, session, start_response, idp_app):
         Service.__init__(self, session, start_response, idp_app)
+        self._sessions = idp_app.sessions
         self._idp_app = idp_app
 
     def perform_login(self, ticket):
@@ -357,7 +358,7 @@ class SSO(Service):
         _info = self.unpack_redirect()
         self.logger.debug("Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
+        ticket = self._sessions.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
         return self._redirect_or_post(ticket)
 
     def post(self):
@@ -370,7 +371,7 @@ class SSO(Service):
         self.logger.debug("--- In SSO POST ---")
         _info = self.unpack_either()
 
-        ticket = self.IDP.ticket.get_ticket(_info, binding=BINDING_HTTP_POST)
+        ticket = self._sessions.get_ticket(_info, binding=BINDING_HTTP_POST)
         return self._redirect_or_post(ticket)
 
     def _redirect_or_post(self, ticket):
@@ -534,7 +535,7 @@ def do_verify(idp_app):
         _loggable['password'] = '<redacted>'
     idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
-    _ticket = idp_app.IDP.ticket.get_ticket(query)
+    _ticket = idp_app.sessions.get_ticket(query)
 
     authn_ref = None
     if _ticket.req_info.message.requested_authn_context:

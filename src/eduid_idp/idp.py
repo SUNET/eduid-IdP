@@ -196,6 +196,9 @@ class IdPApplication(object):
 
         self._init_pysaml2()
 
+        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
+        self.sessions = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
+                                          self.config, threading.Lock())
         self.authn_info_db = None
         self.actions_db = None
 
@@ -260,10 +263,6 @@ class IdPApplication(object):
         finally:
             # restore path
             sys.path = old_path
-
-        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        self.IDP.ticket = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
-                                            self.config, threading.Lock())
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
