@@ -16,11 +16,12 @@ publish_over_ssh:
   - pypi.sunet.se
 
 script:
-  - "virtualenv -p python3 venv"
+  - "python3.7 -m venv venv"
   - ". venv/bin/activate"
-  - "pip install --upgrade setuptools pip wheel"
+  - "pip install --upgrade setuptools pip wheel mypy"
   - "pip install --index-url https://pypi.sunet.se -r test_requirements.txt"
   - "nosetests"
+  - "mypy --ignore-missing-imports src/eduid_idp"
   - "python setup.py sdist bdist_wheel --universal"
 
 extra_jobs:
