@@ -37,10 +37,7 @@ Configuration (file) handling for eduID IdP.
 
 import six
 import os
-try:
-    import configparser
-except:
-    from six.moves import configparser
+from six.moves import configparser
 
 import nacl.secret
 from base64 import urlsafe_b64decode

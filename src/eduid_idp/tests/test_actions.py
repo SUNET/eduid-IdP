@@ -152,7 +152,7 @@ class TestActions(MongoTestCase):
         self.assertEqual(resp.status, '200 Ok')
         self.assertIn(six.b('action="https://sp.example.edu/saml2/acs/"'), resp.body)
 
-    def test_action(self):
+    def test_action_2(self):
 
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
