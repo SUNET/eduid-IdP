@@ -156,6 +156,7 @@ class SSOLoginDataCache(object):
         if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
             self._cache = eduid_idp.cache.ExpiringCacheCommonSession(name, logger, ttl, config)
         else:
+            # This is used in tests
             self._cache = eduid_idp.cache.ExpiringCacheMem(name, logger, ttl, lock)
         logger.debug('Set up IDP ticket cache {!s}'.format(self._cache))
 

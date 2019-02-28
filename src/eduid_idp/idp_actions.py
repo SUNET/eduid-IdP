@@ -33,45 +33,42 @@
 #
 
 
-import six
 from importlib import import_module
 
 import eduid_idp.util
 import eduid_idp.mischttp
 
 from eduid_idp.authn import AuthnData
+from eduid_idp.idp_user import IdPUser
+from eduid_idp.context import IdPContext
+from eduid_idp.loginstate import SSOLoginData
+from eduid_idp.sso_session import SSOSession
 from eduid_common.authn.utils import generate_auth_token
 
 
-def check_for_pending_actions(idp_app, user, ticket, sso_session):
+def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
+                              sso_session: SSOSession) -> None:
     """
     Check whether there are any pending actions for the current user,
     and if there are, redirect to the actions app.
 
     The redirection is performed by raising an eduid_idp.mischttp.Redirect.
 
-    :param idp_app: IdP application instance
+    :param context: IdP application instance
     :param user: the authenticating user
     :param ticket: SSOLoginData instance
     :param sso_session: SSOSession
-
-    :type user: eduid_idp.idp_user.IdPUser
-    :type idp_app: eduid_idp.idp.IdPApplication
-    :type ticket: eduid_idp.loginstate.SSOLoginData
-    :type sso_session: eduid_idp.sso_session.SSOSession
-
-    :rtype: None
     """
 
-    if idp_app.actions_db is None:
-        idp_app.logger.info("This IdP is not initialized for special actions")
+    if context.actions_db is None:
+        context.logger.info("This IdP is not initialized for special actions")
         return
 
     # Add any actions that may depend on the login data
-    add_idp_initiated_actions(idp_app, user, ticket)
+    add_idp_initiated_actions(context, user, ticket)
 
-    actions_eppn = idp_app.actions_db.get_actions(user.eppn, session = ticket.key)
-    actions_userid = idp_app.actions_db.get_actions(user.user_id, session = ticket.key)
+    actions_eppn = context.actions_db.get_actions(user.eppn, session = ticket.key)
+    actions_userid = context.actions_db.get_actions(user.user_id, session = ticket.key)
 
     # Check for pending actions
     pending_actions = [a for a in actions_eppn if a.result is None]
@@ -86,20 +83,20 @@ def check_for_pending_actions(idp_app, user, ticket, sso_session):
             update = True
 
         if update:
-            idp_app.IDP.cache.update_session(user.user_id, sso_session.to_dict())
+            context.idp.cache.update_session(user.user_id, sso_session.to_dict())
 
-        idp_app.logger.debug('There are no pending actions for user {}'.format(user))
+        context.logger.debug('There are no pending actions for user {}'.format(user))
         return
 
     # Pending actions found, redirect to the actions app
-    idp_app.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
+    context.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
-    shared_key = idp_app.config.actions_auth_shared_secret.decode('utf-8')
+    shared_key = context.config.actions_auth_shared_secret.decode('utf-8')
     auth_token, timestamp = generate_auth_token(shared_key, 'idp_actions', user.eppn)
 
-    actions_uri = idp_app.config.actions_app_uri
-    idp_app.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
+    actions_uri = context.config.actions_app_uri
+    context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
     # XXX this leaves the ticket.key vulnerable to manipulation -
     # better move it inside the secret box when we can remove the backwards compat HMAC code

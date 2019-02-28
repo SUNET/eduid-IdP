@@ -117,12 +117,16 @@ import cherrypy
 import simplejson
 
 import logging.handlers
+from logging import Logger
+from typing import Optional, Any
 
 import eduid_idp
 import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
+from eduid_idp.config import IdPConfig
+from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 
 from eduid_userdb.actions import ActionDB
@@ -177,6 +181,8 @@ class IdPApplication(object):
     """
     Main CherryPy application for the eduid IdP.
 
+    Userdb can be passed as an argument to make testing easier.
+
     :param logger: logging logger
     :param config: IdP configuration data
 
@@ -184,7 +190,7 @@ class IdPApplication(object):
     :type config: eduid_idp.config.IdPConfig
     """
 
-    def __init__(self, logger, config):
+    def __init__(self, logger: Logger, config: IdPConfig, userdb: Optional[Any] = None):
         self.logger = logger
         self.config = config
         self.response_status = None
@@ -196,14 +202,17 @@ class IdPApplication(object):
 
         self._init_pysaml2()
 
+        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
+        _sessions = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
+                                      self.config, threading.Lock())
         self.authn_info_db = None
-        self.actions_db = None
+        _actions_db = None
 
         if config.mongo_uri:
             self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
 
         if config.mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
-            self.actions_db = ActionDB(config.mongo_uri)
+            _actions_db = ActionDB(config.mongo_uri)
             self.logger.info("configured to redirect users with pending actions")
 
             from importlib import import_module
@@ -217,7 +226,9 @@ class IdPApplication(object):
         else:
             self.logger.debug("NOT configured to redirect users with pending actions")
 
-        self.userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
+        if userdb is None:
+            userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
+        self.userdb = userdb
         self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.userdb)
 
         cherrypy.config.update({'request.error_response': self.handle_error,
@@ -231,6 +242,13 @@ class IdPApplication(object):
         else:  # IPv4
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
+
+        self.context = IdPContext(config=self.config,
+                                  idp=self.IDP,
+                                  logger=self.logger,
+                                  sessions=_sessions,
+                                  actions_db=_actions_db,
+                                  )
 
     def _init_pysaml2(self):
         """
@@ -261,10 +279,6 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
-        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        self.IDP.ticket = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
-                                            self.config, threading.Lock())
-
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
@@ -275,9 +289,9 @@ class IdPApplication(object):
         session = self._lookup_sso_session()
 
         if path[1] == 'post':
-            return SSO(session, self._my_start_response, self).post()
+            return SSO(session, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SSO(session, self._my_start_response, self).redirect()
+            return SSO(session, self._my_start_response, self.context).redirect()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -291,12 +305,12 @@ class IdPApplication(object):
         session = self._lookup_sso_session()
 
         if path[1] == 'post':
-            return SLO(session, self._my_start_response, self).post()
+            return SLO(session, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SLO(session, self._my_start_response, self).redirect()
+            return SLO(session, self._my_start_response, self.context).redirect()
         if path[1] == 'soap':
             # SOAP is commonly used for SLO
-            return SLO(session, self._my_start_response, self).soap()
+            return SLO(session, self._my_start_response, self.context).soap()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -312,7 +326,7 @@ class IdPApplication(object):
             #raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
             #                                   logger = self.logger)
             self.logger.debug("User is already logged in - verifying credentials again might not work")
-        return eduid_idp.login.do_verify(idp_app = self)
+        return eduid_idp.login.do_verify(self.context, self.authn)
 
     @cherrypy.expose
     def static(self, *_args, **_kwargs):
