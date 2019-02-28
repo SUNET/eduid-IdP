@@ -21,7 +21,6 @@ from typing import Union
 
 import six
 
-from eduid_idp.loginstate import SSOLoginData
 from eduid_common.session.session import SessionManager, RedisEncryptedSession
 from eduid_userdb import MongoDB
 
@@ -65,7 +64,8 @@ class ExpiringCache(object):
         self.ttl = ttl
         self.name = name
 
-    def key(self, something):
+    @staticmethod
+    def key(something):
         """
         Generate a unique (not strictly guaranteed) key based on `something'.
 
@@ -251,7 +251,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         else:
             return u'redis host={!r}'.format(self._redis_cfg['REDIS_HOST'])
 
-    def add(self, key: str, info: Union[SSOLoginData, dict]) -> RedisEncryptedSession:
+    def add(self, key: str, info) -> RedisEncryptedSession:
         """
         Add entry to the cache.
 
@@ -263,7 +263,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :return: New session
         """
-        if isinstance(info, SSOLoginData):
+        if not isinstance(info, dict):
             data = info.to_dict()
             data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
         else:

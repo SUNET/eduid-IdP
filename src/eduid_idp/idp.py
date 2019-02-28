@@ -203,7 +203,7 @@ class IdPApplication(object):
         self._init_pysaml2()
 
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        _sessions = SSOLoginDataCache(self.IDP, 'TicketCache', self.logger, _login_state_ttl,
+        _sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
                                       self.config, threading.Lock())
         self.authn_info_db = None
         _actions_db = None
