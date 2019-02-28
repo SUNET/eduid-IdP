@@ -22,7 +22,9 @@ import cherrypy
 import pkg_resources
 
 from six import string_types
-from  six.moves.urllib.parse import parse_qs
+from six.moves.urllib.parse import parse_qs
+from logging import Logger
+from typing import Callable
 
 import eduid_idp
 from eduid_idp.util import b64encode
@@ -39,7 +41,7 @@ class Redirect(cherrypy.HTTPRedirect):
     pass
 
 
-def create_html_response(binding, http_args, start_response, logger):
+def create_html_response(binding: str, http_args: dict, start_response: Callable, logger: Logger) -> bytes:
     """
     Create a HTML response based on parameters compiled by pysaml2 functions
     like apply_binding().
@@ -50,12 +52,6 @@ def create_html_response(binding, http_args, start_response, logger):
     :param logger: logging logger
 
     :return: HTML response
-
-    :type binding: string
-    :type http_args: dict
-    :type start_response: function
-    :type logger: logging.Logger
-    :rtype: bytes
     """
     if binding == BINDING_HTTP_REDIRECT:
         # XXX This URL extraction code is untested in practice, but it appears

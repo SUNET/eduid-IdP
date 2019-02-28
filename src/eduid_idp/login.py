@@ -16,7 +16,7 @@ import hmac
 import pprint
 import time
 from hashlib import sha256
-from typing import Optional
+from typing import Optional, Callable
 
 import eduid_idp
 from eduid_idp.authn import IdPAuthn
@@ -53,17 +53,13 @@ class SSO(Service):
 
     :param session: SSO session
     :param start_response: WSGI-like start_response function pointer
-    :param idp_app: IdPApplication instance
-
-    :type session: SSOSession | None
-    :type start_response: function
-    :type idp_app: idp.IdPApplication
+    :param context: IdP context
     """
 
-    def __init__(self, session, start_response, context: IdPContext):
+    def __init__(self, session: SSOSession, start_response: Callable, context: IdPContext):
         super().__init__(session, start_response, context)
 
-    def perform_login(self, ticket: SSOLoginData) -> str:
+    def perform_login(self, ticket: SSOLoginData) -> bytes:
         """
         Validate request, and then proceed with creating an AuthnResponse and
         invoking the 'outgoing' SAML2 binding.
@@ -127,7 +123,7 @@ class SSO(Service):
         # Add a list of credentials used in a private attribute that will only be
         # released to the eduID authn component
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
-        for k,v in response_authn.pop('authn_attributes', {}).items():
+        for k, v in response_authn.pop('authn_attributes', {}).items():
             if k in attributes:
                 self.logger.debug('Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(
                     k, attributes[k], v
@@ -205,7 +201,7 @@ class SSO(Service):
                                 msg=user_id.encode('ascii'), digestmod=sha256).hexdigest()
         msg = self.config.fticks_format_string.format(ts=_timestamp,
                                                       rp=relying_party,
-                                                      ap=self.IDP.config.entityid,
+                                                      ap=self.context.idp.config.entityid,
                                                       pn=_anon_userid,
                                                       am=authn_method,
                                                       )
@@ -312,7 +308,7 @@ class SSO(Service):
         return dict(class_ref = resp_authn,
                     authn_instant = self.sso_session.authn_timestamp,
                     authn_attributes = extra_attributes,
-        )
+                    )
 
     def _get_requested_authn_context(self, ticket):
         """
@@ -345,7 +341,7 @@ class SSO(Service):
 
         return res
 
-    def redirect(self):
+    def redirect(self) -> bytes:
         """ This is the HTTP-redirect endpoint.
 
         :return: HTTP response
@@ -358,7 +354,7 @@ class SSO(Service):
         ticket = _get_ticket(self.context, _info, BINDING_HTTP_REDIRECT)
         return self._redirect_or_post(ticket)
 
-    def post(self):
+    def post(self) -> bytes:
         """
         The HTTP-Post endpoint
 
@@ -371,7 +367,7 @@ class SSO(Service):
         ticket = _get_ticket(self.context, _info, BINDING_HTTP_POST)
         return self._redirect_or_post(ticket)
 
-    def _redirect_or_post(self, ticket: SSOLoginData) -> str:
+    def _redirect_or_post(self, ticket: SSOLoginData) -> bytes:
         """ Common code for redirect() and post() endpoints. """
         _force_authn = self._should_force_authn(ticket)
         if self.sso_session and not _force_authn:
@@ -410,13 +406,13 @@ class SSO(Service):
             if ticket.req_info.message.id != self.sso_session.user_authn_request_id:
                 self.logger.debug("Forcing authentication because of ForceAuthn with "
                                   "SSO session id {!r} != {!r}".format(
-                                  self.sso_session.user_authn_request_id, ticket.req_info.message.id))
+                    self.sso_session.user_authn_request_id, ticket.req_info.message.id))
                 return True
             self.logger.debug("Ignoring ForceAuthn, authn already performed for SAML request {!r}".format(
                 ticket.req_info.message.id))
         return False
 
-    def _not_authn(self, ticket: SSOLoginData) -> str:
+    def _not_authn(self, ticket: SSOLoginData) -> bytes:
         """
         Authenticate user. Either, the user hasn't logged in yet,
         or the service provider forces re-authentication.
@@ -431,7 +427,7 @@ class SSO(Service):
 
         return self._show_login_page(ticket, req_authn_context, redirect_uri)
 
-    def _show_login_page(self, ticket: SSOLoginData, requested_authn_context: str, redirect_uri) -> str:
+    def _show_login_page(self, ticket: SSOLoginData, requested_authn_context: str, redirect_uri) -> bytes:
         """
         Display the login form for all authentication methods.
 
@@ -479,7 +475,7 @@ class SSO(Service):
             raise eduid_idp.error.NotFound()
 
         # apply simplistic HTML formatting to template in 'res'
-        return content.format(**argv)
+        return content.format(**argv).encode('utf-8')
 
 
 # -----------------------------------------------------------------------------
@@ -499,11 +495,8 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
     It will figure out what authentication level to assert based on the authncontext
     requested, and the actual authentication that succeeded.
 
-    :param idp_app: IdPApplication instance
     :return: Does not return
     :raise eduid_idp.mischttp.Redirect: On successful authentication, redirect to redirect_uri.
-
-    :type idp_app: idp.IdPApplication
     """
     query = eduid_idp.mischttp.get_post(context.logger)
     # extract password to keep it away from as much code as possible
@@ -575,7 +568,7 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
     if 'key' not in info:
-        if not 'SAMLRequest' in info:
+        if 'SAMLRequest' not in info:
             raise eduid_idp.error.BadRequest('Missing SAMLRequest, please re-initiate login',
                                              logger = logger, extra = {'info': info, 'binding': binding})
         info['key'] = ExpiringCache.key(info['SAMLRequest'])

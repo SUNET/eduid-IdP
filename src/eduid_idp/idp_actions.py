@@ -54,7 +54,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
 
     The redirection is performed by raising an eduid_idp.mischttp.Redirect.
 
-    :param context: IdP application instance
+    :param context: IdP context
     :param user: the authenticating user
     :param ticket: SSOLoginData instance
     :param sso_session: SSOSession
@@ -111,7 +111,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     raise eduid_idp.mischttp.Redirect(uri)
 
 
-def add_idp_initiated_actions(idp_app, user, ticket):
+def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData):
     """
     Load the configured action plugins and execute their `add_actions`
     functions.
@@ -121,24 +121,20 @@ def add_idp_initiated_actions(idp_app, user, ticket):
     Also iterate over add_actions entry points and execute them (for backwards
     compatibility).
 
-    :param idp_app: IdP application instance
+    :param context: IdP context
     :param user: the authenticating user
     :param ticket: the SSO login data
-
-    :type idp_app: eduid_idp.idp.IdPApplication
-    :type user: eduid_idp.idp_user.IdPUser
-    :type ticket: eduid_idp.login.SSOLoginData
     """
-    for plugin_name in idp_app.config.action_plugins:
+    for plugin_name in context.config.action_plugins:
         try:
             plugin_module = import_module('eduid_action.{}.idp'.format(plugin_name))
         except ImportError:
-            idp_app.logger.warn('Configured plugin {} missing from sys.path'.format(plugin_name))
+            context.logger.warn('Configured plugin {} missing from sys.path'.format(plugin_name))
             continue
-        idp_app.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
+        context.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
         try:
             # load() here is the function eduid_action.mfa.add_mfa_actions()
-            getattr(plugin_module, 'add_actions')(idp_app, user, ticket)
+            getattr(plugin_module, 'add_actions')(context, user, ticket)
         except Exception as exc:
-            idp_app.logger.warn('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
+            context.logger.warning('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
             raise
