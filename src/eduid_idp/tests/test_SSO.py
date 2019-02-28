@@ -160,9 +160,9 @@ class TestSSO(IdPSimpleTestCase):
             user = self.get_user_set_nins('test1@eduid.se', [])
         ticket = make_login_ticket(req_class_ref, self.context)
 
-        sso_session_1 = eduid_idp.sso_session.SSOSession(user_id=user.eppn,
-                                                         authn_request_id='some-unique-id-1'
-                                                         )
+        sso_session_1 = eduid_idp.sso_state.SSOState(user_id=user.eppn,
+                                                     authn_request_id='some-unique-id-1'
+                                                     )
         if 'u2f' in credentials and not user.credentials.filter(U2F).to_list():
             # add a U2F credential to the user
             user.credentials.add(_U2F)

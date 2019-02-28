@@ -14,7 +14,12 @@ Common code for SSO login/logout requests.
 """
 
 import eduid_idp.mischttp
+
 from eduid_idp.context import IdPContext
+from eduid_idp.sso_state import SSOState
+from eduid_idp.idp_session import IdPSession
+
+from typing import Callable
 
 
 class Service(object):
@@ -29,10 +34,11 @@ class Service(object):
     :type start_response: function
     """
 
-    def __init__(self, session, start_response, context: IdPContext):
+    def __init__(self, session: IdPSession, state: SSOState, start_response: Callable, context: IdPContext):
         self.context = context
         self.start_response = start_response
-        self.sso_session = session
+        self.session = session
+        self.sso_state = state
         # TODO: Get rid of this copying of things in the context
         self.logger = context.logger
         self.config = context.config

@@ -10,12 +10,9 @@
 
 import pprint
 from html import escape
-from logging import Logger
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict
 
-from eduid_idp.config import IdPConfig
-from eduid_idp.cache import ExpiringCache, ExpiringCacheMem, ExpiringCacheCommonSession
 from saml2.request import AuthnRequest
 
 from eduid_userdb.credentials import Credential
@@ -124,60 +121,3 @@ class SSOLoginData(object):
         :rtype: string
         """
         return escape(self._binding, quote=True)
-
-
-class SSOLoginDataCache(object):
-    """
-    Login data is state kept between rendering the login screen, to when the user is
-    completely logged in and redirected from the IdP to the original resource the
-    user is accessing.
-
-    :param name: string describing this cache
-    :param logger: logging logger
-    :param ttl: expire time of data in seconds
-    :param config: IdP configuration data
-    :param lock: threading.Lock() instance
-
-    :type lock: threading.Lock
-    """
-
-    def __init__(self, name: str, logger: Logger, ttl: int, config: IdPConfig, lock = None):
-        self.logger = logger
-        self._cache: ExpiringCache
-        if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
-            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config)
-        else:
-            # This is used in tests
-            self._cache = ExpiringCacheMem(name, logger, ttl, lock)
-        logger.debug('Set up IDP ticket cache {!s}'.format(self._cache))
-
-    def store_ticket(self, ticket):
-        """
-        Add an entry to the IDP.ticket cache.
-
-        :param ticket: SSOLoginData instance
-        :returns: True on success
-        """
-        self.logger.debug('Storing login state (IdP ticket) in {!r}:\n{!s}'.format(self._cache, ticket))
-        self._cache.add(ticket.key, ticket)
-        return True
-
-    def get_ticket(self, key: str) -> Optional[SSOLoginData]:
-        """
-        Lookup session from key.
-        """
-        self.logger.debug("Lookup SSOLoginData (ticket) using key {!r}".format(key))
-        _ticket = self._cache.get(key)
-        if not _ticket:
-            self.logger.debug("Key {!r} not found in IDP.ticket ({!r})".format(key, self._cache))
-            return None
-
-        self.logger.debug("Retreived login state (IdP.ticket) :\n{!s}".format(_ticket))
-
-        # TODO: is this code needed?
-        #if isinstance(_ticket, dict):
-        #    # Ticket was stored in a backend that could not natively store a SSOLoginData instance. Recreate.
-        #    _ticket = self.create_ticket(_ticket, _ticket['binding'], key=_key)
-        #    self.logger.debug('Re-created SSOLoginData from stored ticket state:\n{!s}'.format(_ticket))
-
-        return _ticket

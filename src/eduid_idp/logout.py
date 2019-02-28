@@ -152,7 +152,7 @@ class SLO(Service):
                 _data = self.context.idp.cache.get_session(this)
                 if not _data:
                     raise KeyError('Session not found')
-                _sso = eduid_idp.sso_session.from_dict(_data)
+                _sso = eduid_idp.sso_state.from_dict(_data)
                 res = self.context.idp.cache.remove_session(this)
                 self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
                     req_key, _sso.public_id, _sso.minutes_old, bool(res)))

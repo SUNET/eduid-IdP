@@ -22,11 +22,16 @@ import cherrypy
 import pkg_resources
 
 from six import string_types
-from  six.moves.urllib.parse import parse_qs
+from six.moves.urllib.parse import parse_qs
+
+from logging import Logger
+
+from typing import Optional
 
 import eduid_idp
 from eduid_idp.util import b64encode
 from eduid_idp.error import BadRequest
+from eduid_idp.config import IdPConfig
 from eduid_common.api.sanitation import Sanitizer, SanitationProblem
 
 from saml2 import BINDING_HTTP_REDIRECT
@@ -271,7 +276,7 @@ def get_content_type(filename):
 # ----------------------------------------------------------------------------
 # Cookie handling
 # ----------------------------------------------------------------------------
-def read_cookie(logger):
+def read_cookie(name: str, logger: Logger) -> Optional[str]:
     """
     Decode information stored in a browser cookie.
 
@@ -285,24 +290,14 @@ def read_cookie(logger):
     """
     cookie = cherrypy.request.cookie
     logger.debug("Parsing cookie(s): {!s}".format(cookie))
-    _authn = cookie.get("idpauthn")
-    if _authn:
-        import binascii
-        try:
-            cookie_val = base64.b64decode(_authn.value)
-            logger.debug("idpauthn cookie value={!r}".format(cookie_val))
-            return cookie_val
-        except binascii.Error:
-            logger.debug('Invalid idpauthn value: {!r}'.format(_authn.value))
-            raise
-        except KeyError:
-            return None
-    else:
-        logger.debug("No idpauthn cookie")
-    return None
+    _authn = cookie.get(name)
+    if not _authn:
+        logger.debug('No {} cookie'.format(name))
+        return None
+    return _authn.value
 
 
-def delete_cookie(name, logger, config):
+def delete_cookie(name: str, logger: Logger, config: IdPConfig):
     """
     Ask browser to delete a cookie.
 

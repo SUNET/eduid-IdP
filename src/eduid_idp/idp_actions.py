@@ -41,13 +41,13 @@ import eduid_idp.mischttp
 from eduid_idp.authn import AuthnData
 from eduid_idp.idp_user import IdPUser
 from eduid_idp.context import IdPContext
-from eduid_idp.loginstate import SSOLoginData
-from eduid_idp.sso_session import SSOSession
+from eduid_idp.idp_session import IdPSessionData
+from eduid_idp.sso_state import SSOState
 from eduid_common.authn.utils import generate_auth_token
 
 
-def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
-                              sso_session: SSOSession) -> None:
+def check_for_pending_actions(context: IdPContext, user: IdPUser, idp_data: IdPSessionData,
+                              sso_session: SSOState) -> None:
     """
     Check whether there are any pending actions for the current user,
     and if there are, redirect to the actions app.
@@ -56,7 +56,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
 
     :param context: IdP application instance
     :param user: the authenticating user
-    :param ticket: SSOLoginData instance
+    :param idp_data: SSOLoginData instance
     :param sso_session: SSOSession
     """
 
@@ -65,10 +65,10 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
         return
 
     # Add any actions that may depend on the login data
-    add_idp_initiated_actions(context, user, ticket)
+    add_idp_initiated_actions(context, user, idp_data)
 
-    actions_eppn = context.actions_db.get_actions(user.eppn, session = ticket.key)
-    actions_userid = context.actions_db.get_actions(user.user_id, session = ticket.key)
+    actions_eppn = context.actions_db.get_actions(user.eppn, session = idp_data.sso_db_key)
+    actions_userid = context.actions_db.get_actions(user.user_id, session = idp_data.sso_db_key)
 
     # Check for pending actions
     pending_actions = [a for a in actions_eppn if a.result is None]
@@ -77,7 +77,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
         # eduid_action.mfa.idp.check_authn_result will have added the credential used
         # to the ticket.mfa_action_creds hash - transfer it to the session
         update = False
-        for cred, ts in ticket.mfa_action_creds.items():
+        for cred, ts in idp_data.mfa_action_creds.items():
             authn = AuthnData(user = user, credential = cred, timestamp = ts)
             sso_session.add_authn_credential(authn)
             update = True
@@ -101,7 +101,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # XXX this leaves the ticket.key vulnerable to manipulation -
     # better move it inside the secret box when we can remove the backwards compat HMAC code
     # from the receiving end
-    actions_session = ticket.key
+    actions_session = idp_data.sso_db_key
     uri = '{uri!s}?eppn={eppn!s}&token={auth_token!s}&ts={ts!s}&session={session!s}'.format(
             uri = actions_uri,
             eppn = user.eppn,
@@ -111,7 +111,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     raise eduid_idp.mischttp.Redirect(uri)
 
 
-def add_idp_initiated_actions(idp_app, user, ticket):
+def add_idp_initiated_actions(context: IdPContext, user: IdPUser, idp_data: IdPSessionData):
     """
     Load the configured action plugins and execute their `add_actions`
     functions.
@@ -121,24 +121,22 @@ def add_idp_initiated_actions(idp_app, user, ticket):
     Also iterate over add_actions entry points and execute them (for backwards
     compatibility).
 
-    :param idp_app: IdP application instance
+    :param context: IdP application instance
     :param user: the authenticating user
-    :param ticket: the SSO login data
+    :param idp_data: the SSO login data
 
-    :type idp_app: eduid_idp.idp.IdPApplication
-    :type user: eduid_idp.idp_user.IdPUser
-    :type ticket: eduid_idp.login.SSOLoginData
+    :type context: eduid_idp.idp.IdPApplication
     """
-    for plugin_name in idp_app.config.action_plugins:
+    for plugin_name in context.config.action_plugins:
         try:
             plugin_module = import_module('eduid_action.{}.idp'.format(plugin_name))
         except ImportError:
-            idp_app.logger.warn('Configured plugin {} missing from sys.path'.format(plugin_name))
+            context.logger.warn('Configured plugin {} missing from sys.path'.format(plugin_name))
             continue
-        idp_app.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
+        context.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
         try:
             # load() here is the function eduid_action.mfa.add_mfa_actions()
-            getattr(plugin_module, 'add_actions')(idp_app, user, ticket)
+            getattr(plugin_module, 'add_actions')(context, user, idp_data)
         except Exception as exc:
-            idp_app.logger.warn('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
+            context.logger.warning('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
             raise

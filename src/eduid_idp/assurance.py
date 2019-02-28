@@ -65,7 +65,7 @@ class AuthnState(object):
         :param sso_session:
 
         :type user: eduid_idp.idp_user.IdPUser
-        :type sso_session: eduid_idp.sso_session.SSOSession
+        :type sso_session: eduid_idp.sso_state.SSOState
         """
         self.logger = logger
 
@@ -138,7 +138,7 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
 
     :type req_authn_ctx: str
     :type user: eduid_idp.idp_user.IdPUser
-    :type sso_session: eduid_idp.sso_session.SSOSession
+    :type sso_session: eduid_idp.sso_state.SSOState
     :type logger: logging.Logger
     :rtype: str | None
     """

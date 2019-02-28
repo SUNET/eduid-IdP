@@ -38,9 +38,9 @@ import eduid_idp.assurance
 from eduid_idp.authn import AuthnData
 
 
-class SSOSession(object):
+class SSOState(object):
     """
-    Single Sign On sessions are used to remember a previous authenticaction
+    Single Sign On state is used to remember a previous authenticaction
     performed, to avoid re-authenticating users for every Service Provider
     they visit.
 
@@ -194,10 +194,10 @@ def from_dict(data):
     :return: SSO session object
 
     :type data: dict
-    :rtype: SSOSession
+    :rtype: SSOState
     """
-    return SSOSession(user_id = data['user_id'],
-                      authn_request_id = data['authn_request_id'],
-                      authn_credentials = data.get('authn_credentials'),
-                      ts = data['authn_timestamp'],
-                      )
+    return SSOState(user_id = data['user_id'],
+                    authn_request_id = data['authn_request_id'],
+                    authn_credentials = data.get('authn_credentials'),
+                    ts = data['authn_timestamp'],
+                    )

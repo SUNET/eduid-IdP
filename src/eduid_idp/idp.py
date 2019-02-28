@@ -122,12 +122,13 @@ from typing import Optional, Any
 
 import eduid_idp
 import eduid_idp.authn
-import eduid_idp.sso_session
+import eduid_idp.sso_state
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
-from eduid_idp.loginstate import SSOLoginDataCache
+from eduid_idp.sso_state import SSOState
+from eduid_idp.idp_session import IdPSessionFactory, IdPSession
 
 from eduid_userdb.actions import ActionDB
 
@@ -203,8 +204,7 @@ class IdPApplication(object):
         self._init_pysaml2()
 
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        _sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
-                                      self.config, threading.Lock())
+        _sessions = IdPSessionFactory(self.logger, _login_state_ttl, self.config, threading.Lock())
         self.authn_info_db = None
         _actions_db = None
 
@@ -287,11 +287,12 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         session = self._lookup_sso_session()
+        state = self._lookup_sso_state(session)
 
         if path[1] == 'post':
-            return SSO(session, self._my_start_response, self.context).post()
+            return SSO(session, state, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SSO(session, self._my_start_response, self.context).redirect()
+            return SSO(session, state, self._my_start_response, self.context).redirect()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -303,14 +304,15 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         session = self._lookup_sso_session()
+        state = self._lookup_sso_state(session)
 
         if path[1] == 'post':
-            return SLO(session, self._my_start_response, self.context).post()
+            return SLO(session, state, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SLO(session, self._my_start_response, self.context).redirect()
+            return SLO(session, state, self._my_start_response, self.context).redirect()
         if path[1] == 'soap':
             # SOAP is commonly used for SLO
-            return SLO(session, self._my_start_response, self.context).soap()
+            return SLO(session, state, self._my_start_response, self.context).soap()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -318,7 +320,7 @@ class IdPApplication(object):
     def verify(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
         self.logger.debug("--- Verify ---")
-        if self._lookup_sso_session():
+        if self._lookup_sso_state():
             # If an already logged in user presses 'back' or similar, we can't really expect to
             # manage to log them in again (think OTPs) and just continue 'back' to the SP.
             # However, with forceAuthn, this is exactly what happens so maybe it isn't really
@@ -464,30 +466,8 @@ class IdPApplication(object):
         for (k, v) in headers:
             cherrypy.response.headers[k] = v
 
-    def _lookup_sso_session(self):
-        """
-        Locate any existing SSO session for this request.
-
-        :returns: SSO session if found (and valid)
-        :rtype: SSOSession | None
-        """
-        session = self._lookup_sso_session2()
-        if session:
-            self.logger.debug("SSO session for user {!r} found in IdP cache".format(session.user_id))
-            session.set_user(self.userdb.lookup_user(session.user_id))
-            if not session.idp_user:
-                return None
-            _age = session.minutes_old
-            if _age > self.config.sso_session_lifetime:
-                self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
-                    _age, self.config.sso_session_lifetime))
-                return None
-            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-                _age, self.config.sso_session_lifetime))
-        return session
-
-    def _lookup_sso_session2(self):
-        """
+    def _lookup_sso_session(self) -> Optional[IdPSession]:
+        self.none_ = """
         See if a SSO session exists for this request, and return the data about
         the currently logged in user from the session store.
 
@@ -495,27 +475,40 @@ class IdPApplication(object):
         :rtype: SSOSession | None
         """
         _data = None
-        _session_id = eduid_idp.mischttp.read_cookie(self.logger)
-        if _session_id:
-            _data = self.IDP.cache.get_session(_session_id)
-            self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
-        else:
-            query = eduid_idp.mischttp.parse_query_string(self.logger)
-            if query:
-                self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
-                try:
-                    _data = self.IDP.cache.get_session(query['id'])
-                    self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
-                        pprint.pformat(_data)))
-                except KeyError:
-                    # no 'id', or not found in cache
-                    pass
-        if not _data:
-            self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
+        _cookie = eduid_idp.mischttp.read_cookie(self.context.config.cookie_name, self.context.logger)
+        if not _cookie:
             return None
-        _sso = eduid_idp.sso_session.from_dict(_data)
-        self.logger.debug("Re-created SSO session {!r}".format(_sso))
-        return _sso
+        return self.context.sessions.get_session(_cookie)
+
+    def _lookup_sso_state(self, session: Optional[IdPSession]) -> Optional[SSOState]:
+        """
+        Locate any existing SSO session for this request.
+
+        :returns: SSO session if found (and valid)
+        :rtype: SSOSession | None
+        """
+        if session and session.idp.sso_db_key:
+            _data = self.IDP.cache.get_session(session.idp.sso_db_key)
+            self.logger.debug('Looked up SSO state using sso_db_key {} :\n{}'.format(session.idp.sso_db_key, _data))
+        else:
+            self.logger.debug('SSO state not found')
+            return None
+        state = eduid_idp.sso_state.from_dict(_data)
+        self.logger.debug("Re-created SSO state {!r}".format(state))
+
+        self.logger.debug('SSO state for user {!r} found in IdP cache'.format(state.user_id))
+        state.set_user(self.userdb.lookup_user(session.user_id))
+        if not state.idp_user:
+            return None
+        _age = state.minutes_old
+        if _age > self.config.sso_session_lifetime:
+            self.logger.debug('SSO state expired (age {!r} minutes > {!r})'.format(
+                _age, self.config.sso_session_lifetime))
+            return None
+        self.logger.debug('SSO state is still valid (age {!r} minutes <= {!r})'.format(
+            _age, self.config.sso_session_lifetime))
+        return state
+
 
     def handle_error(self):
         """
