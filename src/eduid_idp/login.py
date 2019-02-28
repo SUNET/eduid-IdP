@@ -16,18 +16,21 @@ import hmac
 import pprint
 import time
 from hashlib import sha256
+from typing import Optional
 
 import eduid_idp
+from eduid_idp.authn import IdPAuthn
+from eduid_idp.cache import ExpiringCache
+from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.assurance import AssuranceException, WrongMultiFactor, MissingMultiFactor
-from saml2 import BINDING_HTTP_POST
-from saml2 import BINDING_HTTP_REDIRECT
-from saml2.s_utils import UnknownPrincipal
-from saml2.s_utils import UnsupportedBinding
-from saml2.s_utils import UnknownSystemEntity
+from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
+from saml2.s_utils import UnknownPrincipal, UnsupportedBinding, UnknownSystemEntity, UnravelError
+from saml2.sigver import verify_redirect_signature
+from saml2.request import AuthnRequest
 from defusedxml import ElementTree as DefusedElementTree
 
 
@@ -57,10 +60,8 @@ class SSO(Service):
     :type idp_app: idp.IdPApplication
     """
 
-    def __init__(self, session, start_response, idp_app):
-        Service.__init__(self, session, start_response, idp_app)
-        self._sessions = idp_app.sessions
-        self._idp_app = idp_app
+    def __init__(self, session, start_response, context: IdPContext):
+        super().__init__(session, start_response, context)
 
     def perform_login(self, ticket):
         """
@@ -85,7 +86,7 @@ class SSO(Service):
         binding_out = resp_args.get('binding_out')
         destination = resp_args.get('destination')
 
-        check_for_pending_actions(self._idp_app, user, ticket, self.sso_session)
+        check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
 
         response_authn = self._get_login_response_authn(ticket, user)
@@ -96,8 +97,8 @@ class SSO(Service):
         # with a SAMLResponse
         self.logger.debug('Applying binding_out {!r}, destination {!r}, relay_state {!r}'.format(
             binding_out, destination, ticket.RelayState))
-        http_args = self.IDP.apply_binding(binding_out, str(saml_response), destination,
-                                           ticket.RelayState, response = True)
+        http_args = self.context.idp.apply_binding(binding_out, str(saml_response), destination,
+                                                   ticket.RelayState, response = True)
 
         # INFO-Log the SSO session id and the AL and destination
         self.logger.info('{!s}: response authn={!s}, dst={!s}'.format(ticket.key,
@@ -146,9 +147,9 @@ class SSO(Service):
                 pprint.pformat(attributes),
                 pprint.pformat(resp_args),
                 pprint.pformat(response_authn)))
-        saml_response = self.IDP.create_authn_response(attributes, userid = user.eppn,
-                                                       authn = response_authn, sign_response = True,
-                                                       **resp_args)
+        saml_response = self.context.idp.create_authn_response(attributes, userid = user.eppn,
+                                                               authn = response_authn, sign_response = True,
+                                                               **resp_args)
         self._kantara_log_assertion_id(saml_response, ticket)
 
         return saml_response
@@ -240,12 +241,12 @@ class SSO(Service):
         self.logger.debug("Validate login request :\n{!s}".format(ticket))
         self.logger.debug("AuthnRequest from ticket: {!r}".format(ticket.req_info.message))
         try:
-            resp_args = self.IDP.response_args(ticket.req_info.message)
+            resp_args = self.context.idp.response_args(ticket.req_info.message)
 
             # not sure if we need to call pick_binding again (already done in response_args()),
             # but it is what we've always done
-            binding_out, destination = self.IDP.pick_binding('assertion_consumer_service',
-                                                             entity_id=ticket.req_info.message.issuer.text)
+            binding_out, destination = self.context.idp.pick_binding('assertion_consumer_service',
+                                                                     entity_id=ticket.req_info.message.issuer.text)
             self.logger.debug('Binding: {}, destination: {}'.format(binding_out, destination))
 
             resp_args['binding_out'] = binding_out
@@ -334,7 +335,7 @@ class SSO(Service):
             res = req_authn_context.authn_context_class_ref[0].text
 
         try:
-            attributes = self.IDP.metadata.entity_attributes(ticket.req_info.message.issuer.text)
+            attributes = self.context.idp.metadata.entity_attributes(ticket.req_info.message.issuer.text)
         except KeyError:
             attributes = {}
         if 'http://www.swamid.se/assurance-requirement' in attributes:
@@ -358,7 +359,7 @@ class SSO(Service):
         _info = self.unpack_redirect()
         self.logger.debug("Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        ticket = self._sessions.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
+        ticket = self.context.sessions.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
         return self._redirect_or_post(ticket)
 
     def post(self):
@@ -371,7 +372,7 @@ class SSO(Service):
         self.logger.debug("--- In SSO POST ---")
         _info = self.unpack_either()
 
-        ticket = self._sessions.get_ticket(_info, binding=BINDING_HTTP_POST)
+        ticket = self.context.sessions.get_ticket(_info, binding=BINDING_HTTP_POST)
         return self._redirect_or_post(ticket)
 
     def _redirect_or_post(self, ticket):
@@ -384,7 +385,7 @@ class SSO(Service):
         """
         _force_authn = self._should_force_authn(ticket)
         if self.sso_session and not _force_authn:
-            _ttl = self.config.sso_session_lifetime - self.sso_session.minutes_old
+            _ttl = self.context.config.sso_session_lifetime - self.sso_session.minutes_old
             self.logger.info("{!s}: proceeding sso_session={!s}, ttl={:}m".format(
                 ticket.key, self.sso_session.public_id, _ttl))
             self.logger.debug("Continuing with Authn request {!r}".format(ticket.req_info))
@@ -466,7 +467,7 @@ class SSO(Service):
         """
         assert isinstance(ticket, SSOLoginData)
 
-        argv = eduid_idp.mischttp.get_default_template_arguments(self.config)
+        argv = eduid_idp.mischttp.get_default_template_arguments(self.context.config)
         argv.update({
             "action": "/verify",
             "username": "",
@@ -508,7 +509,7 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def do_verify(idp_app):
+def do_verify(context: IdPContext, authn: IdPAuthn):
     """
     Perform authentication of user based on user provided credentials.
 
@@ -526,43 +527,43 @@ def do_verify(idp_app):
 
     :type idp_app: idp.IdPApplication
     """
-    query = eduid_idp.mischttp.get_post(idp_app.logger)
+    query = eduid_idp.mischttp.get_post(context.logger)
     # extract password to keep it away from as much code as possible
     password = query.get('password')
     _loggable = query.copy()
     if password:
         del query['password']
         _loggable['password'] = '<redacted>'
-    idp_app.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
+    context.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
-    _ticket = idp_app.sessions.get_ticket(query)
+    _ticket = context.sessions.get_ticket(query)
 
     authn_ref = None
     if _ticket.req_info.message.requested_authn_context:
         authn_ref = _ticket.req_info.message.requested_authn_context.authn_context_class_ref[0].text
-    idp_app.logger.debug("Authenticating with {!r}".format(authn_ref))
+    context.logger.debug("Authenticating with {!r}".format(authn_ref))
 
     if not password or 'username' not in query:
-        raise eduid_idp.error.Unauthorized("Credentials not supplied", logger = idp_app.logger)
+        raise eduid_idp.error.Unauthorized("Credentials not supplied", logger=context.logger)
 
     login_data = {'username': query['username'].strip(),
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    authninfo = idp_app.authn.password_authn(login_data)
+    authninfo = authn.password_authn(login_data)
 
     if not authninfo:
         _ticket.FailCount += 1
-        idp_app.IDP.ticket.store_ticket(_ticket)
-        idp_app.logger.debug("Unknown user or wrong password")
+        context.idp.ticket.store_ticket(_ticket)
+        context.logger.debug("Unknown user or wrong password")
         _referer = eduid_idp.mischttp.get_request_header().get('Referer')
         if _referer:
             raise eduid_idp.mischttp.Redirect(str(_referer))
-        raise eduid_idp.error.Unauthorized("Login incorrect", logger = idp_app.logger)
+        raise eduid_idp.error.Unauthorized("Login incorrect", logger=context.logger)
 
     # Create SSO session
     user = authninfo.user
-    idp_app.logger.debug("User {} authenticated OK".format(user))
+    context.logger.debug("User {} authenticated OK".format(user))
     _sso_session = SSOSession(user_id = user.user_id,
                               authn_request_id = _ticket.req_info.message.id,
                               authn_credentials = [authninfo],
@@ -571,13 +572,13 @@ def do_verify(idp_app):
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = idp_app.IDP.cache.add_session(user.user_id, _sso_session.to_dict())
-    eduid_idp.mischttp.set_cookie("idpauthn", "/", idp_app.logger, idp_app.config, _session_id)
+    _session_id = context.idp.cache.add_session(user.user_id, _sso_session.to_dict())
+    eduid_idp.mischttp.set_cookie('idpauthn', '/', context.logger, context.config, _session_id)
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id
 
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
-    idp_app.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
+    context.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
         query['key'], _sso_session.public_id,
         authn_ref,
         user))
@@ -586,7 +587,7 @@ def do_verify(idp_app):
     # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'
     # is passed as an URL parameter instead of the SAMLRequest.
     lox = query["redirect_uri"] + '?key=' + query['key']
-    idp_app.logger.debug("Redirect => %s" % lox)
+    context.logger.debug("Redirect => %s" % lox)
     raise eduid_idp.mischttp.Redirect(lox)
 
 

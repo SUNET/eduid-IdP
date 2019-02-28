@@ -39,6 +39,7 @@ from unittest import TestCase
 import eduid_idp
 from eduid_idp.idp_user import IdPUser
 from eduid_idp.idp import IdPApplication
+from eduid_idp.context import IdPContext
 
 from vccs_client import VCCSPasswordFactor
 
@@ -158,9 +159,14 @@ class FakeIdPApp(IdPApplication):
         datadir = pkg_resources.resource_filename(__name__, 'tests/data')
         config_file = os.path.join(datadir, 'test_SSO_conf.py')
         self.IDP = server.Server(config_file=config_file)
-        self.config = {}
+        self.config = FakeConfig()
         self.IDP.metadata = FakeMetadata()
-        self.sessions = None
+        self.context = IdPContext(config=self.config,
+                                  idp=self.IDP,
+                                  logger=self.logger,
+                                  sessions=None,
+                                  actions_db=None,
+                                  )
 
 
 class IdPSimpleTestCase(TestCase):
@@ -169,8 +175,27 @@ class IdPSimpleTestCase(TestCase):
     in-memory FakeUserDb().
     """
     def setUp(self):
-        config = FakeConfig()
+        # load the IdP configuration
+        datadir = pkg_resources.resource_filename(__name__, 'tests/data')
+        self.config_file = os.path.join(datadir, 'test_config.ini')
+        _defaults = eduid_idp.config._CONFIG_DEFAULTS
+        _defaults['mongo_uri'] = None
+        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
+        _defaults['actions_auth_shared_secret'] = 'dGVzdCBrZXkgICAgICAgICAgICAgICAgICAgICAgICA='
+        _config = eduid_idp.config.IdPConfig(self.config_file, debug=True, defaults=_defaults)
+
+        _userdb = FakeUserDb()
+
+        # Create the IdP app
+        _idp_app = IdPApplication(logger, _config, userdb=_userdb)
+
+        self.context = IdPContext(config=_config,
+                                  logger=logger,
+                                  idp=_idp_app.IDP,
+                                  sessions=None,
+                                  actions_db=None,
+                                  )
         #noinspection PyTypeChecker
-        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config, userdb = FakeUserDb())
-        self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.idp_userdb,
+        self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, _config, userdb=_userdb)
+        self.authn = eduid_idp.authn.IdPAuthn(logger, _config, self.idp_userdb,
                                               auth_client = FakeAuthClient())

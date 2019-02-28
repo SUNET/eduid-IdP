@@ -112,18 +112,12 @@ def _transport_encode(data):
     return b64encode(''.join(data.split('\n')))
 
 
-def make_login_ticket(req_class_ref):
+def make_login_ticket(req_class_ref, context):
     xmlstr = make_SAML_request(class_ref = req_class_ref)
     binding = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
     key = 'unique-key-for-request-1'
 
-    start_response = lambda: False
-    idp_app = FakeIdPApp()
-    sso_session_1 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-                                                     authn_request_id='some-unique-id-1'
-                                                     )
-    SSO = eduid_idp.login.SSO(sso_session_1, start_response, idp_app)
-    req_info = SSO.IDP.parse_authn_request(xmlstr, binding)
+    req_info = context.idp.parse_authn_request(xmlstr, binding)
     return SSOLoginData(key, req_info, {'SAMLRequest': xmlstr}, binding)
 
 
@@ -134,20 +128,6 @@ class TestSSO(IdPSimpleTestCase):
         super(TestSSO, self).setUp()
 
         self.start_response = lambda: False
-        self.idp_app = FakeIdPApp()
-
-        #sso_session_1 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-        #                                                 authn_request_id='some-unique-id-1'
-        #                                                 )
-        #self.SSO_AL1 = eduid_idp.login.SSO(sso_session_1, start_response, idp_app)
-        #sso_session_2 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-        #                                                 authn_request_id='some-unique-id-2'
-        #                                                 )
-        #self.SSO_AL2 = eduid_idp.login.SSO(sso_session_2, start_response, idp_app)
-        #sso_session_3 = eduid_idp.sso_session.SSOSession(user_id='test',   # really ObjectId()
-        #                                                 authn_request_id='some-unique-id-3'
-        #                                                 )
-        #self.SSO_AL3 = eduid_idp.login.SSO(sso_session_3, start_response, idp_app)
 
     # ------------------------------------------------------------------------
     def get_user_set_nins(self, eppn, ninlist):
@@ -178,7 +158,7 @@ class TestSSO(IdPSimpleTestCase):
     def _get_login_response_authn(self, req_class_ref, credentials=[], user=None):
         if user is None:
             user = self.get_user_set_nins('test1@eduid.se', [])
-        ticket = make_login_ticket(req_class_ref=req_class_ref)
+        ticket = make_login_ticket(req_class_ref, self.context)
 
         sso_session_1 = eduid_idp.sso_session.SSOSession(user_id=user.eppn,
                                                          authn_request_id='some-unique-id-1'
@@ -196,7 +176,7 @@ class TestSSO(IdPSimpleTestCase):
             else:
                 data = AuthnData(user, this, datetime.datetime.now())
                 sso_session_1.add_authn_credential(data)
-        _SSO = eduid_idp.login.SSO(sso_session_1, self.start_response, self.idp_app)
+        _SSO = eduid_idp.login.SSO(sso_session_1, self.start_response, self.context)
         return _SSO._get_login_response_authn(ticket, user)
 
     # ------------------------------------------------------------------------

@@ -64,7 +64,7 @@ remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
 class TestActions(MongoTestCase):
 
     def setUp(self):
-        super(TestActions, self).setUp()
+        super().setUp()
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
@@ -77,7 +77,7 @@ class TestActions(MongoTestCase):
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
 
-        self.actions = self.idp_app.actions_db
+        self.actions = self.idp_app.context.actions_db
 
         # setup some test data
         _email = 'johnsmith@example.com'

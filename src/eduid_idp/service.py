@@ -14,6 +14,7 @@ Common code for SSO login/logout requests.
 """
 
 import eduid_idp.mischttp
+from eduid_idp.context import IdPContext
 
 
 class Service(object):
@@ -26,15 +27,15 @@ class Service(object):
 
     :type session: SSOSession | None
     :type start_response: function
-    :type idp_app: idp.IdPApplication
     """
 
-    def __init__(self, session, start_response, idp_app):
+    def __init__(self, session, start_response, context: IdPContext):
+        self.context = context
         self.start_response = start_response
-        self.logger = idp_app.logger
-        self.IDP = idp_app.IDP
-        self.config = idp_app.config
         self.sso_session = session
+        # TODO: Get rid of this copying of things in the context
+        self.logger = context.logger
+        self.config = context.config
 
     def unpack_redirect(self):
         """
