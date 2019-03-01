@@ -495,7 +495,7 @@ class IdPApplication(object):
         :rtype: SSOSession | None
         """
         _data = None
-        _session_id = eduid_idp.mischttp.read_cookie(self.logger)
+        _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         if _session_id:
             _data = self.IDP.cache.get_session(_session_id)
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))

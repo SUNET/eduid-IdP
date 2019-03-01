@@ -107,7 +107,7 @@ class SLO(Service):
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
         _name_id = req_info.message.name_id
-        _session_id = eduid_idp.mischttp.read_cookie(self.logger)
+        _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         _username = None
         if _session_id:
             # If the binding is REDIRECT, we can get the SSO session to log out from the
