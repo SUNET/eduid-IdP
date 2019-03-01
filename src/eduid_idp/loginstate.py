@@ -145,7 +145,7 @@ class SSOLoginDataCache(object):
         self.logger = logger
         self._cache: ExpiringCache
         if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
-            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config)
+            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config, secret=config.session_app_key)
         else:
             # This is used in tests
             self._cache = ExpiringCacheMem(name, logger, ttl, lock)

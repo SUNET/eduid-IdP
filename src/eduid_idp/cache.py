@@ -228,7 +228,7 @@ class ExpiringCacheMem(ExpiringCache):
 
 class ExpiringCacheCommonSession(ExpiringCache):
 
-    def __init__(self, name, logger, ttl, config):
+    def __init__(self, name, logger, ttl, config, secret):
         super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
 
         redis_cfg = {'REDIS_PORT': config.redis_port,
@@ -241,8 +241,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         else:
             redis_cfg['REDIS_HOST'] = config.redis_host
         self._redis_cfg = redis_cfg
-
-        self._manager = SessionManager(redis_cfg, ttl = ttl, secret = config.session_app_key)
+        self._manager = SessionManager(redis_cfg, ttl = ttl, secret = secret)
 
     def __repr__(self):
         return '<{!s}: {!s}>'.format(self.__class__.__name__, self.__unicode__())
