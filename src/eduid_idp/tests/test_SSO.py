@@ -176,7 +176,7 @@ class TestSSO(IdPSimpleTestCase):
             else:
                 data = AuthnData(user, this, datetime.datetime.now())
                 sso_session_1.add_authn_credential(data)
-        _SSO = eduid_idp.login.SSO(sso_session_1, self.start_response, self.context)
+        _SSO = eduid_idp.login.SSO(sso_session_1, None, self.start_response, self.context)
         return _SSO._get_login_response_authn(ticket, user)
 
     # ------------------------------------------------------------------------
