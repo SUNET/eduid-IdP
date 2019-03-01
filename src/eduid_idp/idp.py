@@ -244,6 +244,7 @@ class IdPApplication(object):
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
+        _common_sessions: Optional[ExpiringCacheCommonSession]
         if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
                 and config.shared_session_secret_key:
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,

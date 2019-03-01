@@ -283,7 +283,7 @@ def get_idpauthn_cookie(logger: Logger) -> Optional[str]:
         try:
             cookie_val = base64.b64decode(_authn)
             logger.debug('idpauthn cookie value={!r}'.format(cookie_val))
-            return cookie_val
+            return cookie_val.decode('utf-8')
         except binascii.Error:
             logger.debug('Could not b64 decode idpauthn value: {!r}'.format(_authn))
             raise
