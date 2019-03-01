@@ -24,6 +24,8 @@ import six
 from eduid_common.session.session import SessionManager, RedisEncryptedSession
 from eduid_userdb import MongoDB
 
+_SHA1_HEXENCODED_SIZE = 160 // 8 * 2
+
 
 class NoOpLock(object):
     """
@@ -288,8 +290,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :returns: The previously added session
         """
         try:
-            if len(key) == 64:
-                # hex-encoded sha256
+            if len(key) == _SHA1_HEXENCODED_SIZE:
                 _session_id = unhexlify(key)
                 session = self._manager.get_session(session_id = _session_id)
             else:
@@ -322,8 +323,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :return: True on success
         """
-        if len(key) == 64:
-            # hex-encoded sha256
+        if len(key) == _SHA1_HEXENCODED_SIZE:
             _session_id = unhexlify(key)
             session = self._manager.get_session(session_id=_session_id)
         else:
