@@ -17,7 +17,7 @@ from saml2.server import Server as Saml2Server
 @dataclass(frozen=True)
 class IdPContext(object):
     config: IdPConfig
-    sessions: SSOLoginDataCache
+    ticket_sessions: SSOLoginDataCache
     idp: Saml2Server
     logger: Logger
     actions_db: Optional[ActionDB]

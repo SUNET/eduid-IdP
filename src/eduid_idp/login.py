@@ -574,7 +574,7 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
         info['key'] = ExpiringCache.key(info['SAMLRequest'])
         logger.debug("No 'key' in info, hashed SAMLRequest into key {}".format(info['key']))
 
-    ticket = context.sessions.get_ticket(info['key'])
+    ticket = context.ticket_sessions.get_ticket(info['key'])
     if ticket:
         return ticket
     # cache miss, parse SAMLRequest
@@ -583,7 +583,7 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
     if binding is None:
         raise eduid_idp.error.BadRequest('Bad request, no binding')
     ticket = _create_ticket(context, info, binding)
-    context.sessions.store_ticket(ticket)
+    context.ticket_sessions.store_ticket(ticket)
 
     return ticket
 
