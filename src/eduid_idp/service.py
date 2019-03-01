@@ -15,6 +15,9 @@ Common code for SSO login/logout requests.
 
 import eduid_idp.mischttp
 from eduid_idp.context import IdPContext
+from eduid_idp.sso_session import SSOSession
+
+from typing import Optional, Callable
 
 
 class Service(object):
@@ -23,13 +26,10 @@ class Service(object):
 
     :param session: SSO session
     :param start_response: WSGI-like start_response function pointer
-    :param idp_app: IdPApplication instance
-
-    :type session: SSOSession | None
-    :type start_response: function
+    :param context: IdP context
     """
 
-    def __init__(self, session, start_response, context: IdPContext):
+    def __init__(self, session: Optional[SSOSession], start_response: Callable, context: IdPContext):
         self.context = context
         self.start_response = start_response
         self.sso_session = session

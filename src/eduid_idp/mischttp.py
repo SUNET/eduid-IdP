@@ -18,11 +18,13 @@ import re
 import six
 import base64
 import pprint
-import cherrypy
+import binascii
 import pkg_resources
 
+from logging import Logger
 from six import string_types
-from  six.moves.urllib.parse import parse_qs
+from six.moves.urllib.parse import parse_qs
+from typing import Callable, Optional
 
 import eduid_idp
 from eduid_idp.util import b64encode
@@ -30,6 +32,7 @@ from eduid_idp.error import BadRequest
 from eduid_common.api.sanitation import Sanitizer, SanitationProblem
 
 from saml2 import BINDING_HTTP_REDIRECT
+import cherrypy
 
 
 class Redirect(cherrypy.HTTPRedirect):
@@ -39,7 +42,7 @@ class Redirect(cherrypy.HTTPRedirect):
     pass
 
 
-def create_html_response(binding, http_args, start_response, logger):
+def create_html_response(binding: str, http_args: dict, start_response: Callable, logger: Logger) -> bytes:
     """
     Create a HTML response based on parameters compiled by pysaml2 functions
     like apply_binding().
@@ -50,12 +53,6 @@ def create_html_response(binding, http_args, start_response, logger):
     :param logger: logging logger
 
     :return: HTML response
-
-    :type binding: string
-    :type http_args: dict
-    :type start_response: function
-    :type logger: logging.Logger
-    :rtype: bytes
     """
     if binding == BINDING_HTTP_REDIRECT:
         # XXX This URL extraction code is untested in practice, but it appears
@@ -271,35 +268,43 @@ def get_content_type(filename):
 # ----------------------------------------------------------------------------
 # Cookie handling
 # ----------------------------------------------------------------------------
-def read_cookie(logger):
+def get_idpauthn_cookie(logger: Logger) -> Optional[bytes]:
     """
-    Decode information stored in a browser cookie.
+    Decode information stored in the 'idpauthn' browser cookie.
 
-    The idpauthn cookie holds a value used to lookup `userdata' in IDP.cache.
+    The idpauthn cookie holds a value used to lookup `userdata' in context.sso_sessions.
 
     :param logger: logging logger
     :returns: string with cookie content, or None
+    :rtype: string | None
+    """
+    _authn = read_cookie('idpauthn', logger)
+    if _authn:
+        try:
+            cookie_val = base64.b64decode(_authn)
+            logger.debug('idpauthn cookie value={!r}'.format(cookie_val))
+            return cookie_val
+        except binascii.Error:
+            logger.debug('Could not b64 decode idpauthn value: {!r}'.format(_authn))
+            raise
+    return None
 
-    :type logger: logging.Logger
+
+def read_cookie(name: str, logger: Logger) -> Optional[str]:
+    """
+    Read a browser cookie.
+
+    :param logger: logging logger
+    :returns: string with cookie content, or None
     :rtype: string | None
     """
     cookie = cherrypy.request.cookie
-    logger.debug("Parsing cookie(s): {!s}".format(cookie))
-    _authn = cookie.get("idpauthn")
-    if _authn:
-        import binascii
-        try:
-            cookie_val = base64.b64decode(_authn.value)
-            logger.debug("idpauthn cookie value={!r}".format(cookie_val))
-            return cookie_val
-        except binascii.Error:
-            logger.debug('Invalid idpauthn value: {!r}'.format(_authn.value))
-            raise
-        except KeyError:
-            return None
-    else:
-        logger.debug("No idpauthn cookie")
-    return None
+    logger.debug('Reading cookie(s): {}'.format(cookie))
+    cookie = cookie.get(name)
+    if not cookie:
+        logger.debug('No {} cookie'.format(name))
+        return None
+    return cookie.value
 
 
 def delete_cookie(name, logger, config):
@@ -341,7 +346,7 @@ def set_cookie(name, path, logger, config, value=''):
     :type value: string
     :rtype: bool
     """
-    if six.PY3 and type(value) == bytes:
+    if isinstance(value, six.binary_type):
         value = value.decode('utf-8')
     cookie = cherrypy.response.cookie
     cookie[name] = b64encode(value)
@@ -349,7 +354,7 @@ def set_cookie(name, path, logger, config, value=''):
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
     cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
-    logger.debug("Set cookie : {!s}".format(cookie))
+    logger.debug("Set cookie {!r} : {}".format(name, cookie))
     return True
 
 

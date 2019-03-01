@@ -86,7 +86,7 @@ class SLO(Service):
         req_key = _get_request_key(request)
 
         try:
-            req_info = self.IDP.parse_logout_request(request, binding)
+            req_info = self.context.idp.parse_logout_request(request, binding)
             assert isinstance(req_info, saml2.request.LogoutRequest)
             self.logger.debug("Parsed Logout request ({!s}):\n{!s}".format(binding, req_info.message))
         except Exception as exc:
@@ -107,20 +107,20 @@ class SLO(Service):
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
         _name_id = req_info.message.name_id
-        _session_id = eduid_idp.mischttp.read_cookie(self.logger)
+        _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         _username = None
         if _session_id:
             # If the binding is REDIRECT, we can get the SSO session to log out from the
             # client idpauthn cookie
-            session_ids = [_session_id]
+            session_ids = [eduid_idp.cache.SSOSessionId(_session_id)]
         else:
             # For SOAP binding, no cookie is sent - only NameID. Have to figure out
             # the user based on NameID and then destroy *all* the users SSO sessions
             # unfortunately.
-            _username = self.IDP.ident.find_local_id(_name_id)
+            _username = self.context.idp.ident.find_local_id(_name_id)
             self.logger.debug("Logout message name_id: {!r} found username {!r}".format(
                 _name_id, _username))
-            session_ids = self.IDP.cache.get_sessions_for_user(_username)
+            session_ids = self.context.sso_sessions.get_sessions_for_user(_username)
 
         self.logger.debug("Logout resources: name_id {!r} username {!r}, session_ids {!r}".format(
             _name_id, _username, session_ids))
@@ -149,11 +149,11 @@ class SLO(Service):
         for this in session_ids:
             self.logger.debug("Logging out SSO session with key: {!s}".format(this))
             try:
-                _data = self.IDP.cache.get_session(this)
+                _data = self.context.sso_sessions.get_session(this)
                 if not _data:
                     raise KeyError('Session not found')
                 _sso = eduid_idp.sso_session.from_dict(_data)
-                res = self.IDP.cache.remove_session(this)
+                res = self.context.sso_sessions.remove_session(this)
                 self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
                     req_key, _sso.public_id, _sso.minutes_old, bool(res)))
             except KeyError:
@@ -186,7 +186,7 @@ class SLO(Service):
         try:
             # remove the authentication
             # XXX would be useful if remove_authn_statements() returned how many statements it actually removed
-            self.IDP.session_db.remove_authn_statements(name_id)
+            self.context.idp.session_db.remove_authn_statements(name_id)
             self.logger.info("{!s}: logout name_id={!r}".format(req_key, name_id))
         except KeyError as exc:
             self.logger.error("ServiceError removing authn : %s" % exc)
@@ -214,7 +214,7 @@ class SLO(Service):
                                                                             status_code))
         if req_info.binding != BINDING_SOAP:
             bindings = [BINDING_HTTP_REDIRECT, BINDING_HTTP_POST]
-            binding, destination = self.IDP.pick_binding("single_logout_service", bindings,
+            binding, destination = self.context.idp.pick_binding("single_logout_service", bindings,
                                                          entity_id = req_info.sender())
             bindings = [binding]
         else:
@@ -226,15 +226,15 @@ class SLO(Service):
             status = error_status_factory((status_code, "Logout failed"))
             self.logger.debug("Created 'logout failed' status based on {!r} : {!r}".format(status_code, status))
 
-        issuer = self.IDP._issuer(self.IDP.config.entityid)
-        response = self.IDP.create_logout_response(req_info.message, bindings, status, sign = sign_response,
+        issuer = self.context.idp._issuer(self.context.idp.config.entityid)
+        response = self.context.idp.create_logout_response(req_info.message, bindings, status, sign = sign_response,
                                                    issuer = issuer)
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             xmlstr = eduid_idp.util.maybe_xml_to_string(response, logger=self.logger)
             self.logger.debug("Logout SAMLResponse :\n\n{!s}\n\n".format(xmlstr))
 
-        ht_args = self.IDP.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
+        ht_args = self.context.idp.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
                                          response = True)
         # self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 

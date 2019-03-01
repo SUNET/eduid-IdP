@@ -40,6 +40,7 @@ import eduid_idp
 from eduid_idp.idp_user import IdPUser
 from eduid_idp.idp import IdPApplication
 from eduid_idp.context import IdPContext
+from eduid_idp.cache import SSOSessionCacheMem
 
 from vccs_client import VCCSPasswordFactor
 
@@ -164,8 +165,11 @@ class FakeIdPApp(IdPApplication):
         self.context = IdPContext(config=self.config,
                                   idp=self.IDP,
                                   logger=self.logger,
-                                  sessions=None,
+                                  ticket_sessions=None,
+                                  common_sessions=None,
                                   actions_db=None,
+                                  authn=None,
+                                  sso_sessions=SSOSessionCacheMem(logger=logger, ttl=60),
                                   )
 
 
@@ -188,13 +192,7 @@ class IdPSimpleTestCase(TestCase):
 
         # Create the IdP app
         _idp_app = IdPApplication(logger, _config, userdb=_userdb)
-
-        self.context = IdPContext(config=_config,
-                                  logger=logger,
-                                  idp=_idp_app.IDP,
-                                  sessions=None,
-                                  actions_db=None,
-                                  )
+        self.context = _idp_app.context
         #noinspection PyTypeChecker
         self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, _config, userdb=_userdb)
         self.authn = eduid_idp.authn.IdPAuthn(logger, _config, self.idp_userdb,

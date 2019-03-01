@@ -16,7 +16,7 @@ import hmac
 import pprint
 import time
 from hashlib import sha256
-from typing import Optional
+from typing import Optional, Callable
 
 import eduid_idp
 from eduid_idp.authn import IdPAuthn
@@ -53,31 +53,23 @@ class SSO(Service):
 
     :param session: SSO session
     :param start_response: WSGI-like start_response function pointer
-    :param idp_app: IdPApplication instance
-
-    :type session: SSOSession | None
-    :type start_response: function
-    :type idp_app: idp.IdPApplication
+    :param context: IdP context
     """
 
-    def __init__(self, session, start_response, context: IdPContext):
+    def __init__(self, session: SSOSession, start_response: Callable, context: IdPContext):
         super().__init__(session, start_response, context)
 
-    def perform_login(self, ticket):
+    def perform_login(self, ticket: SSOLoginData) -> bytes:
         """
         Validate request, and then proceed with creating an AuthnResponse and
         invoking the 'outgoing' SAML2 binding.
 
         :param ticket: Login process state
         :return: Response
-
-        :type ticket: SSOLoginData
-        :rtype: string
         """
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        assert isinstance(ticket, SSOLoginData)
         assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
 
         user = self.sso_session.idp_user
@@ -131,7 +123,7 @@ class SSO(Service):
         # Add a list of credentials used in a private attribute that will only be
         # released to the eduID authn component
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
-        for k,v in response_authn.pop('authn_attributes', {}).items():
+        for k, v in response_authn.pop('authn_attributes', {}).items():
             if k in attributes:
                 self.logger.debug('Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(
                     k, attributes[k], v
@@ -209,7 +201,7 @@ class SSO(Service):
                                 msg=user_id.encode('ascii'), digestmod=sha256).hexdigest()
         msg = self.config.fticks_format_string.format(ts=_timestamp,
                                                       rp=relying_party,
-                                                      ap=self.IDP.config.entityid,
+                                                      ap=self.context.idp.config.entityid,
                                                       pn=_anon_userid,
                                                       am=authn_method,
                                                       )
@@ -316,7 +308,7 @@ class SSO(Service):
         return dict(class_ref = resp_authn,
                     authn_instant = self.sso_session.authn_timestamp,
                     authn_attributes = extra_attributes,
-        )
+                    )
 
     def _get_requested_authn_context(self, ticket):
         """
@@ -349,7 +341,7 @@ class SSO(Service):
 
         return res
 
-    def redirect(self):
+    def redirect(self) -> bytes:
         """ This is the HTTP-redirect endpoint.
 
         :return: HTTP response
@@ -359,10 +351,10 @@ class SSO(Service):
         _info = self.unpack_redirect()
         self.logger.debug("Unpacked redirect :\n{!s}".format(pprint.pformat(_info)))
 
-        ticket = self.context.sessions.get_ticket(_info, binding=BINDING_HTTP_REDIRECT)
+        ticket = _get_ticket(self.context, _info, BINDING_HTTP_REDIRECT)
         return self._redirect_or_post(ticket)
 
-    def post(self):
+    def post(self) -> bytes:
         """
         The HTTP-Post endpoint
 
@@ -372,17 +364,11 @@ class SSO(Service):
         self.logger.debug("--- In SSO POST ---")
         _info = self.unpack_either()
 
-        ticket = self.context.sessions.get_ticket(_info, binding=BINDING_HTTP_POST)
+        ticket = _get_ticket(self.context, _info, BINDING_HTTP_POST)
         return self._redirect_or_post(ticket)
 
-    def _redirect_or_post(self, ticket):
-        """
-        Common code for redirect() and post() endpoints.
-
-        :type ticket: SSOLoginData
-
-        :rtype: string
-        """
+    def _redirect_or_post(self, ticket: SSOLoginData) -> bytes:
+        """ Common code for redirect() and post() endpoints. """
         _force_authn = self._should_force_authn(ticket)
         if self.sso_session and not _force_authn:
             _ttl = self.context.config.sso_session_lifetime - self.sso_session.minutes_old
@@ -405,16 +391,13 @@ class SSO(Service):
 
         return self._not_authn(ticket)
 
-    def _should_force_authn(self, ticket):
+    def _should_force_authn(self, ticket: SSOLoginData) -> bool:
         """
         Check if the IdP should force authentication of this request.
 
         Will check SAML ForceAuthn but avoid endless loops of forced authentications
         by looking if the SSO session says authentication was actually performed
         based on this SAML request.
-
-        :type ticket: SSOLoginData
-        :rtype: bool
         """
         if ticket.req_info.message.force_authn:
             if not self.sso_session:
@@ -423,21 +406,18 @@ class SSO(Service):
             if ticket.req_info.message.id != self.sso_session.user_authn_request_id:
                 self.logger.debug("Forcing authentication because of ForceAuthn with "
                                   "SSO session id {!r} != {!r}".format(
-                                  self.sso_session.user_authn_request_id, ticket.req_info.message.id))
+                    self.sso_session.user_authn_request_id, ticket.req_info.message.id))
                 return True
             self.logger.debug("Ignoring ForceAuthn, authn already performed for SAML request {!r}".format(
                 ticket.req_info.message.id))
         return False
 
-    def _not_authn(self, ticket):
+    def _not_authn(self, ticket: SSOLoginData) -> bytes:
         """
         Authenticate user. Either, the user hasn't logged in yet,
         or the service provider forces re-authentication.
         :param ticket: SSOLoginData instance
         :returns: HTTP response
-
-        :type ticket: SSOLoginData
-        :rtype: string
         """
         assert isinstance(ticket, SSOLoginData)
         redirect_uri = eduid_idp.mischttp.geturl(self.config, query = False)
@@ -447,7 +427,7 @@ class SSO(Service):
 
         return self._show_login_page(ticket, req_authn_context, redirect_uri)
 
-    def _show_login_page(self, ticket, requested_authn_context, redirect_uri):
+    def _show_login_page(self, ticket: SSOLoginData, requested_authn_context: str, redirect_uri) -> bytes:
         """
         Display the login form for all authentication methods.
 
@@ -458,15 +438,9 @@ class SSO(Service):
         :param ticket: Login session state (not SSO session state)
         :param requested_authn_context: Requested authentication context class
         :param redirect_uri: string with URL to proceed to after authentication
+
         :return: HTTP response
-
-        :type ticket: SSOLoginData
-        :type requested_authn_context: str
-
-        :rtype: string
         """
-        assert isinstance(ticket, SSOLoginData)
-
         argv = eduid_idp.mischttp.get_default_template_arguments(self.context.config)
         argv.update({
             "action": "/verify",
@@ -501,7 +475,7 @@ class SSO(Service):
             raise eduid_idp.error.NotFound()
 
         # apply simplistic HTML formatting to template in 'res'
-        return content.format(**argv)
+        return content.format(**argv).encode('utf-8')
 
 
 # -----------------------------------------------------------------------------
@@ -509,7 +483,7 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def do_verify(context: IdPContext, authn: IdPAuthn):
+def do_verify(context: IdPContext):
     """
     Perform authentication of user based on user provided credentials.
 
@@ -521,11 +495,8 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
     It will figure out what authentication level to assert based on the authncontext
     requested, and the actual authentication that succeeded.
 
-    :param idp_app: IdPApplication instance
     :return: Does not return
     :raise eduid_idp.mischttp.Redirect: On successful authentication, redirect to redirect_uri.
-
-    :type idp_app: idp.IdPApplication
     """
     query = eduid_idp.mischttp.get_post(context.logger)
     # extract password to keep it away from as much code as possible
@@ -536,7 +507,7 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
         _loggable['password'] = '<redacted>'
     context.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
 
-    _ticket = context.sessions.get_ticket(query)
+    _ticket = _get_ticket(context, query, None)
 
     authn_ref = None
     if _ticket.req_info.message.requested_authn_context:
@@ -550,7 +521,7 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    authninfo = authn.password_authn(login_data)
+    authninfo = context.authn.password_authn(login_data)
 
     if not authninfo:
         _ticket.FailCount += 1
@@ -572,7 +543,7 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = context.idp.cache.add_session(user.user_id, _sso_session.to_dict())
+    _session_id = context.sso_sessions.add_session(user.user_id, _sso_session.to_dict())
     eduid_idp.mischttp.set_cookie('idpauthn', '/', context.logger, context.config, _session_id)
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id
@@ -592,3 +563,108 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
 
 
 # ----------------------------------------------------------------------------
+def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOLoginData:
+    logger = context.logger
+    if not info:
+        raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
+    if 'key' not in info:
+        if 'SAMLRequest' not in info:
+            raise eduid_idp.error.BadRequest('Missing SAMLRequest, please re-initiate login',
+                                             logger = logger, extra = {'info': info, 'binding': binding})
+        info['key'] = ExpiringCache.key(info['SAMLRequest'])
+        logger.debug("No 'key' in info, hashed SAMLRequest into key {}".format(info['key']))
+
+    ticket = context.ticket_sessions.get_ticket(info['key'])
+    if ticket:
+        return ticket
+    # cache miss, parse SAMLRequest
+    if binding is None:
+        binding = info['binding']
+    if binding is None:
+        raise eduid_idp.error.BadRequest('Bad request, no binding')
+    ticket = _create_ticket(context, info, binding)
+    context.ticket_sessions.store_ticket(ticket)
+
+    return ticket
+
+
+def _create_ticket(context: IdPContext, info: dict, binding: str) -> SSOLoginData:
+    """
+    Create an SSOLoginData instance from a dict.
+
+    The dict must contain SAMLRequest and is typically
+
+    {'RelayState': '/path',
+     'SAMLRequest': 'nVLB...==',
+     ...
+    }
+
+    :param info: dict containing at least `SAMLRequest' and `key'.
+    :param binding: SAML2 binding as string (typically a URN)
+    :returns: SSOLoginData instance
+    """
+    if not binding:
+        raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = context.logger)
+    req_info = _parse_SAMLRequest(context, info, binding)
+    ticket = SSOLoginData(info['key'], req_info, info, binding)
+    context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(info['key']))
+    return ticket
+
+
+def _parse_SAMLRequest(context: IdPContext, info: dict, binding: str) -> AuthnRequest:
+    """
+    Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
+    instance.
+
+    If the SAMLRequest is signed, the signature is validated and a BadRequest()
+    returned on failure.
+
+    :param info: dict with keys 'SAMLRequest' and possibly 'SigAlg' and 'Signature'
+    :param binding: SAML binding
+    :returns: pysaml2 AuthnRequest information
+    :raise: BadRequest if request signature validation fails
+    """
+    logger = context.logger
+    try:
+        _req_info = context.idp.parse_authn_request(info['SAMLRequest'], binding)
+    except UnravelError as exc:
+        logger.info('Failed parsing SAML request ({!s} bytes)'.format(len(info['SAMLRequest'])))
+        logger.debug('Failed parsing SAML request:\n{!s}\nException {!s}'.format(info['SAMLRequest'], exc))
+        raise eduid_idp.error.BadRequest('No valid SAMLRequest found', logger = logger)
+    if not _req_info:
+        # Either there was no request, or pysaml2 found it to be unacceptable.
+        # For example, the IssueInstant might have been out of bounds.
+        logger.debug('No valid SAMLRequest returned by pysaml2')
+        raise eduid_idp.error.BadRequest('No valid SAMLRequest found', logger = logger)
+    assert isinstance(_req_info, AuthnRequest)
+
+    # Only perform expensive parse/pretty-print if debugging
+    if context.config.debug:
+        xmlstr = eduid_idp.util.maybe_xml_to_string(_req_info.message)
+        logger.debug('Decoded SAMLRequest into AuthnRequest {!r} :\n\n{!s}\n\n'.format(
+            _req_info.message, xmlstr))
+
+    if 'SigAlg' in info and 'Signature' in info:  # Signed request
+        issuer = _req_info.message.issuer.text
+        _certs = context.idp.metadata.certs(issuer, 'any', 'signing')
+        if context.config.verify_request_signatures:
+            verified_ok = False
+            for cert in _certs:
+                if verify_redirect_signature(info, cert):
+                    verified_ok = True
+                    break
+            if not verified_ok:
+                _key = ExpiringCache.key(info['SAMLRequest'])
+                logger.info('{!s}: SAML request signature verification failure'.format(_key))
+                raise eduid_idp.error.BadRequest('SAML request signature verification failure',
+                                                 logger = logger)
+        else:
+            logger.debug('Ignoring existing request signature, verify_request_signature is False')
+    else:
+        # XXX check if metadata says request should be signed ???
+        # Leif says requests are typically not signed, and that verifying signatures
+        # on SAML requests is considered a possible DoS attack vector, so it is typically
+        # not done.
+        # XXX implement configuration flag to disable signature verification
+        logger.debug('No signature in SAMLRequest')
+    return _req_info
