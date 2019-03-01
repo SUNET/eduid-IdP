@@ -37,7 +37,7 @@ import datetime
 
 import eduid_idp
 from eduid_idp.loginstate import SSOLoginData
-from eduid_idp.testing import IdPSimpleTestCase, FakeIdPApp
+from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode
 from eduid_idp.authn import AuthnData
 from eduid_idp.error import Forbidden

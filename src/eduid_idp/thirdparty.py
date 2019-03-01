@@ -3,6 +3,7 @@ Third party code with licenses intact.
 """
 
 import re
+from typing import List, Tuple
 
 # This function is from Django, 2013-10-17
 #   https://github.com/django/django/blob/master/django/utils/translation/trans_real.py
@@ -43,8 +44,9 @@ accept_language_re = re.compile(r'''
         (?:\s*,\s*|$)                                 # Multiple accepts per header.
         ''', re.VERBOSE)
 
+LangEntry = Tuple[str, float]
 
-def parse_accept_lang_header(lang_string):
+def parse_accept_lang_header(lang_string: str) -> List[LangEntry]:
     """
     Parses the lang_string, which is the body of an HTTP Accept-Language
     header, and returns a list of (lang, q-value), ordered by 'q' values.
@@ -52,9 +54,6 @@ def parse_accept_lang_header(lang_string):
     Any format errors in lang_string results in an empty list being returned.
 
     :param lang_string: Accept-Language header
-
-    :type lang_string: string
-    :rtype: list[(string, string)]
     """
     result = []
     pieces = accept_language_re.split(lang_string)
@@ -64,13 +63,14 @@ def parse_accept_lang_header(lang_string):
         first, lang, priority = pieces[i: i + 3]
         if first:
             return []
+        _priority = 1.0
         if priority:
             try:
-                priority = float(priority)
+                _priority = float(priority)
             except ValueError:
                 return []
-        if not priority:        # if priority is 0.0 at this point make it 1.0
-            priority = 1.0
-        result.append((lang, priority))
+        else:  # if priority is 0.0 at this point make it 1.0
+            _priority = 1.0
+        result.append((lang, _priority))
     result.sort(key=lambda k: k[1], reverse=True)
     return result

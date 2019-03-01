@@ -92,7 +92,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     context.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
-    shared_key = context.config.actions_auth_shared_secret.decode('utf-8')
+    shared_key = context.config.actions_auth_shared_secret
     auth_token, timestamp = generate_auth_token(shared_key, 'idp_actions', user.eppn)
 
     actions_uri = context.config.actions_app_uri

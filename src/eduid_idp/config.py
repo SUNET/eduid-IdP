@@ -35,12 +35,13 @@
 Configuration (file) handling for eduID IdP.
 """
 
-import six
 import os
+import six
+from typing import List, Optional
 from six.moves import configparser
+from base64 import urlsafe_b64decode
 
 import nacl.secret
-from base64 import urlsafe_b64decode
 
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
@@ -112,9 +113,9 @@ class IdPConfig(object):
 
     def __init__(self, filename, debug, defaults=None):
         self._parsed_content_packages = None
-        self._parsed_status_test_usernames = None
-        self._parsed_redis_sentinel_hosts = None
-        self._parsed_plugin_names = None
+        self._parsed_status_test_usernames: Optional[List[str]] = None
+        self._parsed_redis_sentinel_hosts: Optional[List[str]] = None
+        self._parsed_plugin_names: Optional[List[str]] = None
         self.section = _CONFIG_SECTION
         _defaults = defaults or _CONFIG_DEFAULTS
         _defaults['debug'] = str(debug)
@@ -327,24 +328,18 @@ class IdPConfig(object):
         return bool(int(res))
 
     @property
-    def status_test_usernames(self):
+    def status_test_usernames(self) -> List[str]:
         """
         Get list of usernames valid for use with the /status URL.
 
         If this list is ['*'], all usernames are allowed for /status.
 
         :return: list of usernames
-
-        :rtype: list[string]
         """
-        if self._parsed_status_test_usernames:
-            return self._parsed_status_test_usernames
-        value = self.config.get(self.section, 'status_test_usernames')
-        res = []
-        if value:
-            res = [x.strip() for x in value.split(',')]
-        self._parsed_status_test_usernames = res
-        return res
+        if self._parsed_status_test_usernames is None:
+            value = self.config.get(self.section, 'status_test_usernames')
+            self._parsed_status_test_usernames = [x.strip() for x in value.split(',')]
+        return self._parsed_status_test_usernames
 
     @property
     def signup_link(self):
@@ -492,22 +487,16 @@ class IdPConfig(object):
         return self.config.get(self.section, 'tou_version')
 
     @property
-    def redis_sentinel_hosts(self):
+    def redis_sentinel_hosts(self) -> List[str]:
         """
         Redis sentinel hosts, comma separated
 
         :return: list of hosts
-
-        :rtype: [string]
         """
-        if self._parsed_redis_sentinel_hosts:
-            return self._parsed_redis_sentinel_hosts
-        value = self.config.get(self.section, 'redis_sentinel_hosts')
-        res = []
-        if value:
-            res = [x.strip() for x in value.split(',')]
-        self._parsed_redis_sentinel_hosts = res
-        return res
+        if self._parsed_redis_sentinel_hosts is None:
+            _value = self.config.get(self.section, 'redis_sentinel_hosts')
+            self._parsed_redis_sentinel_hosts = [x.strip() for x in _value.split(',')]
+        return self._parsed_redis_sentinel_hosts
 
     @property
     def redis_host(self):
@@ -545,22 +534,16 @@ class IdPConfig(object):
         return self.config.get(self.section, 'session_app_key')
 
     @property
-    def action_plugins(self):
+    def action_plugins(self) -> List[str]:
         """
         The plugins for pre-authentication actions that need to be loaded
 
         :return: list of plugin names
-
-        :rtype: list[string]
         """
-        if self._parsed_plugin_names:
-            return self._parsed_plugin_names
-        value = self.config.get(self.section, 'action_plugins')
-        res = []
-        if value:
-            res = [x.strip() for x in value.split(',')]
-        self._parsed_plugin_names = res
-        return res
+        if self._parsed_plugin_names is None:
+            _value = self.config.get(self.section, 'action_plugins')
+            self._parsed_plugin_names = [x.strip() for x in _value.split(',')]
+        return self._parsed_plugin_names
 
     @property
     def shared_session_cookie_name(self) -> str:

@@ -541,7 +541,7 @@ class IdPApplication(object):
         cherrypy.response.status = 500
         cherrypy.response.body = self._render_error_page('500', 'Server Internal Error', filename='error.html')
 
-    def error_page_default(self, status, message, traceback, version):
+    def error_page_default(self, status: str, message: str, traceback: str, version: str) -> bytes:
         """
         Function called by CherryPy when there is an exception
         (subclass of cherrypy.HTTPError) processing a request.
@@ -553,15 +553,9 @@ class IdPApplication(object):
         :param message: HTML error message
         :param traceback: traceback of error
         :param version: cherrypy version
-
-        :type status: string
-        :type message: string
-        :type traceback: string
-        :type version: string
-        :rtype: string
         """
         self.logger.debug("error_page_default() invoked, status={!r}, message={!r}".format(status, message))
-        status_code = 'unknown'
+        status_code = -1
         try:
             status_code = int(status.split()[0])
         except (ValueError, AttributeError, IndexError):
@@ -583,17 +577,9 @@ class IdPApplication(object):
         if fn is None:
             fn = 'error.html'
 
-        res = self._render_error_page(status, message, traceback = traceback, filename = fn)
+        return self._render_error_page(status, message, traceback = traceback, filename = fn)
 
-        # CherryPy will call res.encode('utf-8') so we need to decode() it first. My head hurts.
-        try:
-            return res.decode('utf-8')
-        except UnicodeDecodeError:
-            pass
-
-        return res
-
-    def _render_error_page(self, status, reason, filename, traceback=None):
+    def _render_error_page(self, status: str, reason: str, filename: str, traceback: Optional[str]=None) -> bytes:
         # Look for error page in user preferred language
         """
         Render localized error page `error.html' or a default string based one if
@@ -604,12 +590,6 @@ class IdPApplication(object):
         :param filename: HTML error page filename
         :param traceback: traceback of error
         :return: HTML
-
-        :type status: string
-        :type reason: string
-        :type filename: string
-        :type traceback: string
-        :rtype: unicode
         """
         res = eduid_idp.mischttp.localized_resource(
             self._my_start_response, filename, self.config, logger=self.logger, status=status)
@@ -618,7 +598,7 @@ class IdPApplication(object):
             res = "<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
                 status=status, reason=reason)
 
-        status_code = 'unknown'
+        status_code = -1
         try:
             status_code = int(status.split()[0])
         except (ValueError, AttributeError, IndexError):
@@ -653,13 +633,13 @@ class IdPApplication(object):
             ]:
                 return res
 
-        self.logger.error("Error in IdP application",
-                          exc_info = 1, extra={'data': {'request': cherrypy.request,
-                                                        'traceback': traceback,
-                                                        'status': status,
-                                                        'reason': reason,
-                                                        },
-                                               })
+        self.logger.exception("Error in IdP application",
+                              extra={'data': {'request': cherrypy.request,
+                                              'traceback': traceback,
+                                              'status': status,
+                                              'reason': reason,
+                                              },
+                                     })
         return res
 
 
