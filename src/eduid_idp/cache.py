@@ -268,8 +268,12 @@ class ExpiringCacheCommonSession(ExpiringCache):
             data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
         else:
             data = info
-        _session_id = unhexlify(key)
-        session = self._manager.get_session(session_id = _session_id, data = data)
+        if len(key) == 64:
+            # hex-encoded sha256
+            _session_id = unhexlify(key)
+            session = self._manager.get_session(session_id=_session_id, data=data)
+        else:
+            session = self._manager.get_session(token=key, data=data)
         session.commit()
         return session
 
@@ -283,9 +287,13 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :returns: The previously added session
         """
-        _session_id = unhexlify(key)
         try:
-            session = self._manager.get_session(session_id = _session_id)
+            if len(key) == 64:
+                # hex-encoded sha256
+                _session_id = unhexlify(key)
+                session = self._manager.get_session(session_id = _session_id)
+            else:
+                session = self._manager.get_session(token=key)
             return session
         except KeyError:
             pass
@@ -314,8 +322,12 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :return: True on success
         """
-        _session_id = unhexlify(key)
-        session = self._manager.get_session(session_id = _session_id)
+        if len(key) == 64:
+            # hex-encoded sha256
+            _session_id = unhexlify(key)
+            session = self._manager.get_session(session_id=_session_id)
+        else:
+            session = self._manager.get_session(token=key)
         if not session:
             return False
         session.clear()

@@ -89,6 +89,9 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'redis_db': '0',
                     'session_app_key': None,
                     'action_plugins': [],
+                    'shared_session_cookie_name': 'sessid',  # name of the session cookie that is shared with all other eduid apps
+                    'shared_session_secret_key': None,  # secret key to decrypt the shared sessions
+                    'shared_session_ttl': 3600,
                     }
 
 _CONFIG_SECTION = 'eduid_idp'
@@ -558,3 +561,18 @@ class IdPConfig(object):
             res = [x.strip() for x in value.split(',')]
         self._parsed_plugin_names = res
         return res
+
+    @property
+    def shared_session_cookie_name(self) -> str:
+        """ Name of cookie used to persist session information in the users browser. """
+        return self.config.get(self.section, 'shared_session_cookie_name')
+
+    @property
+    def shared_session_secret_key(self) -> str:
+        """ Key to decrypt shared sessions. """
+        return self.config.get(self.section, 'shared_session_secret_key')
+
+    @property
+    def shared_session_ttl(self) -> int:
+        """ Key to decrypt shared sessions. """
+        return int(self.config.get(self.section, 'shared_session_ttl'))

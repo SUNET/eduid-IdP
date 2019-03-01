@@ -192,7 +192,8 @@ class IdPSimpleTestCase(TestCase):
         self.context = IdPContext(config=_config,
                                   logger=logger,
                                   idp=_idp_app.IDP,
-                                  sessions=None,
+                                  ticket_sessions=None,
+                                  common_sessions=None,
                                   actions_db=None,
                                   authn=None,
                                   )
