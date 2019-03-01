@@ -60,7 +60,7 @@ General non-authenticated user<->IdP interaction flow :
 
      do_verify() tries to authenticate user based on filled out HTML form contents.
 
-     If successful, an SSOSession() is created and stored in IDP.cache. This
+     If successful, an SSOSession() is created and stored in context.sso_sessions. This
      SSO session object contains information about what type of authentication
      was performed, the authn_instant (time of authentication) etc. and will later
      be used to automatically log the user in, as long as the SSO session hasn't
@@ -128,7 +128,7 @@ from eduid_idp.logout import SLO
 from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession
+from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
 
 from eduid_userdb.actions import ActionDB
 
@@ -203,6 +203,14 @@ class IdPApplication(object):
 
         self._init_pysaml2()
 
+        _session_ttl = self.config.sso_session_lifetime * 60
+        _SSOSessions: SSOSessionCache
+        if self.config.sso_session_mongo_uri:
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+                                                              self.logger, _session_ttl)
+        else:
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
+
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
         _ticket_sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
                                       self.config, threading.Lock())
@@ -256,6 +264,7 @@ class IdPApplication(object):
         self.context = IdPContext(config=self.config,
                                   idp=self.IDP,
                                   logger=self.logger,
+                                  sso_sessions=_SSOSessions,
                                   ticket_sessions=_ticket_sessions,
                                   common_sessions=_common_sessions,
                                   actions_db=_actions_db,
@@ -276,17 +285,10 @@ class IdPApplication(object):
             sys.path = [cfgdir] + sys.path
             cfgfile = os.path.basename(self.config.pysaml2_config)
 
-        _session_ttl = self.config.sso_session_lifetime * 60
-        if self.config.sso_session_mongo_uri:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
-                                                              self.logger, _session_ttl)
-        else:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
-
         _path = sys.path[0]
         self.logger.debug("Loading PySAML2 server using cfgfile {!r} and path {!r}".format(cfgfile, _path))
         try:
-            self.IDP = server.Server(cfgfile, cache = _SSOSessions)
+            self.IDP = server.Server(cfgfile)
         finally:
             # restore path
             sys.path = old_path
@@ -440,9 +442,9 @@ class IdPApplication(object):
 
         # Test Redis
         now = time.time()
-        _session_id = self.IDP.cache.add_session('health_test', {'ts': now})
-        fetched = self.IDP.cache.get_session(_session_id)
-        self.IDP.cache.remove_session(_session_id)
+        _session_id = self.context.sso_sessions.add_session('health_test', {'ts': now})
+        fetched = self.context.sso_sessions.get_session(_session_id)
+        self.context.sso_sessions.remove_session(_session_id)
         if not fetched:
             self.logger.info('This seems to be the first Redis health-check...')
         elif fetched['ts'] != now:
@@ -498,25 +500,24 @@ class IdPApplication(object):
                 _age, self.config.sso_session_lifetime))
         return session
 
-    def _lookup_sso_session2(self):
+    def _lookup_sso_session2(self) -> Optional[eduid_idp.sso_session.SSOSession]:
         """
         See if a SSO session exists for this request, and return the data about
         the currently logged in user from the session store.
 
         :return: Data about currently logged in user
-        :rtype: SSOSession | None
         """
         _data = None
         _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         if _session_id:
-            _data = self.IDP.cache.get_session(_session_id)
+            _data = self.context.sso_sessions.get_session(eduid_idp.cache.SSOSessionId(_session_id))
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
             query = eduid_idp.mischttp.parse_query_string(self.logger)
             if query:
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
-                    _data = self.IDP.cache.get_session(query['id'])
+                    _data = self.context.sso_sessions.get_session(query['id'])
                     self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
                         pprint.pformat(_data)))
                 except KeyError:

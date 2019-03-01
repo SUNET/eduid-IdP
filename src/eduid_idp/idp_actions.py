@@ -83,7 +83,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
             update = True
 
         if update:
-            context.idp.cache.update_session(user.user_id, sso_session.to_dict())
+            context.sso_sessions.update_session(user.user_id, sso_session.to_dict())
 
         context.logger.debug('There are no pending actions for user {}'.format(user))
         return

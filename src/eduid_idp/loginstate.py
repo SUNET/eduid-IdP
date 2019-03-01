@@ -158,8 +158,9 @@ class SSOLoginDataCache(object):
         :param ticket: SSOLoginData instance
         :returns: True on success
         """
-        self.logger.debug('Storing login state (IdP ticket) in {!r}:\n{!s}'.format(self._cache, ticket))
-        self._cache.add(ticket.key, ticket)
+        _key = ticket.key
+        self.logger.debug('Storing login state {!r} (IdP ticket) in {!r}:\n{!s}'.format(_key, self._cache, ticket))
+        self._cache.add(_key, ticket)
         return True
 
     def get_ticket(self, key: str) -> Optional[SSOLoginData]:

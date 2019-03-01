@@ -268,11 +268,11 @@ def get_content_type(filename):
 # ----------------------------------------------------------------------------
 # Cookie handling
 # ----------------------------------------------------------------------------
-def get_idpauthn_cookie(logger: Logger) -> Optional[str]:
+def get_idpauthn_cookie(logger: Logger) -> Optional[bytes]:
     """
     Decode information stored in the 'idpauthn' browser cookie.
 
-    The idpauthn cookie holds a value used to lookup `userdata' in IDP.cache.
+    The idpauthn cookie holds a value used to lookup `userdata' in context.sso_sessions.
 
     :param logger: logging logger
     :returns: string with cookie content, or None
@@ -283,7 +283,7 @@ def get_idpauthn_cookie(logger: Logger) -> Optional[str]:
         try:
             cookie_val = base64.b64decode(_authn)
             logger.debug('idpauthn cookie value={!r}'.format(cookie_val))
-            return cookie_val.decode('utf-8')
+            return cookie_val
         except binascii.Error:
             logger.debug('Could not b64 decode idpauthn value: {!r}'.format(_authn))
             raise
@@ -346,7 +346,7 @@ def set_cookie(name, path, logger, config, value=''):
     :type value: string
     :rtype: bool
     """
-    if six.PY3 and type(value) == bytes:
+    if isinstance(value, six.binary_type):
         value = value.decode('utf-8')
     cookie = cherrypy.response.cookie
     cookie[name] = b64encode(value)
@@ -354,7 +354,7 @@ def set_cookie(name, path, logger, config, value=''):
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
     cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
-    logger.debug("Set cookie : {!s}".format(cookie))
+    logger.debug("Set cookie {!r} : {}".format(name, cookie))
     return True
 
 

@@ -17,7 +17,7 @@ from hashlib import sha1
 import datetime
 from binascii import unhexlify
 
-from typing import Union
+from typing import NewType, List
 
 import six
 
@@ -334,6 +334,10 @@ class ExpiringCacheCommonSession(ExpiringCache):
         return True
 
 
+# A distinct type for session ids
+SSOSessionId = NewType('SSOSessionId', bytes)
+
+
 class SSOSessionCache(object):
     """
     This cache holds all SSO sessions, meaning information about what users
@@ -348,7 +352,7 @@ class SSOSessionCache(object):
         if self._lock is None:
             self._lock = NoOpLock()
 
-    def remove_session(self, sid):
+    def remove_session(self, sid: SSOSessionId):
         """
         Remove entrys when SLO is executed.
 
@@ -357,7 +361,7 @@ class SSOSessionCache(object):
         """
         raise NotImplementedError()
 
-    def add_session(self, username, data):
+    def add_session(self, username, data) -> SSOSessionId:
         """
         Add a new SSO session to the cache.
 
@@ -367,7 +371,7 @@ class SSOSessionCache(object):
 
         :param username: Username as string
         :param data: opaque, should be SSOSession converted to dict()
-        :return: Unique session identifier as string
+        :return: Unique session identifier
         """
         raise NotImplementedError()
 
@@ -377,11 +381,11 @@ class SSOSessionCache(object):
 
         :param username: Username as string
         :param data: opaque, should be SSOSession converted to dict()
-        :return: Unique session identifier as string
+        :return: Unique session identifier
         """
         raise NotImplementedError()
 
-    def get_session(self, sid):
+    def get_session(self, sid: SSOSessionId):
         """
         Lookup an SSO session using the session id (same `sid' previously used with add_session).
 
@@ -390,24 +394,23 @@ class SSOSessionCache(object):
         """
         raise NotImplementedError()
 
-    def get_sessions_for_user(self, username):
+    def get_sessions_for_user(self, username) -> List[SSOSessionId]:
         """
         Lookup all SSO sessions for a given username. Used in SLO with SOAP binding.
 
         :param username: The username to look for
 
         :return: Zero or more SSO session_id's
-        :rtype: [string]
         """
 
-    def _create_session_id(self):
+    def _create_session_id(self) -> SSOSessionId:
         """
         Create a unique value suitable for use as session identifier.
 
         The uniqueness and unability to guess is security critical!
         :return: session_id as bytes (to match what cookie decoding yields)
         """
-        return six.b(str(uuid.uuid4()))
+        return SSOSessionId(str(uuid.uuid4()).encode('utf-8'))
 
 
 class SSOSessionCacheMem(SSOSessionCache):
@@ -424,24 +427,27 @@ class SSOSessionCacheMem(SSOSessionCache):
         SSOSessionCache.__init__(self, logger, ttl, lock)
         self.lid2data = ExpiringCacheMem('SSOSession.uid2user', self.logger, self._ttl, lock = self._lock)
 
-    def remove_session(self, sid):
-        self.logger.debug('Purging SSO session, data : {!s}'.format(self.lid2data.get(sid)))
+    def remove_session(self, sid: SSOSessionId):
+        self.logger.debug('Purging SSO session {!r}, data : {!s}'.format(sid, self.lid2data.get(sid)))
         return self.lid2data.delete(sid)
 
-    def add_session(self, username, data):
+    def add_session(self, username, data) -> SSOSessionId:
         _sid = self._create_session_id()
         self.lid2data.add(_sid, {'username': username,
                                  'data': data,
                                  })
+        self.logger.debug('Added SSO session {!r}, data : {!s}'.format(_sid, self.lid2data.get(_sid)))
         return _sid
 
     def update_session(self, username, data):
+        # TODO: This is completely broken - we add a new state rather than updating the old one
         _sid = self._create_session_id()
+        self.logger.debug('Updating data by adding it using new session id {}. FIXME.'.format(_sid))
         self.lid2data.update(_sid, {'username': username,
                                     'data': data,
                                     })
 
-    def get_session(self, sid):
+    def get_session(self, sid: SSOSessionId):
         try:
             this = self.lid2data.get(sid)
             if this:
@@ -450,7 +456,7 @@ class SSOSessionCacheMem(SSOSessionCache):
             self.logger.debug('Failed looking up SSO session with session id={!r}'.format(sid))
             raise
 
-    def get_sessions_for_user(self, username):
+    def get_sessions_for_user(self, username) -> List[SSOSessionId]:
         res = []
         for _key, _val in self.lid2data.items():
             # Traversing all of lid2data could be a bit slow, but any non-trivial
@@ -498,7 +504,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
                     raise
                 self.logger.error('Failed ensuring mongodb index, retrying ({})'.format(retry))
 
-    def remove_session(self, sid):
+    def remove_session(self, sid: SSOSessionId):
         res = self.sso_sessions.remove({'session_id': sid}, w = 'majority')
         try:
             return res['n']  # number of deleted records
@@ -506,7 +512,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
             self.logger.warning('Remove session {!r} failed, result: {!r}'.format(sid, res))
             return False
 
-    def add_session(self, username, data):
+    def add_session(self, username, data) -> SSOSessionId:
         _ts = time.time()
         isodate = datetime.datetime.fromtimestamp(_ts, None)
         _sid = self._create_session_id()
@@ -520,13 +526,15 @@ class SSOSessionCacheMDB(SSOSessionCache):
         return _sid
 
     def update_session(self, username, data):
+        # TODO: This is completely broken - we add a new state rather than updating the old one
         _sid = self._create_session_id()
+        self.logger.debug('Updating data by adding it using new session id {}. FIXME.'.format(_sid))
         _test_doc = {'session_id': _sid,
                      'username': username,
                      }
         self.sso_sessions.update(_test_doc, {'$set': {'data': data}})
 
-    def get_session(self, sid):
+    def get_session(self, sid: SSOSessionId):
         try:
             res = self.sso_sessions.find_one({'session_id': sid})
             if res:
@@ -535,7 +543,7 @@ class SSOSessionCacheMDB(SSOSessionCache):
             self.logger.debug('Failed looking up SSO session with id={!r}'.format(sid))
             raise
 
-    def get_sessions_for_user(self, username):
+    def get_sessions_for_user(self, username) -> List[SSOSessionId]:
         res = []
         entrys = self.sso_sessions.find({'username': username})
         for this in entrys:

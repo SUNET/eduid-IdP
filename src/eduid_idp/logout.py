@@ -112,7 +112,7 @@ class SLO(Service):
         if _session_id:
             # If the binding is REDIRECT, we can get the SSO session to log out from the
             # client idpauthn cookie
-            session_ids = [_session_id]
+            session_ids = [eduid_idp.cache.SSOSessionId(_session_id)]
         else:
             # For SOAP binding, no cookie is sent - only NameID. Have to figure out
             # the user based on NameID and then destroy *all* the users SSO sessions
@@ -120,7 +120,7 @@ class SLO(Service):
             _username = self.context.idp.ident.find_local_id(_name_id)
             self.logger.debug("Logout message name_id: {!r} found username {!r}".format(
                 _name_id, _username))
-            session_ids = self.context.idp.cache.get_sessions_for_user(_username)
+            session_ids = self.context.sso_sessions.get_sessions_for_user(_username)
 
         self.logger.debug("Logout resources: name_id {!r} username {!r}, session_ids {!r}".format(
             _name_id, _username, session_ids))
@@ -149,11 +149,11 @@ class SLO(Service):
         for this in session_ids:
             self.logger.debug("Logging out SSO session with key: {!s}".format(this))
             try:
-                _data = self.context.idp.cache.get_session(this)
+                _data = self.context.sso_sessions.get_session(this)
                 if not _data:
                     raise KeyError('Session not found')
                 _sso = eduid_idp.sso_session.from_dict(_data)
-                res = self.context.idp.cache.remove_session(this)
+                res = self.context.sso_sessions.remove_session(this)
                 self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
                     req_key, _sso.public_id, _sso.minutes_old, bool(res)))
             except KeyError:
