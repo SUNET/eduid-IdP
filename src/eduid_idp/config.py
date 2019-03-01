@@ -124,6 +124,10 @@ class IdPConfig(object):
         self.config = configparser.RawConfigParser(_defaults)
         if not self.config.read([filename]):
             raise ValueError("Failed loading config file {!r}".format(filename))
+        if len(urlsafe_b64decode(self.actions_auth_shared_secret)) != nacl.secret.SecretBox.KEY_SIZE:
+            raise ValueError('Authn shared secret must be exactly {} bytes long'.format(
+                                  nacl.secret.SecretBox.KEY_SIZE))
+
 
     @property
     def num_threads(self):
@@ -459,18 +463,12 @@ class IdPConfig(object):
         return self.config.getboolean(self.section, 'insecure_cookies')
 
     @property
-    def actions_auth_shared_secret(self):
+    def actions_auth_shared_secret(self) -> str:
         """
         Secret shared with the actions app to convince it
         that the redirected user is authenticated.
         """
-        secret = self.config.get(self.section, 'actions_auth_shared_secret')
-        if isinstance(secret, six.text_type):
-            secret = secret.encode('ascii')
-        if len(urlsafe_b64decode(secret)) != nacl.secret.SecretBox.KEY_SIZE:
-            raise ValueError('Authn shared secret must be exactly {} bytes long'.format(
-                                  nacl.secret.SecretBox.KEY_SIZE))
-        return secret
+        return self.config.get(self.section, 'actions_auth_shared_secret')
 
     @property
     def actions_app_uri(self):
