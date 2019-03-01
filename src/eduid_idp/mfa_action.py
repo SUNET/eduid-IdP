@@ -33,12 +33,19 @@
 __author__ = 'ft'
 
 import datetime
+from typing import List
+
+from eduid_idp.context import IdPContext
+from eduid_idp.idp_user import IdPUser
+from eduid_idp.loginstate import SSOLoginData
 from eduid_userdb.credentials import U2F, Webauthn
+from eduid_userdb.actions import Action
+
 
 RESULT_CREDENTIAL_KEY_NAME = 'cred_key'
 
 
-def add_actions(context, user, ticket):
+def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> None:
     """
     Add an action requiring the user to login using one or more additional
     authentication factors.
@@ -49,12 +56,6 @@ def add_actions(context, user, ticket):
     :param context: IdP context
     :param user: the authenticating user
     :param ticket: the SSO login data
-
-    :type context: eduid_idp.context.IdPContext
-    :type user: eduid_idp.idp_user.IdPUser
-    :type ticket: eduid_idp.loginstate.SSOLoginData
-
-    :return: None
     """
     u2f_tokens = user.credentials.filter(U2F).to_list()
     webauthn_tokens = user.credentials.filter(Webauthn).to_list()
@@ -87,7 +88,7 @@ def add_actions(context, user, ticket):
         params = {})
 
 
-def check_authn_result(context, user, ticket, actions):
+def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData, actions: List[Action]) -> bool:
     """
     The user returned to the IdP after being sent to actions. Check if actions has
     added the results of authentication to the action in the database.
@@ -97,14 +98,11 @@ def check_authn_result(context, user, ticket, actions):
     :param ticket: the SSO login data
     :param actions: Actions in the ActionDB matching this user and session
 
-    :type context: eduid_idp.context.IdPContext
-    :type user: eduid_idp.idp_user.IdPUser
-    :type ticket: eduid_idp.loginstate.SSOLoginData
-    :type actions: list of eduid_userdb.actions.Action
-
     :return: MFA action with proof of completion found
-    :rtype: bool
     """
+    if not context.actions_db:
+        raise RuntimeError('check_authn_result called without actions_db')
+
     for this in actions:
         context.logger.debug('Action {} authn result: {}'.format(this, this.result))
         if this.result.get('success') is True:

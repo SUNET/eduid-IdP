@@ -32,8 +32,12 @@
 
 __author__ = 'eperez'
 
+from eduid_idp.context import IdPContext
+from eduid_idp.idp_user import IdPUser
+from eduid_idp.loginstate import SSOLoginData
 
-def add_actions(idp_app, user, ticket):
+
+def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> None:
     """
     Add an action requiring the user to accept a new version of the Terms of Use,
     in case the IdP configuration points to a version the user hasn't accepted.
@@ -41,31 +45,25 @@ def add_actions(idp_app, user, ticket):
     This function is called by the IdP when it iterates over all the registered
     action plugins entry points.
 
-    :param idp_app: IdP application instance
+    :param context: IdP application instance
     :param user: the authenticating user
     :param ticket: the SSO login data
-
-    :type idp_app: eduid_idp.idp.IdPApplication
-    :type user: eduid_idp.idp_user.IdPUser
-    :type ticket: eduid_idp.login.SSOLoginData
-
-    :return: None
     """
-    version = idp_app.config.tou_version
+    version = context.config.tou_version
 
     if user.tou.has_accepted(version):
-        idp_app.logger.debug('User has already accepted ToU version {!r}'.format(version))
+        context.logger.debug('User has already accepted ToU version {!r}'.format(version))
         return
 
-    if not idp_app.actions_db:
-        idp_app.logger.warning('No actions_db - aborting ToU action')
+    if not context.actions_db:
+        context.logger.warning('No actions_db - aborting ToU action')
         return None
 
-    if not idp_app.actions_db.has_actions(user.eppn,
+    if not context.actions_db.has_actions(user.eppn,
                                           action_type = 'tou',
                                           params = {'version': version}):
-        idp_app.logger.debug('User must accept ToU version {!r}'.format(version))
-        idp_app.actions_db.add_action(
+        context.logger.debug('User must accept ToU version {!r}'.format(version))
+        context.actions_db.add_action(
             user.eppn,
             action_type = 'tou',
             preference = 100,
