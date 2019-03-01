@@ -39,12 +39,8 @@ from unittest import TestCase
 import eduid_idp
 from eduid_idp.idp_user import IdPUser
 from eduid_idp.idp import IdPApplication
-from eduid_idp.context import IdPContext
-from eduid_idp.cache import SSOSessionCacheMem
 
 from vccs_client import VCCSPasswordFactor
-
-from saml2 import server
 
 import logging
 logger = logging.getLogger()
@@ -52,6 +48,14 @@ logger = logging.getLogger()
 __author__ = 'ft'
 
 PWHASHES = {}
+
+
+def _get_idpconfig(datadir, sso_config='test_SSO_conf.py', fn='test_config.ini'):
+    _defaults = eduid_idp.config._CONFIG_DEFAULTS
+    _defaults['mongo_uri'] = None
+    _defaults['pysaml2_config'] = os.path.join(datadir, sso_config)
+    _defaults['actions_auth_shared_secret'] = 'dGVzdCBrZXkgICAgICAgICAgICAgICAgICAgICAgICA='
+    return eduid_idp.config.IdPConfig(os.path.join(datadir, fn), debug=True, defaults=_defaults)
 
 
 def _create_passwords(username, factors):
@@ -134,45 +138,6 @@ class FakeAuthClient(object):
         return False
 
 
-class FakeConfig(object):
-    mongo_uri = None
-
-
-class FakeSAML2Server(server.Server):
-
-    def __init__(self):
-        # avoid all the init of saml2.server - we just want the simple functions
-        pass
-
-
-class FakeMetadata(object):
-    """
-    Fake the SAML2 Server metadata.
-    """
-    def entity_attributes(self, _name):
-        return {}
-
-
-class FakeIdPApp(IdPApplication):
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-        datadir = pkg_resources.resource_filename(__name__, 'tests/data')
-        config_file = os.path.join(datadir, 'test_SSO_conf.py')
-        self.IDP = server.Server(config_file=config_file)
-        self.config = FakeConfig()
-        self.IDP.metadata = FakeMetadata()
-        self.context = IdPContext(config=self.config,
-                                  idp=self.IDP,
-                                  logger=self.logger,
-                                  ticket_sessions=None,
-                                  common_sessions=None,
-                                  actions_db=None,
-                                  authn=None,
-                                  sso_sessions=SSOSessionCacheMem(logger=logger, ttl=60),
-                                  )
-
-
 class IdPSimpleTestCase(TestCase):
     """
     For simple test cases that do not need a real mongodb, but rather work with the
@@ -180,15 +145,11 @@ class IdPSimpleTestCase(TestCase):
     """
     def setUp(self):
         # load the IdP configuration
-        datadir = pkg_resources.resource_filename(__name__, 'tests/data')
-        self.config_file = os.path.join(datadir, 'test_config.ini')
-        _defaults = eduid_idp.config._CONFIG_DEFAULTS
-        _defaults['mongo_uri'] = None
-        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
-        _defaults['actions_auth_shared_secret'] = 'dGVzdCBrZXkgICAgICAgICAgICAgICAgICAgICAgICA='
-        _config = eduid_idp.config.IdPConfig(self.config_file, debug=True, defaults=_defaults)
 
         _userdb = FakeUserDb()
+        datadir = pkg_resources.resource_filename(__name__, 'tests/data')
+        self.config_file = os.path.join(datadir, 'test_config.ini')
+        _config = _get_idpconfig(datadir, fn='test_config.ini')
 
         # Create the IdP app
         _idp_app = IdPApplication(logger, _config, userdb=_userdb)

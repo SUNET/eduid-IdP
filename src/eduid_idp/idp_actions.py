@@ -32,11 +32,11 @@
 # Author : Enrique Perez <enrique@cazalla.net>
 #
 
-
-from importlib import import_module
-
 import eduid_idp.util
 import eduid_idp.mischttp
+
+import eduid_idp.mfa_action
+import eduid_idp.tou_action
 
 from eduid_idp.authn import AuthnData
 from eduid_idp.idp_user import IdPUser
@@ -92,7 +92,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     context.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
     # create auth token for actions app
-    shared_key = context.config.actions_auth_shared_secret.decode('utf-8')
+    shared_key = context.config.actions_auth_shared_secret
     auth_token, timestamp = generate_auth_token(shared_key, 'idp_actions', user.eppn)
 
     actions_uri = context.config.actions_app_uri
@@ -125,16 +125,7 @@ def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     :param user: the authenticating user
     :param ticket: the SSO login data
     """
-    for plugin_name in context.config.action_plugins:
-        try:
-            plugin_module = import_module('eduid_action.{}.idp'.format(plugin_name))
-        except ImportError:
-            context.logger.warn('Configured plugin {} missing from sys.path'.format(plugin_name))
-            continue
-        context.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
-        try:
-            # load() here is the function eduid_action.mfa.add_mfa_actions()
-            getattr(plugin_module, 'add_actions')(context.idp, user, ticket)
-        except Exception as exc:
-            context.logger.warning('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
-            raise
+    if 'mfa' in context.config.action_plugins:
+        eduid_idp.mfa_action.add_actions(context, user, ticket)
+    if 'tou' in context.config.action_plugins:
+        eduid_idp.tou_action.add_actions(context, user, ticket)

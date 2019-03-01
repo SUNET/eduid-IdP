@@ -27,6 +27,7 @@ from six.moves.urllib.parse import parse_qs
 from typing import Callable, Optional
 
 import eduid_idp
+import eduid_idp.thirdparty
 from eduid_idp.util import b64encode
 from eduid_idp.error import BadRequest
 from eduid_common.api.sanitation import Sanitizer, SanitationProblem

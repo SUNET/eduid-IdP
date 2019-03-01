@@ -12,12 +12,12 @@
 
 import time
 import uuid
-from collections import deque
-from hashlib import sha1
 import datetime
+from hashlib import sha1
+from collections import deque
 from binascii import unhexlify
 
-from typing import NewType, List
+from typing import NewType, List, Deque
 
 import six
 
@@ -132,8 +132,8 @@ class ExpiringCacheMem(ExpiringCache):
 
     def __init__(self, name, logger, ttl, lock = None):
         super(ExpiringCacheMem, self).__init__(name, logger, ttl)
-        self._data = {}
-        self._ages = deque()
+        self._data: dict = {}
+        self._ages: Deque = deque()
         self.lock = lock
         if self.lock is None:
             self.lock = NoOpLock()

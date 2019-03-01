@@ -33,7 +33,8 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
-from eduid_userdb.credentials import METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
+from typing import List
+from eduid_userdb.credentials import Credential, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
 
 """
 Assurance Level functionality.
@@ -77,7 +78,7 @@ class AuthnState(object):
         self.u2f_used = False
         self.swamid_al2_used = False
         self.swamid_al2_hi_used = False
-        self._creds = []
+        self._creds: List[Credential] = []
 
         for this in sso_session.authn_credentials:
             cred = user.credentials.find(this['cred_id'])
