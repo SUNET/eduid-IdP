@@ -483,7 +483,7 @@ class SSO(Service):
 # -----------------------------------------------------------------------------
 
 
-def do_verify(context: IdPContext, authn: IdPAuthn):
+def do_verify(context: IdPContext):
     """
     Perform authentication of user based on user provided credentials.
 
@@ -521,7 +521,7 @@ def do_verify(context: IdPContext, authn: IdPAuthn):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    authninfo = authn.password_authn(login_data)
+    authninfo = context.authn.password_authn(login_data)
 
     if not authninfo:
         _ticket.FailCount += 1

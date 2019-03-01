@@ -128,6 +128,7 @@ from eduid_idp.logout import SLO
 from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
+from eduid_idp.cache import ExpiringCacheCommonSession
 
 from eduid_userdb.actions import ActionDB
 
@@ -243,11 +244,21 @@ class IdPApplication(object):
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
+        if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
+                and config.shared_session_secret_key:
+            _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
+                                                          config.shared_session_ttl, config)
+        else:
+            logger.info('eduID shared sessions not configured')
+            _common_sessions = None
+
         self.context = IdPContext(config=self.config,
                                   idp=self.IDP,
                                   logger=self.logger,
                                   ticket_sessions=_ticket_sessions,
+                                  common_sessions=_common_sessions,
                                   actions_db=_actions_db,
+                                  authn=self.authn,
                                   )
 
     def _init_pysaml2(self):
@@ -326,7 +337,7 @@ class IdPApplication(object):
             #raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
             #                                   logger = self.logger)
             self.logger.debug("User is already logged in - verifying credentials again might not work")
-        return eduid_idp.login.do_verify(self.context, self.authn)
+        return eduid_idp.login.do_verify(self.context)
 
     @cherrypy.expose
     def static(self, *_args, **_kwargs):

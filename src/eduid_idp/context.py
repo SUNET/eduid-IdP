@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 from logging import Logger
 
+from eduid_idp.authn import IdPAuthn
 from eduid_idp.config import IdPConfig
 from eduid_idp.loginstate import SSOLoginDataCache
 
@@ -21,4 +22,4 @@ class IdPContext(object):
     idp: Saml2Server
     logger: Logger
     actions_db: Optional[ActionDB]
-
+    authn: IdPAuthn

@@ -194,6 +194,7 @@ class IdPSimpleTestCase(TestCase):
                                   idp=_idp_app.IDP,
                                   sessions=None,
                                   actions_db=None,
+                                  authn=None,
                                   )
         #noinspection PyTypeChecker
         self.idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, _config, userdb=_userdb)
