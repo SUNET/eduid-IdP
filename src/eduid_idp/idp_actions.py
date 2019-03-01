@@ -134,7 +134,7 @@ def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
         context.logger.debug('Using plugin {!r} to add new actions'.format(plugin_name))
         try:
             # load() here is the function eduid_action.mfa.add_mfa_actions()
-            getattr(plugin_module, 'add_actions')(context, user, ticket)
+            getattr(plugin_module, 'add_actions')(context.idp, user, ticket)
         except Exception as exc:
             context.logger.warning('Error executing plugin {!r}: {!s}'.format(plugin_name, exc))
             raise
