@@ -534,7 +534,7 @@ def do_verify(context: IdPContext):
 
     if not authninfo:
         _ticket.FailCount += 1
-        context.idp.ticket.store_ticket(_ticket)
+        context.ticket_sessions.store_ticket(_ticket)
         context.logger.debug("Unknown user or wrong password")
         _referer = eduid_idp.mischttp.get_request_header().get('Referer')
         if _referer:
