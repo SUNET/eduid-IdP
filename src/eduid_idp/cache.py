@@ -24,6 +24,8 @@ import six
 from eduid_common.session.session import SessionManager, RedisEncryptedSession
 from eduid_userdb import MongoDB
 
+_SHA1_HEXENCODED_SIZE = 160 // 8 * 2
+
 
 class NoOpLock(object):
     """
@@ -226,7 +228,7 @@ class ExpiringCacheMem(ExpiringCache):
 
 class ExpiringCacheCommonSession(ExpiringCache):
 
-    def __init__(self, name, logger, ttl, config):
+    def __init__(self, name, logger, ttl, config, secret):
         super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
 
         redis_cfg = {'REDIS_PORT': config.redis_port,
@@ -239,8 +241,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         else:
             redis_cfg['REDIS_HOST'] = config.redis_host
         self._redis_cfg = redis_cfg
-
-        self._manager = SessionManager(redis_cfg, ttl = ttl, secret = config.session_app_key)
+        self._manager = SessionManager(redis_cfg, ttl = ttl, secret = secret)
 
     def __repr__(self):
         return '<{!s}: {!s}>'.format(self.__class__.__name__, self.__unicode__())
@@ -288,8 +289,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         :returns: The previously added session
         """
         try:
-            if len(key) == 64:
-                # hex-encoded sha256
+            if len(key) == _SHA1_HEXENCODED_SIZE:
                 _session_id = unhexlify(key)
                 session = self._manager.get_session(session_id = _session_id)
             else:
@@ -322,8 +322,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :return: True on success
         """
-        if len(key) == 64:
-            # hex-encoded sha256
+        if len(key) == _SHA1_HEXENCODED_SIZE:
             _session_id = unhexlify(key)
             session = self._manager.get_session(session_id=_session_id)
         else:

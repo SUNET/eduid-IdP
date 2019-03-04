@@ -19,7 +19,6 @@ from hashlib import sha256
 from typing import Optional, Callable
 
 import eduid_idp
-from eduid_idp.authn import IdPAuthn
 from eduid_idp.cache import ExpiringCache
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
@@ -27,6 +26,7 @@ from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.assurance import AssuranceException, WrongMultiFactor, MissingMultiFactor
+from eduid_idp.cache import RedisEncryptedSession
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 from saml2.s_utils import UnknownPrincipal, UnsupportedBinding, UnknownSystemEntity, UnravelError
 from saml2.sigver import verify_redirect_signature
@@ -56,8 +56,9 @@ class SSO(Service):
     :param context: IdP context
     """
 
-    def __init__(self, session: SSOSession, start_response: Callable, context: IdPContext):
-        super().__init__(session, start_response, context)
+    def __init__(self, sso_session: SSOSession, session: Optional[RedisEncryptedSession],
+                 start_response: Callable, context: IdPContext):
+        super().__init__(sso_session, session, start_response, context)
 
     def perform_login(self, ticket: SSOLoginData) -> bytes:
         """
@@ -78,8 +79,16 @@ class SSO(Service):
         binding_out = resp_args.get('binding_out')
         destination = resp_args.get('destination')
 
+        if self.session:
+            self.session['user_eppn'] = user.eppn
+            self.session.commit()
+
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
+
+        if self.session:
+            self.session['is_logged_in'] = True
+            self.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 
@@ -544,7 +553,7 @@ def do_verify(context: IdPContext):
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
     _session_id = context.sso_sessions.add_session(user.user_id, _sso_session.to_dict())
-    eduid_idp.mischttp.set_cookie('idpauthn', '/', context.logger, context.config, _session_id)
+    eduid_idp.mischttp.set_cookie('idpauthn', '/', context.logger, context.config, _session_id.decode('utf-8'))
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id
 

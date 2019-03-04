@@ -16,6 +16,7 @@ Common code for SSO login/logout requests.
 import eduid_idp.mischttp
 from eduid_idp.context import IdPContext
 from eduid_idp.sso_session import SSOSession
+from eduid_idp.cache import RedisEncryptedSession
 
 from typing import Optional, Callable
 
@@ -29,10 +30,12 @@ class Service(object):
     :param context: IdP context
     """
 
-    def __init__(self, session: Optional[SSOSession], start_response: Callable, context: IdPContext):
+    def __init__(self, sso_session: Optional[SSOSession], session: Optional[RedisEncryptedSession],
+                 start_response: Callable, context: IdPContext):
         self.context = context
         self.start_response = start_response
-        self.sso_session = session
+        self.session = session
+        self.sso_session = sso_session
         # TODO: Get rid of this copying of things in the context
         self.logger = context.logger
         self.config = context.config

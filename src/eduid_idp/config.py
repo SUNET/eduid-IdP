@@ -341,8 +341,7 @@ class IdPConfig(object):
         :return: list of usernames
         """
         if self._parsed_status_test_usernames is None:
-            value = self.config.get(self.section, 'status_test_usernames')
-            self._parsed_status_test_usernames = [x.strip() for x in value.split(',')]
+            self._parsed_status_test_usernames = _comma_split(self.config, self.section, 'status_test_usernames')
         return self._parsed_status_test_usernames
 
     @property
@@ -492,8 +491,7 @@ class IdPConfig(object):
         :return: list of hosts
         """
         if self._parsed_redis_sentinel_hosts is None:
-            _value = self.config.get(self.section, 'redis_sentinel_hosts')
-            self._parsed_redis_sentinel_hosts = [x.strip() for x in _value.split(',')]
+            self._parsed_redis_sentinel_hosts = _comma_split(self.config, self.section, 'redis_sentinel_hosts')
         return self._parsed_redis_sentinel_hosts
 
     @property
@@ -539,8 +537,7 @@ class IdPConfig(object):
         :return: list of plugin names
         """
         if self._parsed_plugin_names is None:
-            _value = self.config.get(self.section, 'action_plugins')
-            self._parsed_plugin_names = [x.strip() for x in _value.split(',')]
+            self._parsed_plugin_names = _comma_split(self.config, self.section, 'action_plugins')
         return self._parsed_plugin_names
 
     @property
@@ -557,3 +554,11 @@ class IdPConfig(object):
     def shared_session_ttl(self) -> int:
         """ Key to decrypt shared sessions. """
         return int(self.config.get(self.section, 'shared_session_ttl'))
+
+
+def _comma_split(config, section, name: str) -> List[str]:
+    """ Parse a list of comma-separated strings, e.g: 'foo,bar' into ['foo', 'bar'] """
+    value = config.get(section, name)
+    if not value:
+        return []
+    return [x.strip() for x in value.split(',')]

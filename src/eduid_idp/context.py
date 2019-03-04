@@ -9,7 +9,7 @@ from logging import Logger
 from eduid_idp.authn import IdPAuthn
 from eduid_idp.config import IdPConfig
 from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
+from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
 
 from eduid_userdb.actions import ActionDB
 
@@ -24,5 +24,6 @@ class IdPContext(object):
     common_sessions: Optional[ExpiringCacheCommonSession]
     idp: Saml2Server
     logger: Logger
-    actions_db: Optional[ActionDB]
     authn: IdPAuthn
+    actions_db: Optional[ActionDB] = None
+    session: Optional[RedisEncryptedSession] = None
