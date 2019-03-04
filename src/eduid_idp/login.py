@@ -86,9 +86,9 @@ class SSO(Service):
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
 
-        if self.session:
-            self.session['is_logged_in'] = True
-            self.session.commit()
+        #if self.session:
+        #    self.session['is_logged_in'] = True
+        #    self.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 
