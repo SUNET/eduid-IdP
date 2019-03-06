@@ -269,8 +269,8 @@ class ExpiringCacheCommonSession(ExpiringCache):
             data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
         else:
             data = info
-        if len(key) == 64:
-            # hex-encoded sha256
+        if len(key) == _SHA1_HEXENCODED_SIZE:
+            # hex-encoded sha1
             _session_id = unhexlify(key)
             session = self._manager.get_session(session_id=_session_id, data=data)
         else:
