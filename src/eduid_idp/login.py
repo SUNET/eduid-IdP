@@ -589,6 +589,10 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
             # If context.ticket_sessions is ExpiringCacheCommonSession, this will be an
             # RedisEncryptedSession dict-like object. Need to re-create an SSOLoginData from
             # it using _create_ticket() below.
+            if binding is None:
+                binding = info['binding']
+            if binding is None:
+                raise eduid_idp.error.BadRequest('Bad request, no binding')
             return _create_ticket(context, ticket, binding)
         return ticket
     # cache miss, parse SAMLRequest
