@@ -585,6 +585,11 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
 
     ticket = context.ticket_sessions.get_ticket(info['key'])
     if ticket:
+        if not isinstance(ticket, SSOLoginData):
+            # If context.ticket_sessions is ExpiringCacheCommonSession, this will be an
+            # RedisEncryptedSession dict-like object. Need to re-create an SSOLoginData from
+            # it using _create_ticket() below.
+            return _create_ticket(context, ticket.to_dict(), binding)
         return ticket
     # cache miss, parse SAMLRequest
     if binding is None:
