@@ -12,7 +12,7 @@ import pprint
 from html import escape
 from logging import Logger
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, Mapping
 
 from eduid_idp.config import IdPConfig
 from eduid_idp.cache import ExpiringCache, ExpiringCacheMem, ExpiringCacheCommonSession
@@ -30,7 +30,7 @@ class SSOLoginData(object):
     :param req_info: pysaml2 AuthnRequest data
     :param data: dict
     """
-    def __init__(self, key: str, req_info: AuthnRequest, data: dict, binding: str):
+    def __init__(self, key: str, req_info: AuthnRequest, data: Mapping, binding: str):
         self._key = key
         self._req_info = req_info
         self._SAMLRequest = data['SAMLRequest']
@@ -163,7 +163,7 @@ class SSOLoginDataCache(object):
         self._cache.add(_key, ticket)
         return True
 
-    def get_ticket(self, key: str) -> Optional[SSOLoginData]:
+    def get_ticket(self, key: str) -> Optional[Union[SSOLoginData, Mapping]]:
         """
         Lookup session from key.
         """

@@ -16,7 +16,7 @@ import hmac
 import pprint
 import time
 from hashlib import sha256
-from typing import Optional, Callable
+from typing import Optional, Callable, Mapping
 
 import eduid_idp
 from eduid_idp.cache import ExpiringCache
@@ -589,7 +589,7 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
             # If context.ticket_sessions is ExpiringCacheCommonSession, this will be an
             # RedisEncryptedSession dict-like object. Need to re-create an SSOLoginData from
             # it using _create_ticket() below.
-            return _create_ticket(context, ticket.to_dict(), binding)
+            return _create_ticket(context, ticket, binding)
         return ticket
     # cache miss, parse SAMLRequest
     if binding is None:
@@ -602,7 +602,7 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
     return ticket
 
 
-def _create_ticket(context: IdPContext, info: dict, binding: str) -> SSOLoginData:
+def _create_ticket(context: IdPContext, info: Mapping, binding: str) -> SSOLoginData:
     """
     Create an SSOLoginData instance from a dict.
 
@@ -625,7 +625,7 @@ def _create_ticket(context: IdPContext, info: dict, binding: str) -> SSOLoginDat
     return ticket
 
 
-def _parse_SAMLRequest(context: IdPContext, info: dict, binding: str) -> AuthnRequest:
+def _parse_SAMLRequest(context: IdPContext, info: Mapping, binding: str) -> AuthnRequest:
     """
     Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
     instance.
