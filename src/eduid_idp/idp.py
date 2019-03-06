@@ -528,6 +528,8 @@ class IdPApplication(object):
         if not self.context.common_sessions:
             return None
         cookie = eduid_idp.mischttp.read_cookie(self.config.shared_session_cookie_name, self.context.logger)
+        if not cookie:
+            return None
         session = self.context.common_sessions.get(cookie)
         self.context.logger.debug('Fetched common session: {}'.format(session))
         return session
