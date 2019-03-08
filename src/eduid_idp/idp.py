@@ -623,7 +623,7 @@ class IdPApplication(object):
             'error_traceback': str(traceback),
             'error_details': str(error_details),
         })
-        res = six.b(res.format(**argv))
+        res = res.format(**argv).encode('utf-8')
 
         # Return before logging the error for errors that are not failures in the IdP
         # (avoids sentry reports)
