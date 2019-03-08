@@ -460,7 +460,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     if logger:
         logger.debug("Client language preferences: {!r}".format(languages))
     languages = [lang for (lang, q_val) in languages[:50]]  # cap somewhere to prevent DoS
-    if not config.default_language in languages and config.default_language:
+    if config.default_language not in languages and config.default_language:
         languages.append(config.default_language)
 
     if languages:
