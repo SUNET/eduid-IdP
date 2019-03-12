@@ -16,6 +16,7 @@ from hashlib import sha1
 
 import eduid_idp
 from eduid_idp.service import Service
+from eduid_idp.cache import ExpiringCache
 
 from saml2 import BINDING_HTTP_REDIRECT
 from saml2 import BINDING_HTTP_POST
@@ -83,7 +84,7 @@ class SLO(Service):
             raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
 
         request = info["SAMLRequest"]
-        req_key = _get_request_key(request)
+        req_key = ExpiringCache.key(request)
 
         try:
             req_info = self.context.idp.parse_logout_request(request, binding)
@@ -251,16 +252,3 @@ class SLO(Service):
             self.logger.debug("Creating response with binding {!r] instead of {!r} used before".format(
                 bindings[0], req_info.binding))
         return eduid_idp.mischttp.create_html_response(bindings[0], ht_args, self.start_response, self.logger)
-
-
-def _get_request_key(request):
-    """
-    Generate a unique identifier for this request looking like the ticket.key in login.
-
-    :param request: SAMLRequest as string
-    :return: unique id
-
-    :type request: string
-    :rtype: string
-    """
-    return sha1(request).hexdigest()
