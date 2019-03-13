@@ -17,7 +17,7 @@ from hashlib import sha1
 from collections import deque
 from binascii import unhexlify
 
-from typing import NewType, List, Deque
+from typing import NewType, List, Deque, AnyStr
 
 import six
 
@@ -67,14 +67,14 @@ class ExpiringCache(object):
         self.name = name
 
     @staticmethod
-    def key(something):
+    def key(something: AnyStr) -> str:
         """
         Generate a unique (not strictly guaranteed) key based on `something'.
 
         :param something: object
         :return:
         """
-        if six.PY2:
+        if isinstance(something, six.binary_type):
             return sha1(something).hexdigest()
         return sha1(something.encode('UTF-8')).hexdigest()
 
