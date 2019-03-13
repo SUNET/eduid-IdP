@@ -108,7 +108,7 @@ class AuthnState(object):
             self.is_swamid_al2 = True
 
     def __str__(self):
-        return (f'<AuthnState: creds={len(self._creds)}, pw={self.password_used}, u2f={self.fido_used}, '
+        return (f'<AuthnState: creds={len(self._creds)}, pw={self.password_used}, fido={self.fido_used}, '
                 f'nin is al2={self.is_swamid_al2}, token is (al2={self.swamid_al2_used}, '
                 f'al2_hi={self.swamid_al2_hi_used})>')
 
