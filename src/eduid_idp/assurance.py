@@ -75,7 +75,7 @@ class AuthnState(object):
         #  'authn_ts': self.timestamp,
         # }
         self.password_used = False
-        self.u2f_used = False
+        self.fido_used = False
         self.swamid_al2_used = False
         self.swamid_al2_hi_used = False
         self._creds: List[Credential] = []
@@ -90,8 +90,10 @@ class AuthnState(object):
             # until we can go to Python3 and have some... working type checks please
             if 'Password' in str(cred):
                 self.password_used = True
-            elif 'U2F' in str(cred):
-                self.u2f_used = True
+            elif 'U2F' in str(cred) or 'Webauthn' in str(cred):
+                # TODO: Match this using eduid_credential.credentials.FidoCredential instead, if that works
+                #       now that we use Python 3
+                self.fido_used = True
 
         if self.password_used:
             # second pass for second factor
@@ -106,22 +108,17 @@ class AuthnState(object):
             self.is_swamid_al2 = True
 
     def __str__(self):
-        return '<AuthnState: creds={}, pw={}, u2f={}, nin is al2={}, token is (al2={}, al2_hi={})>'.format(
-            len(self._creds),
-            self.password_used,
-            self.u2f_used,
-            self.is_swamid_al2,
-            self.swamid_al2_used,
-            self.swamid_al2_hi_used,
-        )
+        return (f'<AuthnState: creds={len(self._creds)}, pw={self.password_used}, u2f={self.fido_used}, '
+                f'nin is al2={self.is_swamid_al2}, token is (al2={self.swamid_al2_used}, '
+                f'al2_hi={self.swamid_al2_hi_used})>')
 
     @property
     def is_singlefactor(self):
-        return self.password_used or self.u2f_used
+        return self.password_used or self.fido_used
 
     @property
     def is_multifactor(self):
-        return self.password_used and self.u2f_used
+        return self.password_used and self.fido_used
 
     @property
     def is_swamid_al2_mfa(self):
@@ -172,7 +169,7 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
         response_authn = cc['REFEDS_SFA']
 
     elif req_authn_ctx == cc['FIDO_U2F']:
-        if not authn.password_used and authn.u2f_used:
+        if not authn.password_used and authn.fido_used:
             raise MissingMultiFactor()
         response_authn = cc['FIDO_U2F']
 
@@ -182,7 +179,7 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
 
     else:
         # Handle both unknown and empty req_authn_ctx the same
-        if authn.password_used and authn.u2f_used:
+        if authn.password_used and authn.fido_used:
             response_authn = cc['FIDO_U2F']
         elif authn.password_used:
             response_authn = cc['PASSWORD_PT']
