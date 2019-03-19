@@ -21,7 +21,7 @@ from typing import NewType, List, Deque, AnyStr
 
 import six
 
-from eduid_common.session.session import SessionManager, RedisEncryptedSession
+from eduid_common.session import SessionManager, RedisEncryptedSession
 from eduid_userdb import MongoDB
 
 _SHA1_HEXENCODED_SIZE = 160 // 8 * 2
