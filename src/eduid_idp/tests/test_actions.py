@@ -48,8 +48,6 @@ from mock import patch
 import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
 from eduid_idp.idp import IdPApplication
-from eduid_idp.mfa_action import add_actions
-from eduid_idp.tou_action import add_actions
 
 import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
