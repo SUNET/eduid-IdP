@@ -261,3 +261,65 @@ class TestActions(MongoTestCase):
         mock_ticket = MockTicket(key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+
+    def test_add_mfa_action_no_db(self):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        webauthn = Webauthn(keyhandle='test_key_handle',
+                    credential_data='test_credential_data',
+                    app_id='https://dev.eduid.se/u2f-app-id.json',
+                    attest_obj='test_attest_obj',
+                    description='test_description',
+        )
+        self.test_user.credentials.add(webauthn)
+        self.amdb.save(self.user, check_sync=False)
+        from eduid_idp.mfa_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        with self.assertRaises(AttributeError):
+            add_actions(self.idp_app, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+
+    def _test_add_2nd_mfa_action(self, success=True, authn_context=True, cred_key=None, actions=0):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        webauthn = Webauthn(keyhandle='test_key_handle',
+                    credential_data='test_credential_data',
+                    app_id='https://dev.eduid.se/u2f-app-id.json',
+                    attest_obj='test_attest_obj',
+                    description='test_description',
+        )
+        self.test_user.credentials.add(webauthn)
+        self.amdb.save(self.user, check_sync=False)
+        cred = self.test_user.credentials.filter(Webauthn).to_list()[0]
+        if cred_key is None:
+            cred_key = cred.key
+        completed_action = self.actions.add_action(self.test_user.eppn,
+                                                   action_type = 'mfa',
+                                                   preference = 100,
+                                                   params = {},
+                                                   session='mock-session')
+        completed_action.result = {
+            'cred_key': cred_key,
+            'issuer': 'dummy-issuer',
+            'success': success,
+            'authn_context': authn_context
+        }
+        self.actions.update_action(completed_action)
+        from eduid_idp.mfa_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), actions)
+        return mock_ticket
+
+    def test_add_mfa_action_already_authn(self):
+        self._test_add_2nd_mfa_action(actions=0)
+
+    def test_add_mfa_action_already_authn_not(self):
+        ticket = self._test_add_2nd_mfa_action(success=False, actions=2)
+        self.assertEquals(len(ticket.mfa_action_creds), 0)
+
+    def test_add_2nd_mfa_action_no_context(self):
+        ticket = self._test_add_2nd_mfa_action(authn_context=False, actions=0)
+        self.assertEquals(len(ticket.mfa_action_creds), 1)
+
+    def test_add_2nd_mfa_action_no_context_wrong_key(self):
+        ticket = self._test_add_2nd_mfa_action(authn_context=False, cred_key='wrong key', actions=2)
+        self.assertEquals(len(ticket.mfa_action_creds), 0)
