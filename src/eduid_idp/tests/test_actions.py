@@ -47,8 +47,11 @@ from mock import patch
 import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request
 from eduid_idp.idp import IdPApplication
+from eduid_idp.mfa_action import add_actions
+from eduid_idp.tou_action import add_actions
 
 import eduid_userdb
+from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.testing import MongoTestCase
 
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
@@ -58,6 +61,12 @@ logger = logging.getLogger(__name__)
 
 local = cherrypy.lib.httputil.Host('127.0.0.1', 50000, "")
 remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
+
+
+class MockTicket:
+    def __init__(self, key):
+        self.key = key
+        self.mfa_action_creds = {}
 
 
 # noinspection PyProtectedMember
@@ -214,3 +223,41 @@ class TestActions(MongoTestCase):
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '302 Found')
         self.assertIn(self.config.actions_app_uri, resp.location)
+
+    def test_add_mfa_action_no_key(self):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.mfa_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+
+    def test_add_mfa_action_old_key(self):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        u2f = U2F(version='U2F_V2',
+                  app_id='https://dev.eduid.se/u2f-app-id.json',
+                  keyhandle='test_key_handle',
+                  public_key='test_public_key',
+                  attest_cert='test_attest_cert',
+                  description='test_description',
+        )
+        self.test_user.credentials.add(u2f)
+        self.amdb.save(self.user, check_sync=False)
+        from eduid_idp.mfa_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+
+    def test_add_mfa_action_new_key(self):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        webauthn = Webauthn(keyhandle='test_key_handle',
+                    credential_data='test_credential_data',
+                    app_id='https://dev.eduid.se/u2f-app-id.json',
+                    attest_obj='test_attest_obj',
+                    description='test_description',
+        )
+        self.test_user.credentials.add(webauthn)
+        self.amdb.save(self.user, check_sync=False)
+        from eduid_idp.mfa_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
