@@ -36,6 +36,7 @@
 import os
 import logging
 import pkg_resources
+from datetime import datetime
 
 import six
 import bson
@@ -52,6 +53,7 @@ from eduid_idp.tou_action import add_actions
 
 import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
+from eduid_userdb.tou import ToUEvent
 from eduid_userdb.testing import MongoTestCase
 
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
@@ -81,6 +83,7 @@ class TestActions(MongoTestCase):
         _defaults = eduid_idp.config._CONFIG_DEFAULTS
         _defaults['mongo_uri'] = self.tmp_db.uri
         _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
+        _defaults['tou_version'] = 'mock-version'
         self.config = eduid_idp.config.IdPConfig(self.config_file, debug=False, defaults=_defaults)
 
         # Create the IdP app
@@ -142,7 +145,6 @@ class TestActions(MongoTestCase):
             self.assertEqual(resp.status, '302 Found')
 
         # Register user acceptance for the ToU version in use
-        from eduid_userdb.tou import ToUEvent
         tou = ToUEvent(version = self.config.tou_version,
                        application = 'unit test',
                        created_ts = True,
@@ -228,7 +230,7 @@ class TestActions(MongoTestCase):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.mfa_action import add_actions
         mock_ticket = MockTicket(key='mock-session')
-        add_actions(self.idp_app, self.test_user, mock_ticket)
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
 
     def test_add_mfa_action_old_key(self):
@@ -323,3 +325,64 @@ class TestActions(MongoTestCase):
     def test_add_2nd_mfa_action_no_context_wrong_key(self):
         ticket = self._test_add_2nd_mfa_action(authn_context=False, cred_key='wrong key', actions=2)
         self.assertEquals(len(ticket.mfa_action_creds), 0)
+
+    def test_add_tou_action(self):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.tou_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+
+    def test_add_tou_action_already_accepted(self):
+        event_id = bson.ObjectId()
+        self.test_user.tou.add(ToUEvent(
+            version = 'mock-version',
+            application = 'test_tou_plugin',
+            created_ts = datetime.utcnow(),
+            event_id = event_id
+        ))
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.tou_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+
+    def test_add_tou_action_already_accepted_other_version(self):
+        event_id = bson.ObjectId()
+        self.test_user.tou.add(ToUEvent(
+            version = 'mock-version-2',
+            application = 'test_tou_plugin',
+            created_ts = datetime.utcnow(),
+            event_id = event_id
+        ))
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.tou_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+
+    def test_add_tou_action_already_action(self):
+        self.idp_app.context.actions_db.add_action(
+            self.test_user.eppn,
+            action_type = 'tou',
+            preference = 100,
+            params = {'version': 'mock-version'}
+        )
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.tou_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+
+    def test_add_tou_action_already_action_other_version(self):
+        self.idp_app.context.actions_db.add_action(
+            self.test_user.eppn,
+            action_type = 'tou',
+            preference = 100,
+            params = {'version': 'mock-version-2'}
+        )
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.tou_action import add_actions
+        mock_ticket = MockTicket(key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 2)
