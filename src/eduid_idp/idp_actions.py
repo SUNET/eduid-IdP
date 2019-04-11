@@ -32,8 +32,6 @@
 # Author : Enrique Perez <enrique@cazalla.net>
 #
 
-import time
-
 import eduid_idp.util
 import eduid_idp.mischttp
 
@@ -45,6 +43,7 @@ from eduid_idp.idp_user import IdPUser
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.sso_session import SSOSession
+from eduid_common.authn.utils import generate_auth_token
 
 
 def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
@@ -92,15 +91,24 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Pending actions found, redirect to the actions app
     context.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
 
-    ts = int(time.time())
-    timestamp = '{:x}'.format(ts)
+    # create auth token for actions app
+    shared_key = context.config.actions_auth_shared_secret
+    auth_token, timestamp = generate_auth_token(shared_key, 'idp_actions', user.eppn)
 
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
-    context.session.implicit_login.ts = timestamp
-    context.session.implicit_login.session = ticket.key
-    raise eduid_idp.mischttp.Redirect(actions_uri)
+    # XXX this leaves the ticket.key vulnerable to manipulation -
+    # better move it inside the secret box when we can remove the backwards compat HMAC code
+    # from the receiving end
+    actions_session = ticket.key
+    uri = '{uri!s}?eppn={eppn!s}&token={auth_token!s}&ts={ts!s}&session={session!s}'.format(
+            uri = actions_uri,
+            eppn = user.eppn,
+            auth_token = auth_token,
+            ts = timestamp,
+            session = actions_session)
+    raise eduid_idp.mischttp.Redirect(uri)
 
 
 def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData):
