@@ -220,7 +220,7 @@ class IdPApplication(object):
         if config.mongo_uri:
             self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
 
-        if config.mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
+        if config.mongo_uri and config.actions_app_uri:
             _actions_db = ActionDB(config.mongo_uri)
             self.logger.info("configured to redirect users with pending actions")
         else:

@@ -54,7 +54,6 @@ def _get_idpconfig(datadir, sso_config='test_SSO_conf.py', fn='test_config.ini')
     _defaults = eduid_idp.config._CONFIG_DEFAULTS
     _defaults['mongo_uri'] = None
     _defaults['pysaml2_config'] = os.path.join(datadir, sso_config)
-    _defaults['actions_auth_shared_secret'] = 'dGVzdCBrZXkgICAgICAgICAgICAgICAgICAgICAgICA='
     return eduid_idp.config.IdPConfig(os.path.join(datadir, fn), debug=True, defaults=_defaults)
 
 
