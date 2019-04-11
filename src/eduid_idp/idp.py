@@ -120,7 +120,7 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
-import eduid_idp
+import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
@@ -129,6 +129,7 @@ from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
+from eduid_idp.util import lookup_common_session
 
 from eduid_userdb.actions import ActionDB
 
@@ -173,7 +174,6 @@ def parse_args():
                         )
 
     return parser.parse_args()
-
 
 # -----------------------------------------------------------------------------
 
@@ -293,7 +293,7 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        session = self._lookup_common_session()
+        session = lookup_common_session(self.context)
 
         if path[1] == 'post':
             return SSO(sso_session, session, self._my_start_response, self.context).post()
@@ -310,7 +310,7 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        session = self._lookup_common_session()
+        session = lookup_common_session(self.context)
 
         if path[1] == 'post':
             return SLO(sso_session, session, self._my_start_response, self.context).post()
@@ -523,16 +523,6 @@ class IdPApplication(object):
         _sso = eduid_idp.sso_session.from_dict(_data)
         self.logger.debug("Re-created SSO session {!r}".format(_sso))
         return _sso
-
-    def _lookup_common_session(self) -> Optional[RedisEncryptedSession]:
-        if not self.context.common_sessions:
-            return None
-        cookie = eduid_idp.mischttp.read_cookie(self.config.shared_session_cookie_name, self.context.logger)
-        if not cookie:
-            return None
-        session = self.context.common_sessions.get(cookie)
-        self.context.logger.debug('Fetched common session: {}'.format(session))
-        return session
 
     def handle_error(self):
         """
