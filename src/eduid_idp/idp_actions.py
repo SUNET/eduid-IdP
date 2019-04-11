@@ -45,7 +45,6 @@ from eduid_idp.idp_user import IdPUser
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.sso_session import SSOSession
-from eduid_idp.util import lookup_common_session
 
 
 def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
@@ -99,12 +98,11 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
-    session = lookup_common_session(context)
-    session['_implicit_login'] = {
+    context.session['_implicit_login'] = {
             'ts': timestamp,
             'session': ticket.key
         }
-    session.commit()
+    context.session.commit()
     raise eduid_idp.mischttp.Redirect(actions_uri)
 
 

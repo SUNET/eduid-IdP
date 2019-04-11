@@ -129,7 +129,6 @@ from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
-from eduid_idp.util import lookup_common_session
 
 from eduid_userdb.actions import ActionDB
 
@@ -243,7 +242,10 @@ class IdPApplication(object):
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
-        _common_sessions: Optional[ExpiringCacheCommonSession]
+        _common_sessions: Optional[ExpiringCacheCommonSession] = None
+
+        logger.debug(f"{config.redis_sentinel_hosts} or {config.redis_host}) and {config.shared_session_cookie_name} \
+                and {config.shared_session_secret_key}")
         if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
                 and config.shared_session_secret_key:
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
@@ -251,7 +253,6 @@ class IdPApplication(object):
                                                           secret=config.shared_session_secret_key)
         else:
             logger.info('eduID shared sessions not configured')
-            _common_sessions = None
 
         self.context = IdPContext(config=self.config,
                                   idp=self.IDP,
@@ -285,6 +286,20 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
+    def _update_context_session(self):
+        logger = self.context.logger
+        if self.context.common_sessions is not None:
+            cookie_name = self.config.shared_session_cookie_name
+            logger.debug(f'Cookie name configured {cookie_name}')
+            cookie = eduid_idp.mischttp.read_cookie(cookie_name, logger)
+            logger.debug(f'Cookie retrieved {cookie}')
+            if cookie:
+                session = self.context.common_sessions.get(cookie)
+                logger.debug(f'Session retrieved {session}')
+                object.__setattr__(self.context, 'session', session)
+        else:
+            logger.info('eduID shared sessions not configured')
+
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
@@ -293,12 +308,12 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        session = lookup_common_session(self.context)
+        self._update_context_session()
 
         if path[1] == 'post':
-            return SSO(sso_session, session, self._my_start_response, self.context).post()
+            return SSO(sso_session, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SSO(sso_session, session, self._my_start_response, self.context).redirect()
+            return SSO(sso_session, self._my_start_response, self.context).redirect()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -310,15 +325,15 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        session = lookup_common_session(self.context)
+        self._update_context_session()
 
         if path[1] == 'post':
-            return SLO(sso_session, session, self._my_start_response, self.context).post()
+            return SLO(sso_session, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SLO(sso_session, session, self._my_start_response, self.context).redirect()
+            return SLO(sso_session, self._my_start_response, self.context).redirect()
         if path[1] == 'soap':
             # SOAP is commonly used for SLO
-            return SLO(sso_session, session, self._my_start_response, self.context).soap()
+            return SLO(sso_session, self._my_start_response, self.context).soap()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 

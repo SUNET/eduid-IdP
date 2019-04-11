@@ -75,14 +75,3 @@ def maybe_xml_to_string(message, logger=None):
         if logger is not None:
             logger.debug("Could not parse message of type {!r} as XML: {!r}".format(type(message), exc))
         return message
-
-
-def lookup_common_session(context: IdPContext) -> Optional[RedisEncryptedSession]:
-    if not context.common_sessions:
-        return None
-    cookie = eduid_idp.mischttp.read_cookie(context.config.shared_session_cookie_name, context.logger)
-    if not cookie:
-        return None
-    session = context.common_sessions.get(cookie)
-    context.logger.debug('Fetched common session: {}'.format(session))
-    return session
