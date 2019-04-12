@@ -34,6 +34,8 @@
 
 import time
 
+from eduid_common.session.namespaces import ImplicitLogin
+
 import eduid_idp.util
 import eduid_idp.mischttp
 
@@ -98,10 +100,8 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
-    context.session['_implicit_login'] = {
-            'ts': timestamp,
-            'session': ticket.key
-        }
+    implicit_login = ImplicitLogin(ts=timestamp, session=ticket.key)
+    context.session['_implicit_login'] = implicit_login.to_dict()
     context.session.commit()
     raise eduid_idp.mischttp.Redirect(actions_uri)
 
