@@ -128,7 +128,7 @@ from eduid_idp.logout import SLO
 from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
+from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
 
 from eduid_userdb.actions import ActionDB
 
@@ -286,15 +286,18 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
-    def _update_context_session(self):
+    def _update_context_session(self, token=None):
+        if self.context.session is not None:
+            return
         logger = self.context.logger
         if self.context.common_sessions is not None:
-            cookie_name = self.config.shared_session_cookie_name
-            logger.debug(f'Cookie name configured {cookie_name}')
-            cookie = eduid_idp.mischttp.read_cookie(cookie_name, logger)
-            logger.debug(f'Cookie retrieved {cookie}')
-            if cookie:
-                session = self.context.common_sessions.get(cookie)
+            if token is None:
+                cookie_name = self.config.shared_session_cookie_name
+                logger.debug(f'Cookie name configured {cookie_name}')
+                token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
+                logger.debug(f'Cookie retrieved {token}')
+            if token:
+                session = self.context.common_sessions.get(token)
                 logger.debug(f'Session retrieved {session}')
                 object.__setattr__(self.context, 'session', session)
         else:

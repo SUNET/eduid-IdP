@@ -32,9 +32,10 @@
 # Author : Enrique Perez <enrique@cazalla.net>
 #
 
-import time
+from time import time
+from datetime import datetime
 
-from eduid_common.session.namespaces import ImplicitLogin
+from eduid_common.session.namespaces import Actions
 
 import eduid_idp.util
 import eduid_idp.mischttp
@@ -92,16 +93,15 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
         return
 
     # Pending actions found, redirect to the actions app
-    context.logger.debug('There are pending actions for user {}: {}'.format(user, pending_actions))
+    context.logger.debug(f'There are pending actions for user {user}: {pending_actions}')
 
-    ts = int(time.time())
-    timestamp = '{:x}'.format(ts)
+    timestamp = datetime.fromtimestamp(int(time()))
 
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
-    implicit_login = ImplicitLogin(ts=timestamp, session=ticket.key)
-    context.session['_implicit_login'] = implicit_login.to_dict()
+    actions = Actions.from_dict({'ts': timestamp, 'idp_ticket_key': ticket.key})
+    context.session['_actions'] = actions.to_dict()
     context.session.commit()
     raise eduid_idp.mischttp.Redirect(actions_uri)
 

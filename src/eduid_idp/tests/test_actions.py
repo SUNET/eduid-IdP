@@ -53,6 +53,7 @@ import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.tou import ToUEvent
 from eduid_userdb.testing import MongoTestCase
+from eduid_common.api.testing import RedisTemporaryInstance
 
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
@@ -73,7 +74,7 @@ class MockTicket:
 class TestActions(MongoTestCase):
 
     def setUp(self):
-        super().setUp()
+        MongoTestCase.setUp(self)
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
@@ -82,6 +83,13 @@ class TestActions(MongoTestCase):
         _defaults['mongo_uri'] = self.tmp_db.uri
         _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
         _defaults['tou_version'] = 'mock-version'
+
+        self.redis_instance = RedisTemporaryInstance.get_instance()
+        _defaults['shared_session_secret_key'] = 'shared-session-secret-key'
+        _defaults['redis_host'] = 'localhost'
+        _defaults['redis_port'] = str(self.redis_instance.port)
+        _defaults['insecure_cookies'] = 1
+
         self.config = eduid_idp.config.IdPConfig(self.config_file, debug=False, defaults=_defaults)
 
         # Create the IdP app
@@ -112,7 +120,13 @@ class TestActions(MongoTestCase):
     def tearDown(self):
         # reset the testing environment
         self.http.reset()
-        super(TestActions, self).tearDown()
+        MongoTestCase.tearDown(self)
+
+    def _update_session(self):
+        # make sure there is a redis common session ready to be used by the IdP
+        session = self.idp_app.context.common_sessions._manager.get_session(data={'dummy':'data'})
+        session.commit()
+        self.idp_app._update_context_session(token=session.token)
 
     def test_no_actions(self):
 
@@ -166,6 +180,9 @@ class TestActions(MongoTestCase):
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
+        # make sure there is a common session
+        self._update_session()
+
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
@@ -197,6 +214,9 @@ class TestActions(MongoTestCase):
 
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
+
+        # make sure there is a common session
+        self._update_session()
 
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
