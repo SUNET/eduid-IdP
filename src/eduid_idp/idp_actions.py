@@ -71,8 +71,8 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Add any actions that may depend on the login data
     add_idp_initiated_actions(context, user, ticket)
 
-    actions_eppn = context.actions_db.get_actions(user.eppn, session = ticket.key)
-    actions_userid = context.actions_db.get_actions(user.user_id, session = ticket.key)
+    actions_eppn = context.actions_db.get_actions(user.eppn, idp_ticket_key = ticket.key)
+    actions_userid = context.actions_db.get_actions(user.user_id, idp_ticket_key = ticket.key)
 
     # Check for pending actions
     pending_actions = [a for a in actions_eppn if a.result is None]
