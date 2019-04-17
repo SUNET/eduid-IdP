@@ -72,11 +72,9 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     add_idp_initiated_actions(context, user, ticket)
 
     actions_eppn = context.actions_db.get_actions(user.eppn, idp_ticket_key = ticket.key)
-    actions_userid = context.actions_db.get_actions(user.user_id, idp_ticket_key = ticket.key)
 
     # Check for pending actions
     pending_actions = [a for a in actions_eppn if a.result is None]
-    pending_actions += [a for a in actions_userid if a.result is None]
     if not pending_actions:
         # eduid_action.mfa.idp.check_authn_result will have added the credential used
         # to the ticket.mfa_action_creds hash - transfer it to the session
@@ -95,7 +93,8 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Pending actions found, redirect to the actions app
     context.logger.debug(f'There are pending actions for user {user}: {pending_actions}')
 
-    timestamp = datetime.fromtimestamp(int(time()))
+    now = int(time.time())
+    timestamp = int(now, 16)
 
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
