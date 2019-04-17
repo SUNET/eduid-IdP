@@ -93,7 +93,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Pending actions found, redirect to the actions app
     context.logger.debug(f'There are pending actions for user {user}: {pending_actions}')
 
-    now = int(time.time())
+    now = int(time())
     timestamp = int(now, 16)
 
     actions_uri = context.config.actions_app_uri
