@@ -71,7 +71,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Add any actions that may depend on the login data
     add_idp_initiated_actions(context, user, ticket)
 
-    actions_eppn = context.actions_db.get_actions(user.eppn, idp_ticket_key = ticket.key)
+    actions_eppn = context.actions_db.get_actions(user.eppn, session = ticket.key)
 
     # Check for pending actions
     pending_actions = [a for a in actions_eppn if a.result is None]
@@ -99,7 +99,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
-    actions = Actions.from_dict({'ts': timestamp, 'idp_ticket_key': ticket.key})
+    actions = Actions.from_dict({'ts': timestamp, 'session': ticket.key})
     context.session['_actions'] = actions.to_dict()
     context.session.commit()
     raise eduid_idp.mischttp.Redirect(actions_uri)

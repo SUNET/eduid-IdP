@@ -84,7 +84,7 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
         user.eppn,
         action_type = 'mfa',
         preference = 1,
-        idp_ticket_key = ticket.key,  # XXX double-check that ticket.key is not sensitive to disclose to the user
+        session = ticket.key,  # XXX double-check that ticket.key is not sensitive to disclose to the user
         params = {})
 
 

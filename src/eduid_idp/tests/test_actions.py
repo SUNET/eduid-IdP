@@ -315,7 +315,7 @@ class TestActions(MongoTestCase):
                                                    action_type = 'mfa',
                                                    preference = 100,
                                                    params = {},
-                                                   idp_ticket_key='mock-session')
+                                                   session='mock-session')
         completed_action.result = {
             'cred_key': cred_key,
             'issuer': 'dummy-issuer',
