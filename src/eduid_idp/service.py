@@ -30,11 +30,10 @@ class Service(object):
     :param context: IdP context
     """
 
-    def __init__(self, sso_session: Optional[SSOSession], session: Optional[RedisEncryptedSession],
+    def __init__(self, sso_session: Optional[SSOSession],
                  start_response: Callable, context: IdPContext):
         self.context = context
         self.start_response = start_response
-        self.session = session
         self.sso_session = sso_session
         # TODO: Get rid of this copying of things in the context
         self.logger = context.logger

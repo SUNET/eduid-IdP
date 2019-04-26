@@ -56,9 +56,8 @@ class SSO(Service):
     :param context: IdP context
     """
 
-    def __init__(self, sso_session: SSOSession, session: Optional[RedisEncryptedSession],
-                 start_response: Callable, context: IdPContext):
-        super().__init__(sso_session, session, start_response, context)
+    def __init__(self, sso_session: SSOSession, start_response: Callable, context: IdPContext):
+        super().__init__(sso_session, start_response, context)
 
     def perform_login(self, ticket: SSOLoginData) -> bytes:
         """
@@ -79,16 +78,16 @@ class SSO(Service):
         binding_out = resp_args.get('binding_out')
         destination = resp_args.get('destination')
 
-        if self.session:
-            self.session['user_eppn'] = user.eppn
-            self.session.commit()
+        if self.context.session:
+            self.context.session['user_eppn'] = user.eppn
+            self.context.session.commit()
 
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
 
-        #if self.session:
-        #    self.session['is_logged_in'] = True
-        #    self.session.commit()
+        #if self.context.session:
+        #    self.context.session['is_logged_in'] = True
+        #    self.context.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 

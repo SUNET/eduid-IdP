@@ -120,7 +120,7 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
-import eduid_idp
+import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
@@ -128,7 +128,7 @@ from eduid_idp.logout import SLO
 from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
+from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
 
 from eduid_userdb.actions import ActionDB
 
@@ -173,7 +173,6 @@ def parse_args():
                         )
 
     return parser.parse_args()
-
 
 # -----------------------------------------------------------------------------
 
@@ -220,7 +219,7 @@ class IdPApplication(object):
         if config.mongo_uri:
             self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
 
-        if config.mongo_uri and config.actions_auth_shared_secret and config.actions_app_uri:
+        if config.mongo_uri and config.actions_app_uri:
             _actions_db = ActionDB(config.mongo_uri)
             self.logger.info("configured to redirect users with pending actions")
         else:
@@ -243,7 +242,10 @@ class IdPApplication(object):
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
-        _common_sessions: Optional[ExpiringCacheCommonSession]
+        _common_sessions: Optional[ExpiringCacheCommonSession] = None
+
+        logger.debug(f"{config.redis_sentinel_hosts} or {config.redis_host}) and {config.shared_session_cookie_name} \
+                and {config.shared_session_secret_key}")
         if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
                 and config.shared_session_secret_key:
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
@@ -251,7 +253,6 @@ class IdPApplication(object):
                                                           secret=config.shared_session_secret_key)
         else:
             logger.info('eduID shared sessions not configured')
-            _common_sessions = None
 
         self.context = IdPContext(config=self.config,
                                   idp=self.IDP,
@@ -285,6 +286,23 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
+    def _update_context_session(self, token=None):
+        if self.context.session is not None:
+            return
+        logger = self.context.logger
+        if self.context.common_sessions is not None:
+            if token is None:
+                cookie_name = self.config.shared_session_cookie_name
+                logger.debug(f'Cookie name configured {cookie_name}')
+                token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
+                logger.debug(f'Cookie retrieved {token}')
+            if token:
+                session = self.context.common_sessions.get(token)
+                logger.debug(f'Session retrieved {session}')
+                object.__setattr__(self.context, 'session', session)
+        else:
+            logger.info('eduID shared sessions not configured')
+
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
@@ -293,12 +311,12 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        session = self._lookup_common_session()
+        self._update_context_session()
 
         if path[1] == 'post':
-            return SSO(sso_session, session, self._my_start_response, self.context).post()
+            return SSO(sso_session, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SSO(sso_session, session, self._my_start_response, self.context).redirect()
+            return SSO(sso_session, self._my_start_response, self.context).redirect()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -310,15 +328,15 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        session = self._lookup_common_session()
+        self._update_context_session()
 
         if path[1] == 'post':
-            return SLO(sso_session, session, self._my_start_response, self.context).post()
+            return SLO(sso_session, self._my_start_response, self.context).post()
         if path[1] == 'redirect':
-            return SLO(sso_session, session, self._my_start_response, self.context).redirect()
+            return SLO(sso_session, self._my_start_response, self.context).redirect()
         if path[1] == 'soap':
             # SOAP is commonly used for SLO
-            return SLO(sso_session, session, self._my_start_response, self.context).soap()
+            return SLO(sso_session, self._my_start_response, self.context).soap()
 
         raise eduid_idp.error.NotFound(logger = self.logger)
 
@@ -523,16 +541,6 @@ class IdPApplication(object):
         _sso = eduid_idp.sso_session.from_dict(_data)
         self.logger.debug("Re-created SSO session {!r}".format(_sso))
         return _sso
-
-    def _lookup_common_session(self) -> Optional[RedisEncryptedSession]:
-        if not self.context.common_sessions:
-            return None
-        cookie = eduid_idp.mischttp.read_cookie(self.config.shared_session_cookie_name, self.context.logger)
-        if not cookie:
-            return None
-        session = self.context.common_sessions.get(cookie)
-        self.context.logger.debug('Fetched common session: {}'.format(session))
-        return session
 
     def handle_error(self):
         """

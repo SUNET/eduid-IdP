@@ -36,12 +36,8 @@ Configuration (file) handling for eduID IdP.
 """
 
 import os
-import six
 from typing import List, Optional
 from six.moves import configparser
-from base64 import urlsafe_b64decode
-
-import nacl.secret
 
 
 _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
@@ -80,7 +76,6 @@ _CONFIG_DEFAULTS = {'debug': False,  # overwritten in IdPConfig.__init__()
                     'default_scoped_affiliation': None,
                     'vccs_url': 'http://localhost:8550/',  # VCCS backend URL
                     'insecure_cookies': '0',  # Set to 1 to not set HTTP Cookie 'secure' flag
-                    'actions_auth_shared_secret': '',  # must be exactly 32 bytes long
                     'actions_app_uri': 'http://actions.example.com/',
                     'tou_version': 'version1',
                     'redis_sentinel_hosts': [],
@@ -124,10 +119,6 @@ class IdPConfig(object):
         self.config = configparser.RawConfigParser(_defaults)
         if not self.config.read([filename]):
             raise ValueError("Failed loading config file {!r}".format(filename))
-        if len(urlsafe_b64decode(self.actions_auth_shared_secret)) != nacl.secret.SecretBox.KEY_SIZE:
-            raise ValueError('Authn shared secret must be exactly {} bytes long'.format(
-                                  nacl.secret.SecretBox.KEY_SIZE))
-
 
     @property
     def num_threads(self):
@@ -460,14 +451,6 @@ class IdPConfig(object):
         Set to True to NOT set HTTP Cookie 'secure' flag (boolean).
         """
         return self.config.getboolean(self.section, 'insecure_cookies')
-
-    @property
-    def actions_auth_shared_secret(self) -> str:
-        """
-        Secret shared with the actions app to convince it
-        that the redirected user is authenticated.
-        """
-        return self.config.get(self.section, 'actions_auth_shared_secret')
 
     @property
     def actions_app_uri(self):

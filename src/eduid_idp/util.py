@@ -35,6 +35,11 @@
 
 import six
 import base64
+from typing import Optional
+
+import eduid_idp.mischttp
+from eduid_idp.context import IdPContext
+from eduid_idp.cache import RedisEncryptedSession
 
 
 def b64encode(source):
