@@ -93,13 +93,10 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Pending actions found, redirect to the actions app
     context.logger.debug(f'There are pending actions for user {user}: {pending_actions}')
 
-    now = int(time())
-    timestamp = '{:x}'.format(now)
-
     actions_uri = context.config.actions_app_uri
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
-    actions = Actions.from_dict({'ts': timestamp, 'session': ticket.key})
+    actions = Actions.from_dict({'ts': time(), 'session': ticket.key})
     context.session['_actions'] = actions.to_dict()
     context.session.commit()
     raise eduid_idp.mischttp.Redirect(actions_uri)
