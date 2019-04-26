@@ -12,6 +12,7 @@ services:
   - docker
 # command to install dependencies
 before_install:
+  - docker pull docker.sunet.se/eduid/redis:latest
   - docker pull docker.sunet.se/eduid/mongodb:latest
 install:
   - pip install -U setuptools mypy
