@@ -51,7 +51,7 @@ class SSO(Service):
     """
     Single Sign On service.
 
-    :param session: SSO session
+    :param sso_session: SSO session
     :param start_response: WSGI-like start_response function pointer
     :param context: IdP context
     """
