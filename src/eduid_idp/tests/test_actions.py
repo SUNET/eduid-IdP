@@ -53,7 +53,7 @@ import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.tou import ToUEvent
 from eduid_userdb.testing import MongoTestCase
-from eduid_common.api.testing import RedisTemporaryInstance
+from eduid_common.session.testing import RedisTemporaryInstance
 
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
