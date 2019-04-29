@@ -240,6 +240,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
                               })
         else:
             redis_cfg['REDIS_HOST'] = config.redis_host
+        self._debug = config.debug
         self._redis_cfg = redis_cfg
         self._manager = SessionManager(redis_cfg, ttl = ttl, secret = secret)
 
@@ -272,9 +273,9 @@ class ExpiringCacheCommonSession(ExpiringCache):
         if len(key) == _SHA1_HEXENCODED_SIZE:
             # hex-encoded sha1
             _session_id = unhexlify(key)
-            session = self._manager.get_session(session_id=_session_id, data=data)
+            session = self._manager.get_session(session_id=_session_id, data=data, debug=self._debug)
         else:
-            session = self._manager.get_session(token=key, data=data)
+            session = self._manager.get_session(token=key, data=data, debug=self._debug)
         session.commit()
         return session
 
@@ -291,9 +292,9 @@ class ExpiringCacheCommonSession(ExpiringCache):
         try:
             if len(key) == _SHA1_HEXENCODED_SIZE:
                 _session_id = unhexlify(key)
-                session = self._manager.get_session(session_id = _session_id)
+                session = self._manager.get_session(session_id = _session_id, debug=self._debug)
             else:
-                session = self._manager.get_session(token=key)
+                session = self._manager.get_session(token=key, debug=self._debug)
             return session
         except KeyError:
             pass
@@ -324,9 +325,9 @@ class ExpiringCacheCommonSession(ExpiringCache):
         """
         if len(key) == _SHA1_HEXENCODED_SIZE:
             _session_id = unhexlify(key)
-            session = self._manager.get_session(session_id=_session_id)
+            session = self._manager.get_session(session_id=_session_id, debug=self._debug)
         else:
-            session = self._manager.get_session(token=key)
+            session = self._manager.get_session(token=key, debug=self._debug)
         if not session:
             return False
         session.clear()
