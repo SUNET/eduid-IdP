@@ -78,15 +78,16 @@ class SSO(Service):
         binding_out = resp_args.get('binding_out')
         destination = resp_args.get('destination')
 
-        cherrypy.request.session['user_eppn'] = user.eppn
-        cherrypy.request.session.commit()
+        if self.context.common_sessions is not None:
+            cherrypy.request.session['user_eppn'] = user.eppn
+            cherrypy.request.session.commit()
 
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
 
-        #if self.context.session:
-        #    self.context.session['is_logged_in'] = True
-        #    self.context.session.commit()
+        #  if self.context.common_sessions is not None:
+        #      cherrypy.request.session['is_logged_in'] = True
+        #      cherrypy.request.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 
