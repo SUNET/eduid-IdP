@@ -126,7 +126,7 @@ class TestActions(MongoTestCase):
         # make sure there is a redis common session ready to be used by the IdP
         session = self.idp_app.context.common_sessions._manager.get_session(data={'dummy':'data'})
         session.commit()
-        self.idp_app._update_context_session(token=session.token)
+        self.idp_app._update_request_session(token=session.token)
 
     def test_no_actions(self):
 

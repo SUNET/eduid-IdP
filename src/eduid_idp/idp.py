@@ -286,7 +286,7 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
-    def _update_context_session(self, token=None):
+    def _update_request_session(self, token=None):
         logger = self.context.logger
         if self.context.common_sessions is not None:
             if token is None:
@@ -309,7 +309,7 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        self._update_context_session()
+        self._update_request_session()
 
         if path[1] == 'post':
             return SSO(sso_session, self._my_start_response, self.context).post()
@@ -326,7 +326,7 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        self._update_context_session()
+        self._update_request_session()
 
         if path[1] == 'post':
             return SLO(sso_session, self._my_start_response, self.context).post()
