@@ -12,6 +12,7 @@
 Code handling Single Sign On logins.
 """
 
+import cherrypy
 import hmac
 import pprint
 import time
@@ -26,7 +27,6 @@ from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.assurance import AssuranceException, WrongMultiFactor, MissingMultiFactor
-from eduid_idp.cache import RedisEncryptedSession
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 from saml2.s_utils import UnknownPrincipal, UnsupportedBinding, UnknownSystemEntity, UnravelError
 from saml2.sigver import verify_redirect_signature
@@ -78,16 +78,16 @@ class SSO(Service):
         binding_out = resp_args.get('binding_out')
         destination = resp_args.get('destination')
 
-        if self.context.session:
-            self.context.session['user_eppn'] = user.eppn
-            self.context.session.commit()
+        if self.context.common_sessions is not None:
+            cherrypy.request.session['user_eppn'] = user.eppn
+            cherrypy.request.session.commit()
 
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
 
-        #if self.context.session:
-        #    self.context.session['is_logged_in'] = True
-        #    self.context.session.commit()
+        #  if self.context.common_sessions is not None:
+        #      cherrypy.request.session['is_logged_in'] = True
+        #      cherrypy.request.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 

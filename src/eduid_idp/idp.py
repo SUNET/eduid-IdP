@@ -286,9 +286,7 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
-    def _update_context_session(self, token=None):
-        if self.context.session is not None:
-            return
+    def _update_request_session(self, token=None):
         logger = self.context.logger
         if self.context.common_sessions is not None:
             if token is None:
@@ -299,7 +297,7 @@ class IdPApplication(object):
             if token:
                 session = self.context.common_sessions.get(token)
                 logger.debug(f'Session retrieved {session}')
-                object.__setattr__(self.context, 'session', session)
+                object.__setattr__(cherrypy.request, 'session', session)
         else:
             logger.info('eduID shared sessions not configured')
 
@@ -311,7 +309,7 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        self._update_context_session()
+        self._update_request_session()
 
         if path[1] == 'post':
             return SSO(sso_session, self._my_start_response, self.context).post()
@@ -328,7 +326,7 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        self._update_context_session()
+        self._update_request_session()
 
         if path[1] == 'post':
             return SLO(sso_session, self._my_start_response, self.context).post()
