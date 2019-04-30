@@ -287,8 +287,6 @@ class IdPApplication(object):
             sys.path = old_path
 
     def _update_context_session(self, token=None):
-        if self.context.session is not None:
-            return
         logger = self.context.logger
         if self.context.common_sessions is not None:
             if token is None:
@@ -299,7 +297,7 @@ class IdPApplication(object):
             if token:
                 session = self.context.common_sessions.get(token)
                 logger.debug(f'Session retrieved {session}')
-                object.__setattr__(self.context, 'session', session)
+                object.__setattr__(cherrypy.request, 'session', session)
         else:
             logger.info('eduID shared sessions not configured')
 
