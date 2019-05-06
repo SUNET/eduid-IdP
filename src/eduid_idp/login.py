@@ -535,9 +535,6 @@ def do_verify(context: IdPContext):
         _ticket.FailCount += 1
         context.ticket_sessions.store_ticket(_ticket)
         context.logger.debug("Unknown user or wrong password")
-        _referer = eduid_idp.mischttp.get_request_header().get('Referer')
-        if _referer:
-            raise eduid_idp.mischttp.Redirect(str(_referer))
         raise eduid_idp.error.Unauthorized("Login incorrect", logger=context.logger)
 
     # Create SSO session
