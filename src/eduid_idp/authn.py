@@ -38,6 +38,8 @@ such as rate limiting.
 """
 
 import datetime
+from dataclasses import dataclass
+
 import vccs_client
 
 import eduid_idp.assurance
@@ -116,6 +118,14 @@ class AuthnData(object):
         return {'cred_id': self.credential.key,
                 'authn_ts': self.timestamp,
                 }
+
+
+@dataclass
+class ExternalMfaData(object):
+    user: IdPUser
+    issuer: str
+    authn_context: str
+    timestamp: datetime.datetime
 
 
 class IdPAuthn(object):
