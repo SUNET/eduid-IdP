@@ -32,14 +32,18 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
+from logging import Logger
 
 import six
 import base64
 from typing import Optional
 
+from saml2.server import Server as Saml2Server
+
 import eduid_idp.mischttp
 from eduid_idp.context import IdPContext
 from eduid_idp.cache import RedisEncryptedSession
+from eduid_idp.loginstate import SSOLoginData
 
 
 def b64encode(source):
@@ -75,3 +79,29 @@ def maybe_xml_to_string(message, logger=None):
         if logger is not None:
             logger.debug("Could not parse message of type {!r} as XML: {!r}".format(type(message), exc))
         return message
+
+
+def get_requested_authn_context(idp: Saml2Server, ticket: SSOLoginData, logger: Logger) -> Optional[str]:
+    """
+    Check if the SP has explicit Authn preferences in the metadata (some SPs are not
+    capable of conveying this preference in the RequestedAuthnContext)
+    """
+    res = None
+    req_authn_context = ticket.req_info.message.requested_authn_context
+    if req_authn_context and req_authn_context.authn_context_class_ref:
+        res = req_authn_context.authn_context_class_ref[0].text
+
+    try:
+        attributes = idp.metadata.entity_attributes(ticket.req_info.message.issuer.text)
+    except KeyError:
+        attributes = {}
+    if 'http://www.swamid.se/assurance-requirement' in attributes:
+        # XXX don't just pick the first one from the list - choose the most applicable one somehow.
+        new_authn = attributes['http://www.swamid.se/assurance-requirement'][0]
+        logger.debug("Entity {!r} has AuthnCtx preferences in metadata. Overriding {!r} -> {!r}".format(
+            ticket.req_info.message.issuer.text,
+            res,
+            new_authn))
+        res = new_authn
+
+    return res

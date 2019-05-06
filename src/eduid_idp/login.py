@@ -33,6 +33,8 @@ from saml2.sigver import verify_redirect_signature
 from saml2.request import AuthnRequest
 from defusedxml import ElementTree as DefusedElementTree
 
+from eduid_idp.util import get_requested_authn_context
+
 
 class MustAuthenticate(Exception):
     """
@@ -290,7 +292,7 @@ class SSO(Service):
         # Decide what AuthnContext to assert based on the one requested in the request
         # and the authentication performed
 
-        req_authn_context = self._get_requested_authn_context(ticket)
+        req_authn_context = get_requested_authn_context(self.context.idp, ticket, self.logger)
 
         try:
             resp_authn, extra_attributes = eduid_idp.assurance.response_authn(
@@ -317,37 +319,6 @@ class SSO(Service):
                     authn_instant = self.sso_session.authn_timestamp,
                     authn_attributes = extra_attributes,
                     )
-
-    def _get_requested_authn_context(self, ticket):
-        """
-        Check if this SP has explicit Authn preferences in the metadata (some SPs are not
-        capable of conveying this preference in the RequestedAuthnContext)
-
-        :param ticket: State for this request
-        :return: Requested Authn Context
-
-        :type ticket: SSOLoginData
-        :rtype: str | None
-        """
-        res = None
-        req_authn_context = ticket.req_info.message.requested_authn_context
-        if req_authn_context and req_authn_context.authn_context_class_ref:
-            res = req_authn_context.authn_context_class_ref[0].text
-
-        try:
-            attributes = self.context.idp.metadata.entity_attributes(ticket.req_info.message.issuer.text)
-        except KeyError:
-            attributes = {}
-        if 'http://www.swamid.se/assurance-requirement' in attributes:
-            # XXX don't just pick the first one from the list - choose the most applicable one somehow.
-            new_authn = attributes['http://www.swamid.se/assurance-requirement'][0]
-            self.logger.debug("Entity {!r} has AuthnCtx preferences in metadata. Overriding {!r} -> {!r}".format(
-                ticket.req_info.message.issuer.text,
-                res,
-                new_authn))
-            res = new_authn
-
-        return res
 
     def redirect(self) -> bytes:
         """ This is the HTTP-redirect endpoint.
@@ -430,7 +401,7 @@ class SSO(Service):
         assert isinstance(ticket, SSOLoginData)
         redirect_uri = eduid_idp.mischttp.geturl(self.config, query = False)
 
-        req_authn_context = self._get_requested_authn_context(ticket)
+        req_authn_context = get_requested_authn_context(self.context.idp, ticket, self.logger)
         self.logger.debug("Do authentication, requested auth context : {!r}".format(req_authn_context))
 
         return self._show_login_page(ticket, req_authn_context, redirect_uri)
