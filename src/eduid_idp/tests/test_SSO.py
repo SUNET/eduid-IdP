@@ -112,11 +112,11 @@ def _transport_encode(data):
     return b64encode(''.join(data.split('\n')))
 
 
-def make_login_ticket(req_class_ref, context):
+def make_login_ticket(req_class_ref, context, key=None):
     xmlstr = make_SAML_request(class_ref = req_class_ref)
     binding = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
-    key = 'unique-key-for-request-1'
-
+    if key is None:
+        key = 'unique-key-for-request-1'
     req_info = context.idp.parse_authn_request(xmlstr, binding)
     return SSOLoginData(key, req_info, {'SAMLRequest': xmlstr}, binding)
 
