@@ -154,7 +154,7 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     :rtype: str | None
     """
     authn = AuthnState(user, sso_session, logger)
-    logger.debug('Authn will be evaluated based on: {!s}'.format(authn))
+    logger.info(f'Authn for user {user.eppn} will be evaluated based on: {authn}')
 
     cc = {'REFEDS_MFA':  'https://refeds.org/profile/mfa',
           'REFEDS_SFA':  'https://refeds.org/profile/sfa',
@@ -208,4 +208,5 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     else:
         attributes['eduPersonAssurance'] = [SWAMID_AL1]
 
+    logger.info(f'Assurances for user {user.eppn} was evaluated to: {response_authn} with attributes {attributes}')
     return response_authn, attributes

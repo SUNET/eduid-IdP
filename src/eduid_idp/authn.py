@@ -122,6 +122,9 @@ class AuthnData(object):
 
 @dataclass
 class ExternalMfaData(object):
+    """
+    Data about a successful external authentication as a multi factor.
+    """
     user: IdPUser
     issuer: str
     authn_context: str

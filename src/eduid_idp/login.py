@@ -286,6 +286,7 @@ class SSO(Service):
         :rtype: dict
         """
         self.logger.debug('MFA credentials logged in the ticket: {}'.format(ticket.mfa_action_creds))
+        self.logger.debug('External MFA credential logged in the ticket: {}'.format(ticket.mfa_action_external))
         self.logger.debug('Credentials used in this SSO session:\n{}'.format(self.sso_session.authn_credentials))
         self.logger.debug('User credentials:\n{}'.format(user.credentials.to_list()))
 
@@ -406,7 +407,7 @@ class SSO(Service):
 
         return self._show_login_page(ticket, req_authn_context, redirect_uri)
 
-    def _show_login_page(self, ticket: SSOLoginData, requested_authn_context: str, redirect_uri) -> bytes:
+    def _show_login_page(self, ticket: SSOLoginData, requested_authn_context: Optional[str], redirect_uri) -> bytes:
         """
         Display the login form for all authentication methods.
 
