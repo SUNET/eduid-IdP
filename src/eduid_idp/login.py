@@ -495,7 +495,7 @@ def do_verify(context: IdPContext):
     context.logger.debug("Authenticating with {!r}".format(authn_ref))
 
     if not password or 'username' not in query:
-        lox = f'{query["redirect_uri"]}?{_ticket.to_original_qs()}'
+        lox = f'{query["redirect_uri"]}?{_ticket.query_string}'
         context.logger.debug(f'Credentials not supplied. Redirect => {lox}')
         raise eduid_idp.mischttp.Redirect(lox)
 
