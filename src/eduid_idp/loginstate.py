@@ -10,6 +10,7 @@
 
 import pprint
 from html import escape
+from urllib.parse import urlencode
 from logging import Logger
 from datetime import datetime
 from typing import Dict, Optional, Union, Mapping
@@ -126,6 +127,14 @@ class SSOLoginData(object):
         :rtype: string
         """
         return escape(self._binding, quote=True)
+
+    @property
+    def query_string(self):
+        qs = {
+            'SAMLRequest': self._SAMLRequest,
+            'RelayState': self._RelayState
+        }
+        return urlencode(qs)
 
 
 class SSOLoginDataCache(object):
