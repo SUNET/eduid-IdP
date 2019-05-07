@@ -171,9 +171,10 @@ class TestSSO(IdPSimpleTestCase):
                 this = user.credentials.filter(Password).to_list()[0]
             elif this == 'u2f':
                 this = user.credentials.filter(U2F).to_list()[0]
+
             if isinstance(this, AuthnData):
                 sso_session_1.add_authn_credential(this)
-            if isinstance(this, ExternalMfaData):
+            elif isinstance(this, ExternalMfaData):
                 sso_session_1.external_mfa = this
             else:
                 data = AuthnData(user, this, datetime.datetime.now())
@@ -331,7 +332,6 @@ class TestSSO(IdPSimpleTestCase):
                                              )
         self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
 
-
     def test__get_login_response_assurance_AL1(self):
         """
         Make sure eduPersonAssurace is SWAMID AL1 with no verified nin.
@@ -353,4 +353,3 @@ class TestSSO(IdPSimpleTestCase):
                                              )
         attr = out.get('authn_attributes', {})
         self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
-
