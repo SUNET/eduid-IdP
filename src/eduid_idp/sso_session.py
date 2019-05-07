@@ -194,7 +194,8 @@ class SSOSession(object):
         """
         return self._data['external_mfa']
 
-    def add_external_mfa(self, data: ExternalMfaData):
+    @external_mfa.setter
+    def external_mfa(self, data: ExternalMfaData):
         self._data['external_mfa'] = data
 
 
