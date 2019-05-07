@@ -508,7 +508,7 @@ def do_verify(context: IdPContext):
     if not authninfo:
         _ticket.FailCount += 1
         context.ticket_sessions.store_ticket(_ticket)
-        lox = f'{query["redirect_uri"]}?{_ticket.to_original_qs()}'
+        lox = f'{query["redirect_uri"]}?{_ticket.query_string}'
         context.logger.debug(f'Unknown user or wrong password. Redirect => {lox}')
         raise eduid_idp.mischttp.Redirect(lox)
 

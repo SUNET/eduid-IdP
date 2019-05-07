@@ -61,13 +61,6 @@ class SSOLoginData(object):
                }
         return res
 
-    def to_original_qs(self):
-        qs = {
-            'SAMLRequest': self._SAMLRequest,
-            'RelayState': self._RelayState
-        }
-        return urlencode(qs)
-
     @property
     def key(self):
         """
@@ -134,6 +127,14 @@ class SSOLoginData(object):
         :rtype: string
         """
         return escape(self._binding, quote=True)
+
+    @property
+    def query_string(self):
+        qs = {
+            'SAMLRequest': self._SAMLRequest,
+            'RelayState': self._RelayState
+        }
+        return urlencode(qs)
 
 
 class SSOLoginDataCache(object):
