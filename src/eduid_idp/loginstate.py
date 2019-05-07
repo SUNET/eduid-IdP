@@ -10,6 +10,7 @@
 
 import pprint
 from html import escape
+from urllib.parse import urlencode
 from logging import Logger
 from datetime import datetime
 from typing import Dict, Optional, Union, Mapping
@@ -59,6 +60,13 @@ class SSOLoginData(object):
                'FailCount': self._FailCount,
                }
         return res
+
+    def to_original_qs(self):
+        qs = {
+            'SAMLRequest': self._SAMLRequest,
+            'RelayState': self._RelayState
+        }
+        return urlencode(qs)
 
     @property
     def key(self):

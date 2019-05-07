@@ -495,7 +495,9 @@ def do_verify(context: IdPContext):
     context.logger.debug("Authenticating with {!r}".format(authn_ref))
 
     if not password or 'username' not in query:
-        raise eduid_idp.error.Unauthorized("Credentials not supplied", logger=context.logger)
+        lox = f'{query["redirect_uri"]}?{_ticket.to_original_qs()}'
+        context.logger.debug(f'Credentials not supplied. Redirect => {lox}')
+        raise eduid_idp.mischttp.Redirect(lox)
 
     login_data = {'username': query['username'].strip(),
                   'password': password,
@@ -506,8 +508,9 @@ def do_verify(context: IdPContext):
     if not authninfo:
         _ticket.FailCount += 1
         context.ticket_sessions.store_ticket(_ticket)
-        context.logger.debug("Unknown user or wrong password")
-        raise eduid_idp.error.Unauthorized("Login incorrect", logger=context.logger)
+        lox = f'{query["redirect_uri"]}?{_ticket.to_original_qs()}'
+        context.logger.debug(f'Unknown user or wrong password. Redirect => {lox}')
+        raise eduid_idp.mischttp.Redirect(lox)
 
     # Create SSO session
     user = authninfo.user
