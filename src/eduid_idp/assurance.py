@@ -131,7 +131,7 @@ class AuthnState(object):
 
     @property
     def is_multifactor(self):
-        return (self.password_used and self.fido_used) or (self.password_used and self.external_mfa_used)
+        return self.password_used and (self.fido_used or self.external_mfa_used)
 
     @property
     def is_swamid_al2_mfa(self):
@@ -154,7 +154,7 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     :rtype: str | None
     """
     authn = AuthnState(user, sso_session, logger)
-    logger.info(f'Authn for user {user.eppn} will be evaluated based on: {authn}')
+    logger.info(f'Authn for {user} will be evaluated based on: {authn}')
 
     cc = {'REFEDS_MFA':  'https://refeds.org/profile/mfa',
           'REFEDS_SFA':  'https://refeds.org/profile/sfa',
@@ -208,5 +208,5 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     else:
         attributes['eduPersonAssurance'] = [SWAMID_AL1]
 
-    logger.info(f'Assurances for user {user.eppn} was evaluated to: {response_authn} with attributes {attributes}')
+    logger.info(f'Assurances for {user} was evaluated to: {response_authn} with attributes {attributes}')
     return response_authn, attributes

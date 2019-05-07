@@ -75,7 +75,7 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
     tokens = u2f_tokens + webauthn_tokens
 
     if not tokens and not require_mfa:
-        context.logger.debug('User does not have any U2F or Webauthn tokens registered and SP did not require MFA')
+        context.logger.debug('User does not have any FIDO tokens registered and SP did not require MFA')
         return None
 
     existing_actions = context.actions_db.get_actions(user.eppn, ticket.key, action_type = 'mfa')
