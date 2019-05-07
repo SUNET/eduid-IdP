@@ -39,7 +39,7 @@ import eduid_idp
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode
-from eduid_idp.authn import AuthnData
+from eduid_idp.authn import AuthnData, ExternalMfaData
 from eduid_idp.error import Forbidden
 
 from eduid_userdb.nin import Nin
@@ -112,11 +112,11 @@ def _transport_encode(data):
     return b64encode(''.join(data.split('\n')))
 
 
-def make_login_ticket(req_class_ref, context):
+def make_login_ticket(req_class_ref, context, key=None):
     xmlstr = make_SAML_request(class_ref = req_class_ref)
     binding = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
-    key = 'unique-key-for-request-1'
-
+    if key is None:
+        key = 'unique-key-for-request-1'
     req_info = context.idp.parse_authn_request(xmlstr, binding)
     return SSOLoginData(key, req_info, {'SAMLRequest': xmlstr}, binding)
 
@@ -173,6 +173,8 @@ class TestSSO(IdPSimpleTestCase):
                 this = user.credentials.filter(U2F).to_list()[0]
             if isinstance(this, AuthnData):
                 sso_session_1.add_authn_credential(this)
+            if isinstance(this, ExternalMfaData):
+                sso_session_1.external_mfa = this
             else:
                 data = AuthnData(user, this, datetime.datetime.now())
                 sso_session_1.add_authn_credential(data)
@@ -197,7 +199,6 @@ class TestSSO(IdPSimpleTestCase):
         attr = out.get('authn_attributes', {})
         self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
 
-
     def test__get_login_response_2(self):
         """
         Test login with password and SWAMID AL2 U2F, request REFEDS MFA.
@@ -214,7 +215,6 @@ class TestSSO(IdPSimpleTestCase):
         attr = out.get('authn_attributes', {})
         self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
 
-
     def test__get_login_response_wrong_multifactor(self):
         """
         Test login with password and non-SWAMID-AL2 U2F, request REFEDS MFA.
@@ -225,6 +225,23 @@ class TestSSO(IdPSimpleTestCase):
             self._get_login_response_authn(req_class_ref=cc['REFEDS_MFA'],
                                            credentials=['pw', 'u2f'],
                                            )
+
+    def test__get_login_response_external_multifactor(self):
+        """
+        Test login with password and and external MFA, request REFEDS MFA.
+
+        Expect the response Authn to be REFEDS MFA and assurance attribute to include SWAMID MFA HI.
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        external_mfa = ExternalMfaData(user=user, issuer='issuer.example.com',
+                                       authn_context='http://id.elegnamnden.se/loa/1.0/loa3',
+                                       timestamp=datetime.datetime.utcnow())
+        out = self._get_login_response_authn(user=user, req_class_ref=cc['REFEDS_MFA'],
+                                             credentials=['pw', external_mfa],
+                                             )
+        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
+        attr = out.get('authn_attributes', {})
+        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
 
     def test__get_login_response_3(self):
         """

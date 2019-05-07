@@ -31,11 +31,12 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
+from typing import Optional
 
 import time
 import eduid_idp.idp_user
 import eduid_idp.assurance
-from eduid_idp.authn import AuthnData
+from eduid_idp.authn import AuthnData, ExternalMfaData
 
 
 class SSOSession(object):
@@ -69,6 +70,7 @@ class SSOSession(object):
                       'authn_request_id': authn_request_id,
                       'authn_credentials': [],
                       'authn_timestamp': ts,
+                      'external_mfa': None,
                       }
         if authn_credentials is not None:
             for x in authn_credentials:
@@ -184,6 +186,17 @@ class SSOSession(object):
         if not isinstance(data, AuthnData):
             raise ValueError('data should be AuthnData (not {})'.format(type(data)))
         self._data['authn_credentials'] += [data.to_session_dict()]
+
+    @property
+    def external_mfa(self) -> Optional[ExternalMfaData]:
+        """
+        Get the data about any external service used for mfa.
+        """
+        return self._data['external_mfa']
+
+    @external_mfa.setter
+    def external_mfa(self, data: ExternalMfaData):
+        self._data['external_mfa'] = data
 
 
 def from_dict(data):

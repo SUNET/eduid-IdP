@@ -29,6 +29,8 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
+from eduid_idp.authn import ExternalMfaData
+from eduid_idp.util import get_requested_authn_context
 
 __author__ = 'ft'
 
@@ -57,25 +59,32 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
     :param user: the authenticating user
     :param ticket: the SSO login data
     """
-    u2f_tokens = user.credentials.filter(U2F).to_list()
-    webauthn_tokens = user.credentials.filter(Webauthn).to_list()
-    tokens = u2f_tokens + webauthn_tokens
-    if not tokens:
-        context.logger.debug('User does not have any U2F or Webauthn tokens registered')
-        return None
-
     if not context.actions_db:
         context.logger.warning('No actions_db - aborting MFA action')
         return None
 
-    existing_actions = context.actions_db.get_actions(user.eppn, ticket.key,
-                                                      action_type = 'mfa',
-                                                      )
+    require_mfa = False
+    requested_authn_context = get_requested_authn_context(idp=context.idp, ticket=ticket, logger=context.logger)
+    if requested_authn_context in ['https://refeds.org/profile/mfa',
+                                   'https://www.swamid.se/specs/id-fido-u2f-ce-transports']:
+        require_mfa = True
+
+    # Security Keys
+    u2f_tokens = user.credentials.filter(U2F).to_list()
+    webauthn_tokens = user.credentials.filter(Webauthn).to_list()
+    tokens = u2f_tokens + webauthn_tokens
+
+    if not tokens and not require_mfa:
+        context.logger.debug('User does not have any FIDO tokens registered and SP did not require MFA')
+        return None
+
+    existing_actions = context.actions_db.get_actions(user.eppn, ticket.key, action_type = 'mfa')
     if existing_actions and len(existing_actions) > 0:
         context.logger.debug('User has existing MFA actions - checking them')
         if check_authn_result(context, user, ticket, existing_actions):
             for this in ticket.mfa_action_creds:
                 context.authn.log_authn(user, success=[this.key], failure=[])
+            # TODO: Should we persistently log external mfa usage?
             return
         context.logger.error('User returned without MFA credentials')
 
@@ -105,9 +114,13 @@ def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
 
     for this in actions:
         context.logger.debug('Action {} authn result: {}'.format(this, this.result))
+        utc_now = datetime.datetime.utcnow().replace(tzinfo=None)  # thanks for not having timezone.utc, Python2
         if this.result.get('success') is True:
             if this.result.get('issuer') and this.result.get('authn_context'):
                 # External MFA authentication
+                ticket.mfa_action_external = ExternalMfaData(user=user, issuer=this.result['issuer'],
+                                                             authn_context=this.result['authn_context'],
+                                                             timestamp=utc_now)
                 context.logger.debug('Removing MFA action completed with external issuer {}'.format(
                     this.result.get('issuer')))
                 context.actions_db.remove_action_by_id(this.action_id)
@@ -115,7 +128,6 @@ def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
             key = this.result.get(RESULT_CREDENTIAL_KEY_NAME)
             cred = user.credentials.find(key)
             if cred:
-                utc_now = datetime.datetime.utcnow().replace(tzinfo = None)  # thanks for not having timezone.utc, Python2
                 ticket.mfa_action_creds[cred] = utc_now
                 context.logger.debug('Removing MFA action completed with {}'.format(cred))
                 context.actions_db.remove_action_by_id(this.action_id)

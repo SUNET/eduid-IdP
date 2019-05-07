@@ -14,6 +14,7 @@ from logging import Logger
 from datetime import datetime
 from typing import Dict, Optional, Union, Mapping
 
+from eduid_idp.authn import ExternalMfaData
 from eduid_idp.config import IdPConfig
 from eduid_idp.cache import ExpiringCache, ExpiringCacheMem, ExpiringCacheCommonSession
 from saml2.request import AuthnRequest
@@ -40,6 +41,7 @@ class SSOLoginData(object):
         # dict to transfer data about credentials successfully used from the MFA plugin
         # to the IdP code, where it will be transferred to the SSO session
         self.mfa_action_creds: Dict[Credential, datetime] = {}
+        self.mfa_action_external: Optional[ExternalMfaData] = None
 
     def __str__(self):
         data = self.to_dict()

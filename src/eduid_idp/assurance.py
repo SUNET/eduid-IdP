@@ -40,21 +40,25 @@ from eduid_userdb.credentials import Credential, METHOD_SWAMID_AL2_MFA, METHOD_S
 Assurance Level functionality.
 """
 
+
 class AssuranceException(Exception):
     pass
+
 
 class MissingSingleFactor(AssuranceException):
     pass
 
+
 class MissingMultiFactor(AssuranceException):
     pass
+
 
 class WrongMultiFactor(AssuranceException):
     pass
 
+
 class MissingAuthentication(AssuranceException):
     pass
-
 
 
 class AuthnState(object):
@@ -75,7 +79,9 @@ class AuthnState(object):
         #  'authn_ts': self.timestamp,
         # }
         self.password_used = False
+        self.is_swamid_al2 = False
         self.fido_used = False
+        self.external_mfa_used = False
         self.swamid_al2_used = False
         self.swamid_al2_hi_used = False
         self._creds: List[Credential] = []
@@ -103,14 +109,21 @@ class AuthnState(object):
                         self.swamid_al2_used = True
                     elif cred.proofing_method == METHOD_SWAMID_AL2_MFA_HI:
                         self.swamid_al2_hi_used = True
-        self.is_swamid_al2 = False
+            # External mfa check
+            if sso_session.external_mfa is not None:
+                self.logger.debug('External MFA issuer: {}'.format(sso_session.external_mfa.issuer))
+                self.external_mfa_used = True
+                # TODO: Support more SwedenConnect authn contexts?
+                if sso_session.external_mfa.authn_context == 'http://id.elegnamnden.se/loa/1.0/loa3':
+                    self.swamid_al2_hi_used = True
+
         if user.nins.verified.to_list():
             self.is_swamid_al2 = True
 
     def __str__(self):
         return (f'<AuthnState: creds={len(self._creds)}, pw={self.password_used}, fido={self.fido_used}, '
-                f'nin is al2={self.is_swamid_al2}, token is (al2={self.swamid_al2_used}, '
-                f'al2_hi={self.swamid_al2_hi_used})>')
+                f'external_mfa={self.external_mfa_used}, nin is al2={self.is_swamid_al2}, '
+                f'mfa is (al2={self.swamid_al2_used}, al2_hi={self.swamid_al2_hi_used})>')
 
     @property
     def is_singlefactor(self):
@@ -118,7 +131,7 @@ class AuthnState(object):
 
     @property
     def is_multifactor(self):
-        return self.password_used and self.fido_used
+        return self.password_used and (self.fido_used or self.external_mfa_used)
 
     @property
     def is_swamid_al2_mfa(self):
@@ -141,7 +154,7 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     :rtype: str | None
     """
     authn = AuthnState(user, sso_session, logger)
-    logger.debug('Authn will be evaluated based on: {!s}'.format(authn))
+    logger.info(f'Authn for {user} will be evaluated based on: {authn}')
 
     cc = {'REFEDS_MFA':  'https://refeds.org/profile/mfa',
           'REFEDS_SFA':  'https://refeds.org/profile/sfa',
@@ -195,4 +208,5 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
     else:
         attributes['eduPersonAssurance'] = [SWAMID_AL1]
 
+    logger.info(f'Assurances for {user} was evaluated to: {response_authn} with attributes {attributes}')
     return response_authn, attributes

@@ -46,7 +46,8 @@ import cherrypy
 from mock import patch
 
 import eduid_idp
-from eduid_idp.tests.test_SSO import make_SAML_request
+from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMID_AL2
+from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
 from eduid_idp.idp import IdPApplication
 
 import eduid_userdb
@@ -247,9 +248,17 @@ class TestActions(MongoTestCase):
     def test_add_mfa_action_no_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.mfa_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+
+    def test_add_mfa_action_no_key_required_mfa(self):
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.mfa_action import add_actions
+        mock_ticket = make_login_ticket(req_class_ref=CONTEXTCLASSREFS['REFEDS_MFA'], context=self.idp_app.context,
+                                        key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_old_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -263,7 +272,7 @@ class TestActions(MongoTestCase):
         self.test_user.credentials.add(u2f)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
@@ -278,7 +287,7 @@ class TestActions(MongoTestCase):
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
@@ -293,7 +302,7 @@ class TestActions(MongoTestCase):
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         with self.assertRaises(AttributeError):
             add_actions(self.idp_app, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
@@ -324,7 +333,7 @@ class TestActions(MongoTestCase):
         }
         self.actions.update_action(completed_action)
         from eduid_idp.mfa_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), actions)
         return mock_ticket
@@ -347,7 +356,7 @@ class TestActions(MongoTestCase):
     def test_add_tou_action(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
@@ -361,7 +370,7 @@ class TestActions(MongoTestCase):
         ))
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
 
@@ -375,7 +384,7 @@ class TestActions(MongoTestCase):
         ))
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
@@ -388,7 +397,7 @@ class TestActions(MongoTestCase):
         )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
@@ -401,6 +410,6 @@ class TestActions(MongoTestCase):
         )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
-        mock_ticket = MockTicket(key='mock-session')
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 2)
