@@ -528,31 +528,32 @@ def do_verify(context: IdPContext):
 
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
     context.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
-        query['key'], _sso_session.public_id,
+        _ticket.key, _sso_session.public_id,
         authn_ref,
         user))
 
     # Now that an SSO session has been created, redirect the users browser back to
     # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'
     # is passed as an URL parameter instead of the SAMLRequest.
-    lox = query["redirect_uri"] + '?key=' + query['key']
+    lox = query["redirect_uri"] + '?key=' + _ticket.key
     context.logger.debug("Redirect => %s" % lox)
     raise eduid_idp.mischttp.Redirect(lox)
 
 
 # ----------------------------------------------------------------------------
-def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOLoginData:
+def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
-    if 'key' not in info:
+    _key = info.get('key')
+    if not _key:
         if 'SAMLRequest' not in info:
             raise eduid_idp.error.BadRequest('Missing SAMLRequest, please re-initiate login',
                                              logger = logger, extra = {'info': info, 'binding': binding})
-        info['key'] = ExpiringCache.key(info['SAMLRequest'])
-        logger.debug("No 'key' in info, hashed SAMLRequest into key {}".format(info['key']))
+        _key = ExpiringCache.key(info['SAMLRequest'])
+        logger.debug("No 'key' in info, hashed SAMLRequest into key {}".format(_key))
 
-    ticket = context.ticket_sessions.get_ticket(info['key'])
+    ticket = context.ticket_sessions.get_ticket(_key)
     if ticket:
         if not isinstance(ticket, SSOLoginData):
             # If context.ticket_sessions is ExpiringCacheCommonSession, this will be an
@@ -562,20 +563,20 @@ def _get_ticket(context: IdPContext, info: dict, binding: Optional[str]) -> SSOL
                 binding = info['binding']
             if binding is None:
                 raise eduid_idp.error.BadRequest('Bad request, no binding')
-            return _create_ticket(context, ticket, binding)
+            return _create_ticket(context, ticket, binding, _key)
         return ticket
     # cache miss, parse SAMLRequest
     if binding is None:
         binding = info['binding']
     if binding is None:
         raise eduid_idp.error.BadRequest('Bad request, no binding')
-    ticket = _create_ticket(context, info, binding)
+    ticket = _create_ticket(context, info, binding, _key)
     context.ticket_sessions.store_ticket(ticket)
 
     return ticket
 
 
-def _create_ticket(context: IdPContext, info: Mapping, binding: str) -> SSOLoginData:
+def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -> SSOLoginData:
     """
     Create an SSOLoginData instance from a dict.
 
@@ -593,8 +594,8 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str) -> SSOLogin
     if not binding:
         raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = context.logger)
     req_info = _parse_SAMLRequest(context, info, binding)
-    ticket = SSOLoginData(info['key'], req_info, info, binding)
-    context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(info['key']))
+    ticket = SSOLoginData(key, req_info, info, binding)
+    context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
     return ticket
 
 
