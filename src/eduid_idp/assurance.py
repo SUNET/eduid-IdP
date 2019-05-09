@@ -127,7 +127,7 @@ class AuthnState(object):
 
     @property
     def is_singlefactor(self):
-        return self.password_used or self.fido_used or self.external_mfa_used
+        return self.password_used or self.fido_used
 
     @property
     def is_multifactor(self):
