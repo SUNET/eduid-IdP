@@ -38,7 +38,8 @@ such as rate limiting.
 """
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from typing import Dict
 
 import vccs_client
 
@@ -125,10 +126,16 @@ class ExternalMfaData(object):
     """
     Data about a successful external authentication as a multi factor.
     """
-    user: IdPUser
     issuer: str
     authn_context: str
     timestamp: datetime.datetime
+
+    def to_session_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_session_dict(cls, data: Dict):
+        return cls(**data)
 
 
 class IdPAuthn(object):

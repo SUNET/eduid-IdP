@@ -234,7 +234,7 @@ class TestSSO(IdPSimpleTestCase):
         Expect the response Authn to be REFEDS MFA and assurance attribute to include SWAMID MFA HI.
         """
         user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
-        external_mfa = ExternalMfaData(user=user, issuer='issuer.example.com',
+        external_mfa = ExternalMfaData(issuer='issuer.example.com',
                                        authn_context='http://id.elegnamnden.se/loa/1.0/loa3',
                                        timestamp=datetime.datetime.utcnow())
         out = self._get_login_response_authn(user=user, req_class_ref=cc['REFEDS_MFA'],
