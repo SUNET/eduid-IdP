@@ -480,12 +480,10 @@ def do_verify(context: IdPContext):
     """
     query = eduid_idp.mischttp.get_post(context.logger)
     # extract password to keep it away from as much code as possible
-    password = query.get('password')
-    _loggable = query.copy()
+    password = query.pop('password', None)
     if password:
-        del query['password']
-        _loggable['password'] = '<redacted>'
-    context.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(_loggable)))
+        query['password'] = '<redacted>'
+    context.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(query)))
 
     _ticket = _get_ticket(context, query, None)
 
