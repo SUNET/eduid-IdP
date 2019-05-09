@@ -33,13 +33,14 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
-from unittest import TestCase
+import unittest
 
 from eduid_idp.loginstate import SSOLoginData
 
 
-class TestSSOLoginData(TestCase):
+class TestSSOLoginData(unittest.TestCase):
 
+    @unittest.skip('We ought to remove this FailCount thingy')
     def test_FailCount(self):
         data = {'SAMLRequest': '4711',
                 }
@@ -47,6 +48,7 @@ class TestSSOLoginData(TestCase):
         ticket.FailCount = 9
         self.assertEqual(ticket.FailCount, 9)
 
+    @unittest.skip('We ought to remove this FailCount thingy')
     def test_SAMLRequest(self):
         data = {'SAMLRequest': '4711',
                 }

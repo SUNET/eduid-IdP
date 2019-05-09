@@ -13,27 +13,26 @@
 Miscellaneous HTTP related functions.
 """
 
-import os
-import re
-import six
 import base64
-import pprint
 import binascii
-import pkg_resources
-
+import os
+import pprint
+import re
 from logging import Logger
+from typing import Callable, Optional
+
+import cherrypy
+import pkg_resources
+import six
 from six import string_types
 from six.moves.urllib.parse import parse_qs
-from typing import Callable, Optional
 
 import eduid_idp
 import eduid_idp.thirdparty
-from eduid_idp.util import b64encode
+from eduid_common.api.sanitation import SanitationProblem, Sanitizer
 from eduid_idp.error import BadRequest
-from eduid_common.api.sanitation import Sanitizer, SanitationProblem
-
+from eduid_idp.util import b64encode
 from saml2 import BINDING_HTTP_REDIRECT
-import cherrypy
 
 
 class Redirect(cherrypy.HTTPRedirect):
@@ -350,6 +349,7 @@ def set_cookie(name, path, logger, config, value=''):
     if isinstance(value, six.binary_type):
         value = value.decode('utf-8')
     cookie = cherrypy.response.cookie
+    # TODO: Don't b64encode in here
     cookie[name] = b64encode(value)
     cookie[name]['path'] = path
     if not config.insecure_cookies:

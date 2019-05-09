@@ -36,16 +36,15 @@
 import datetime
 
 import eduid_idp
+import saml2.time_util
+from eduid_idp.authn import AuthnData, ExternalMfaData
+from eduid_idp.error import Forbidden
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode
-from eduid_idp.authn import AuthnData, ExternalMfaData
-from eduid_idp.error import Forbidden
-
+from eduid_userdb.credentials import METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI, Password, U2F, u2f_from_dict
 from eduid_userdb.nin import Nin
-from eduid_userdb.credentials import U2F, Password, u2f_from_dict, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
-import saml2.time_util
-
+from idp_saml import parse_SAMLRequest
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
 SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'
@@ -112,13 +111,16 @@ def _transport_encode(data):
     return b64encode(''.join(data.split('\n')))
 
 
-def make_login_ticket(req_class_ref, context, key=None):
+def make_login_ticket(req_class_ref, context, key=None) -> SSOLoginData:
     xmlstr = make_SAML_request(class_ref = req_class_ref)
+    info = {'SAMLRequest': xmlstr}
     binding = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
     if key is None:
         key = 'unique-key-for-request-1'
-    req_info = context.idp.parse_authn_request(xmlstr, binding)
-    return SSOLoginData(key, req_info, {'SAMLRequest': xmlstr}, binding)
+    saml_req = parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
+                                 context.config.debug, context.config.verify_request_signatures)
+    #context.idp.parse_authn_request(xmlstr, binding)
+    return SSOLoginData(key, saml_req, xmlstr)
 
 
 # noinspection PyProtectedMember
@@ -196,9 +198,8 @@ class TestSSO(IdPSimpleTestCase):
                                              req_class_ref = cc['REFEDS_MFA'],
                                              credentials = ['pw', _U2F_SWAMID_AL2_HI],
                                              )
-        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
-        attr = out.get('authn_attributes', {})
-        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
+        self.assertEqual(out.class_ref, cc['REFEDS_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
 
     def test__get_login_response_2(self):
         """
@@ -212,9 +213,8 @@ class TestSSO(IdPSimpleTestCase):
                                              req_class_ref = cc['REFEDS_MFA'],
                                              credentials = ['pw', _U2F_SWAMID_AL2],
                                              )
-        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
-        attr = out.get('authn_attributes', {})
-        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+        self.assertEqual(out.class_ref, cc['REFEDS_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
 
     def test__get_login_response_wrong_multifactor(self):
         """
@@ -240,9 +240,8 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(user=user, req_class_ref=cc['REFEDS_MFA'],
                                              credentials=['pw', external_mfa],
                                              )
-        self.assertEqual(out['class_ref'], cc['REFEDS_MFA'])
-        attr = out.get('authn_attributes', {})
-        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
+        self.assertEqual(out.class_ref, cc['REFEDS_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2, SWAMID_AL2_MFA_HI])
 
     def test__get_login_response_3(self):
         """
@@ -253,7 +252,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['pw', 'u2f'],
                                              )
-        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
+        self.assertEqual(out.class_ref, cc['REFEDS_SFA'])
 
     def test__get_login_response_4(self):
         """
@@ -264,7 +263,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['pw'],
                                              )
-        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
+        self.assertEqual(out.class_ref, cc['REFEDS_SFA'])
 
     def test__get_login_response_UNSPECIFIED2(self):
         """
@@ -275,7 +274,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = cc['REFEDS_SFA'],
                                              credentials = ['u2f'],
                                              )
-        self.assertEqual(out['class_ref'], cc['REFEDS_SFA'])
+        self.assertEqual(out.class_ref, cc['REFEDS_SFA'])
 
     def test__get_login_response_5(self):
         """
@@ -286,7 +285,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = cc['FIDO_U2F'],
                                              credentials = ['pw', 'u2f'],
                                              )
-        self.assertEqual(out['class_ref'], cc['FIDO_U2F'])
+        self.assertEqual(out.class_ref, cc['FIDO_U2F'])
 
     def test__get_login_response_6(self):
         """
@@ -297,7 +296,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = PASSWORDPROTECTEDTRANSPORT,
                                              credentials = ['pw', 'u2f'],
                                              )
-        self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
+        self.assertEqual(out.class_ref, PASSWORDPROTECTEDTRANSPORT)
 
     def test__get_login_response_7(self):
         """
@@ -308,7 +307,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = PASSWORDPROTECTEDTRANSPORT,
                                              credentials = ['pw'],
                                              )
-        self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
+        self.assertEqual(out.class_ref, PASSWORDPROTECTEDTRANSPORT)
 
     def test__get_login_response_8(self):
         """
@@ -319,7 +318,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
                                              credentials = ['pw', 'u2f'],
                                              )
-        self.assertEqual(out['class_ref'], cc['FIDO_U2F'])
+        self.assertEqual(out.class_ref, cc['FIDO_U2F'])
 
     def test__get_login_response_9(self):
         """
@@ -330,7 +329,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
                                              credentials = ['pw'],
                                              )
-        self.assertEqual(out['class_ref'], PASSWORDPROTECTEDTRANSPORT)
+        self.assertEqual(out.class_ref, PASSWORDPROTECTEDTRANSPORT)
 
     def test__get_login_response_assurance_AL1(self):
         """
@@ -339,8 +338,7 @@ class TestSSO(IdPSimpleTestCase):
         out = self._get_login_response_authn(req_class_ref = 'urn:no-such-class',
                                              credentials = ['pw'],
                                              )
-        attr = out.get('authn_attributes', {})
-        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1])
 
     def test__get_login_response_assurance_AL2(self):
         """
@@ -351,5 +349,4 @@ class TestSSO(IdPSimpleTestCase):
                                              req_class_ref = 'urn:no-such-class',
                                              credentials = ['pw'],
                                              )
-        attr = out.get('authn_attributes', {})
-        self.assertEqual(attr['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])

@@ -32,18 +32,14 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
-from logging import Logger
-
-import six
 import base64
+from logging import Logger
 from typing import Optional
 
-from saml2.server import Server as Saml2Server
+import six
 
-import eduid_idp.mischttp
-from eduid_idp.context import IdPContext
-from eduid_idp.cache import RedisEncryptedSession
-from eduid_idp.loginstate import SSOLoginData
+from idp_saml import IdP_SAMLRequest
+from saml2.server import Server as Saml2Server
 
 
 def b64encode(source):
@@ -81,27 +77,20 @@ def maybe_xml_to_string(message, logger=None):
         return message
 
 
-def get_requested_authn_context(idp: Saml2Server, ticket: SSOLoginData, logger: Logger) -> Optional[str]:
+def get_requested_authn_context(idp: Saml2Server, saml_req: IdP_SAMLRequest, logger: Logger) -> Optional[str]:
     """
     Check if the SP has explicit Authn preferences in the metadata (some SPs are not
     capable of conveying this preference in the RequestedAuthnContext)
     """
-    res = None
-    req_authn_context = ticket.req_info.message.requested_authn_context
-    if req_authn_context and req_authn_context.authn_context_class_ref:
-        res = req_authn_context.authn_context_class_ref[0].text
+    res = saml_req.get_requested_authn_context()
 
-    try:
-        attributes = idp.metadata.entity_attributes(ticket.req_info.message.issuer.text)
-    except KeyError:
-        attributes = {}
+    attributes = saml_req.sp_entity_attributes
+
     if 'http://www.swamid.se/assurance-requirement' in attributes:
         # XXX don't just pick the first one from the list - choose the most applicable one somehow.
         new_authn = attributes['http://www.swamid.se/assurance-requirement'][0]
-        logger.debug("Entity {!r} has AuthnCtx preferences in metadata. Overriding {!r} -> {!r}".format(
-            ticket.req_info.message.issuer.text,
-            res,
-            new_authn))
+        logger.debug(f'Entity {saml_req.sp_entity_id} has AuthnCtx preferences in metadata. '
+                     f'Overriding {res} -> {new_authn}')
         res = new_authn
 
     return res

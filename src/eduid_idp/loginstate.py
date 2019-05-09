@@ -9,17 +9,16 @@
 #
 
 import pprint
-from html import escape
-from urllib.parse import urlencode
-from logging import Logger
 from datetime import datetime
-from typing import Dict, Optional, Union, Mapping
+from html import escape
+from logging import Logger
+from typing import Dict, Mapping, Optional, Union
+from urllib.parse import urlencode
 
 from eduid_idp.authn import ExternalMfaData
+from eduid_idp.cache import ExpiringCache, ExpiringCacheCommonSession, ExpiringCacheMem
 from eduid_idp.config import IdPConfig
-from eduid_idp.cache import ExpiringCache, ExpiringCacheMem, ExpiringCacheCommonSession
-from saml2.request import AuthnRequest
-
+from eduid_idp.idp_saml import IdP_SAMLRequest
 from eduid_userdb.credentials import Credential
 
 
@@ -32,13 +31,13 @@ class SSOLoginData(object):
     :param req_info: pysaml2 AuthnRequest data
     :param data: dict
     """
-    def __init__(self, key: str, req_info: AuthnRequest, data: Mapping, binding: str):
+    def __init__(self, key: str, saml_req: IdP_SAMLRequest, relay_state: str = '', fail_count: int = 0):
         self._key = key
-        self._req_info = req_info
-        self._SAMLRequest = data['SAMLRequest']
-        self._RelayState = data.get('RelayState', '')
-        self._FailCount = data.get('FailCount', 0)
-        self._binding = binding
+        self._saml_req = saml_req
+        self._SAMLRequest = saml_req.request
+        self._RelayState = relay_state
+        self._FailCount = fail_count
+        self._binding = saml_req.binding
         # dict to transfer data about credentials successfully used from the MFA plugin
         # to the IdP code, where it will be transferred to the SSO session
         self.mfa_action_creds: Dict[Credential, datetime] = {}
@@ -53,10 +52,10 @@ class SSOLoginData(object):
 
     def to_dict(self):
         res = {'key': self._key,
-               'req_info': self._req_info,
-               'SAMLRequest': self._SAMLRequest,
+               'req_info': self._saml_req,
+               'SAMLRequest': self._saml_req.request,  # backwards compat
                'RelayState': self._RelayState,
-               'binding': self._binding,
+               'binding': self._saml_req.binding,  # backwards compat
                'FailCount': self._FailCount,
                }
         return res
@@ -80,13 +79,9 @@ class SSOLoginData(object):
         return escape(self._SAMLRequest, quote=True)
 
     @property
-    def req_info(self):
-        """
-        req_info is SAMLRequest, but parsed
-
-        :rtype: AuthnRequest
-        """
-        return self._req_info
+    def saml_req(self) -> IdP_SAMLRequest:
+        """Parsed SAML request."""
+        return self._saml_req
 
     @property
     def RelayState(self):
