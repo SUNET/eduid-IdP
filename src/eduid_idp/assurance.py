@@ -33,7 +33,7 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 import logging
-from typing import List
+from typing import List, Optional
 
 from eduid_userdb.credentials import Credential, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
 from idp_saml import AuthnInfo
@@ -141,7 +141,8 @@ class AuthnState(object):
         return self.swamid_al2_used or self.swamid_al2_hi_used
 
 
-def response_authn(req_authn_ctx: str, user: IdPUser, sso_session: 'SSOSession', logger: logging.Logger) -> AuthnInfo:
+# Can't type sso_session: SSOSession here because it creates an import dependency loop
+def response_authn(req_authn_ctx: Optional[str], user: IdPUser, sso_session, logger: logging.Logger) -> AuthnInfo:
     """
     Figure out what AuthnContext to assert in a SAML response,
     given the RequestedAuthnContext from the SAML request.
