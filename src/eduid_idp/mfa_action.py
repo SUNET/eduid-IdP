@@ -118,7 +118,7 @@ def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
         if this.result.get('success') is True:
             if this.result.get('issuer') and this.result.get('authn_context'):
                 # External MFA authentication
-                ticket.mfa_action_external = ExternalMfaData(user=user, issuer=this.result['issuer'],
+                ticket.mfa_action_external = ExternalMfaData(issuer=this.result['issuer'],
                                                              authn_context=this.result['authn_context'],
                                                              timestamp=utc_now)
                 context.logger.debug('Removing MFA action completed with external issuer {}'.format(

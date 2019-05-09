@@ -84,6 +84,11 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
             authn = AuthnData(user = user, credential = cred, timestamp = ts)
             sso_session.add_authn_credential(authn)
             update = True
+        # eduid_action.mfa.idp.check_authn_result will have added any external mfa used to
+        # the ticket.mfa_action_external - transfer it to the session
+        if ticket.mfa_action_external is not None:
+            sso_session.external_mfa = ticket.mfa_action_external
+            update = True
 
         if update:
             context.sso_sessions.update_session(user.user_id, sso_session.to_dict())

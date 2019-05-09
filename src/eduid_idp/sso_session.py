@@ -31,7 +31,7 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
-from typing import Optional
+from typing import Optional, Dict
 
 import time
 import eduid_idp.idp_user
@@ -63,7 +63,7 @@ class SSOSession(object):
     """
 
     def __init__(self, user_id, authn_request_id,
-                 authn_credentials = None, ts=None):
+                 authn_credentials = None, ts=None, external_mfa=None):
         if ts is None:
             ts = int(time.time())
         self._data = {'user_id': user_id,
@@ -79,6 +79,12 @@ class SSOSession(object):
                     self._data['authn_credentials'] += [x]
                 else:
                     self.add_authn_credential(x)
+        if external_mfa is not None:
+            if isinstance(external_mfa, dict):
+                self._data['external_mfa'] = external_mfa
+            else:
+                self.external_mfa = external_mfa
+
         # Extra information not serialized
         self._idp_user = None
 
@@ -192,11 +198,13 @@ class SSOSession(object):
         """
         Get the data about any external service used for mfa.
         """
+        if self._data['external_mfa'] is not None:
+            return ExternalMfaData.from_session_dict(self._data['external_mfa'])
         return self._data['external_mfa']
 
     @external_mfa.setter
     def external_mfa(self, data: ExternalMfaData):
-        self._data['external_mfa'] = data
+        self._data['external_mfa'] = data.to_session_dict()
 
 
 def from_dict(data):
@@ -213,4 +221,5 @@ def from_dict(data):
                       authn_request_id = data['authn_request_id'],
                       authn_credentials = data.get('authn_credentials'),
                       ts = data['authn_timestamp'],
+                      external_mfa = data['external_mfa'],
                       )
