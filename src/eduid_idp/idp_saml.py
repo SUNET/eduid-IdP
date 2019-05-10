@@ -4,7 +4,7 @@ from typing import Mapping, NewType, Optional
 
 import eduid_idp
 import saml2.server
-from cache import ExpiringCache
+from eduid_idp.cache import ExpiringCache
 from saml2.s_utils import UnknownPrincipal, UnknownSystemEntity, UnravelError, UnsupportedBinding
 from saml2.saml import Issuer
 from saml2.samlp import RequestedAuthnContext

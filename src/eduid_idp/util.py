@@ -38,7 +38,7 @@ from typing import Optional
 
 import six
 
-from idp_saml import IdP_SAMLRequest
+from eduid_idp.idp_saml import IdP_SAMLRequest
 from saml2.server import Server as Saml2Server
 
 

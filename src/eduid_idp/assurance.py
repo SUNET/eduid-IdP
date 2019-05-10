@@ -35,9 +35,9 @@
 import logging
 from typing import List, Optional
 
+from eduid_idp.idp_saml import AuthnInfo
+from eduid_idp.idp_user import IdPUser
 from eduid_userdb.credentials import Credential, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
-from idp_saml import AuthnInfo
-from idp_user import IdPUser
 
 """
 Assurance Level functionality.
