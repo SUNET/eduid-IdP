@@ -15,6 +15,7 @@ Miscellaneous HTTP related functions.
 
 import base64
 import binascii
+import logging
 import os
 import pprint
 import re
@@ -30,6 +31,7 @@ from six.moves.urllib.parse import parse_qs
 import eduid_idp
 import eduid_idp.thirdparty
 from eduid_common.api.sanitation import SanitationProblem, Sanitizer
+from eduid_idp.config import IdPConfig
 from eduid_idp.error import BadRequest
 from eduid_idp.util import b64encode
 from saml2 import BINDING_HTTP_REDIRECT
@@ -307,25 +309,19 @@ def read_cookie(name: str, logger: Logger) -> Optional[str]:
     return cookie.value
 
 
-def delete_cookie(name, logger, config):
+def delete_cookie(name: str, logger: logging.Logger, config: IdPConfig) -> None:
     """
     Ask browser to delete a cookie.
 
     :param name: cookie name as string
     :param logger: logging instance
     :param config: IdPConfig instance
-    :return: True on success
-
-    :type name: string
-    :type logger: logging.Logger
-    :type config: eduid_idp.config.IdPConfig
-    :rtype: bool
     """
     logger.debug("Delete cookie: {!s}".format(name))
-    return set_cookie(name, '/', logger, config)
+    return set_cookie(name, '/', logger, config, value='')
 
 
-def set_cookie(name, path, logger, config, value=''):
+def set_cookie(name: str, path: str, logger: logging.Logger, config: IdPConfig, value: str, b64: bool = True) -> None:
     """
     Ask browser to store a cookie.
 
@@ -336,27 +332,22 @@ def set_cookie(name, path, logger, config, value=''):
     :param logger: logging instance
     :param config: IdPConfig instance
     :param value: The value to assign to the cookie
-
-    :return: True on success
-
-    :type name: string
-    :type path: string
-    :type logger: logging.Logger
-    :type config: eduid_idp.config.IdPConfig
-    :type value: string
-    :rtype: bool
     """
-    if isinstance(value, six.binary_type):
-        value = value.decode('utf-8')
     cookie = cherrypy.response.cookie
+<<<<<<< HEAD
     # TODO: Don't b64encode in here
     cookie[name] = b64encode(value)
+=======
+    if b64:
+        cookie[name] = b64encode(value)
+    else:
+        cookie[name] = value
+>>>>>>> master
     cookie[name]['path'] = path
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
     cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
     logger.debug("Set cookie {!r} : {}".format(name, cookie))
-    return True
 
 
 def parse_query_string(logger):
