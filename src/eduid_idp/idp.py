@@ -289,15 +289,23 @@ class IdPApplication(object):
     def _update_request_session(self, token=None):
         logger = self.context.logger
         if self.context.common_sessions is not None:
+            cookie_name = self.config.shared_session_cookie_name
+            logger.debug(f'Cookie name configured {cookie_name}')
             if token is None:
-                cookie_name = self.config.shared_session_cookie_name
-                logger.debug(f'Cookie name configured {cookie_name}')
                 token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
                 logger.debug(f'Cookie retrieved {token}')
             if token:
                 session = self.context.common_sessions.get(token)
                 logger.debug(f'Session retrieved {session}')
-                object.__setattr__(cherrypy.request, 'session', session)
+            else:
+                session = self.context.common_sessions.new_common_session()
+                logger.debug(f'Created new common session {session}')
+                eduid_idp.mischttp.set_cookie(cookie_name, '/', self.context.logger,
+                                              self.context.config,
+                                              session.token, b64=False,
+                                              )
+                session.commit()
+            object.__setattr__(cherrypy.request, 'session', session)
         else:
             logger.info('eduID shared sessions not configured')
 
