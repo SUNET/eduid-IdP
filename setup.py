@@ -6,7 +6,7 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README')).read()
 
-version = '0.5.9b2'
+version = '0.5.9b3'
 
 install_requires = [x for x in open(os.path.join(here, 'requirements.txt')).read().split('\n') if len(x) > 0]
 testing_extras = [x for x in open(os.path.join(here, 'test_requirements.txt')).read().split('\n')

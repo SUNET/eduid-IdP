@@ -279,13 +279,11 @@ class ExpiringCacheCommonSession(ExpiringCache):
         session.commit()
         return session
 
-    def get(self, key) -> RedisEncryptedSession:
+    def get(self, key: str) -> RedisEncryptedSession:
         """
         Fetch data from cache based on `key'.
 
         :param key: hash key to use for lookup
-
-        :type key: str | unicode
 
         :returns: The previously added session
         """
@@ -298,6 +296,11 @@ class ExpiringCacheCommonSession(ExpiringCache):
             return session
         except KeyError:
             pass
+
+    def new_common_session(self) -> RedisEncryptedSession:
+        """Create a new eduid common session for use in the old CherryPy IdP."""
+        session = self._manager.get_session(data={}, debug=self._debug)
+        return session
 
     def update(self, key, info):
         """

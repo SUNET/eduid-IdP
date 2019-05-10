@@ -1,5 +1,5 @@
 eduid_userdb>=0.4.6b6
-eduid_common[idp]>=0.4.1b3
+eduid_common[idp]>=0.4.1b4
 pysaml2==4.6.5
 cherrypy==15.0
 defusedxml>=0.5.0
