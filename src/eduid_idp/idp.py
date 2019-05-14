@@ -244,8 +244,6 @@ class IdPApplication(object):
 
         _common_sessions: Optional[ExpiringCacheCommonSession] = None
 
-        logger.debug(f"{config.redis_sentinel_hosts} or {config.redis_host}) and {config.shared_session_cookie_name} \
-                and {config.shared_session_secret_key}")
         if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
                 and config.shared_session_secret_key:
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
