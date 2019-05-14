@@ -221,5 +221,5 @@ def from_dict(data):
                       authn_request_id = data['authn_request_id'],
                       authn_credentials = data.get('authn_credentials'),
                       ts = data['authn_timestamp'],
-                      external_mfa = data['external_mfa'],
+                      external_mfa = data.get('external_mfa'),
                       )
