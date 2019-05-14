@@ -334,15 +334,10 @@ def set_cookie(name: str, path: str, logger: logging.Logger, config: IdPConfig, 
     :param value: The value to assign to the cookie
     """
     cookie = cherrypy.response.cookie
-<<<<<<< HEAD
-    # TODO: Don't b64encode in here
-    cookie[name] = b64encode(value)
-=======
     if b64:
         cookie[name] = b64encode(value)
     else:
         cookie[name] = value
->>>>>>> master
     cookie[name]['path'] = path
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
