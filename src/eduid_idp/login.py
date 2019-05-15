@@ -93,8 +93,8 @@ class SSO(Service):
 
         saml_response = self._make_saml_response(response_authn, resp_args, user, ticket, self.sso_session)
 
-        binding_out = resp_args.get('binding_out')
-        destination = resp_args.get('destination')
+        binding_out = resp_args['binding_out']
+        destination = resp_args['destination']
         http_args = ticket.saml_req.apply_binding(resp_args, ticket.RelayState, str(saml_response))
 
         # INFO-Log the SSO session id and the AL and destination
