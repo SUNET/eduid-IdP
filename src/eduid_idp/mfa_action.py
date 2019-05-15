@@ -114,6 +114,8 @@ def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
 
     for this in actions:
         context.logger.debug('Action {} authn result: {}'.format(this, this.result))
+        if this.result is None:
+            continue
         utc_now = datetime.datetime.utcnow().replace(tzinfo=None)  # thanks for not having timezone.utc, Python2
         if this.result.get('success') is True:
             if this.result.get('issuer') and this.result.get('authn_context'):
