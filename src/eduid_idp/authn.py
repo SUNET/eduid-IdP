@@ -38,19 +38,18 @@ such as rate limiting.
 """
 
 import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Dict
-
-import vccs_client
+from typing import Optional
 
 import eduid_idp.assurance
 import eduid_idp.error
+import vccs_client
+from eduid_common.authn import get_vccs_client
 from eduid_idp.idp_user import IdPUser
-
 from eduid_userdb import MongoDB
 from eduid_userdb.credentials import Password, U2F
 from eduid_userdb.exceptions import UserHasNotCompletedSignup
-from eduid_common.authn import get_vccs_client
 
 
 class AuthnData(object):
@@ -158,13 +157,12 @@ class IdPAuthn(object):
         if self.authn_store is None and config.mongo_uri:
             self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
 
-    def password_authn(self, data):
+    def password_authn(self, data: dict) -> Optional[AuthnData]:
         """
         Authenticate someone using a username and password.
 
         :param login_data: Login credentials (dict with 'username' and 'password')
-        :type login_data: dict
-        :rtype: AuthnData | False | None
+        :returns: AuthnData on success
         """
         username = data['username']
         password = data['password']
@@ -184,7 +182,7 @@ class IdPAuthn(object):
 
         cred = self._verify_username_and_password2(user, password)
         if not cred:
-            return False
+            return None
 
         return AuthnData(user, cred, datetime.datetime.utcnow())
 

@@ -32,8 +32,11 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
+import logging
+from typing import List, Optional
 
-from typing import List
+from eduid_idp.idp_saml import AuthnInfo
+from eduid_idp.idp_user import IdPUser
 from eduid_userdb.credentials import Credential, METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI
 
 """
@@ -138,20 +141,13 @@ class AuthnState(object):
         return self.swamid_al2_used or self.swamid_al2_hi_used
 
 
-def response_authn(req_authn_ctx, user, sso_session, logger):
+# Can't type sso_session: SSOSession here because it creates an import dependency loop
+def response_authn(req_authn_ctx: Optional[str], user: IdPUser, sso_session, logger: logging.Logger) -> AuthnInfo:
     """
     Figure out what AuthnContext to assert in a SAML response,
     given the RequestedAuthnContext from the SAML request.
 
     :param req_authn_ctx: Requested authn context class
-    :param logger: logging logger
-    :return: dict with information about the authn context (pysaml2 style)
-
-    :type req_authn_ctx: str
-    :type user: eduid_idp.idp_user.IdPUser
-    :type sso_session: eduid_idp.sso_session.SSOSession
-    :type logger: logging.Logger
-    :rtype: str | None
     """
     authn = AuthnState(user, sso_session, logger)
     logger.info(f'Authn for {user} will be evaluated based on: {authn}')
@@ -209,4 +205,4 @@ def response_authn(req_authn_ctx, user, sso_session, logger):
         attributes['eduPersonAssurance'] = [SWAMID_AL1]
 
     logger.info(f'Assurances for {user} was evaluated to: {response_authn} with attributes {attributes}')
-    return response_authn, attributes
+    return AuthnInfo(class_ref=response_authn, authn_attributes=attributes)

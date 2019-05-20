@@ -12,29 +12,29 @@
 """
 Miscellaneous HTTP related functions.
 """
+
+import base64
+import binascii
 import logging
 import os
-import re
-import six
-import base64
 import pprint
-import binascii
-import pkg_resources
-
+import re
 from logging import Logger
+from typing import Callable, Optional
+
+import cherrypy
+import pkg_resources
+import six
 from six import string_types
 from six.moves.urllib.parse import parse_qs
-from typing import Callable, Optional
 
 import eduid_idp
 import eduid_idp.thirdparty
+from eduid_common.api.sanitation import SanitationProblem, Sanitizer
 from eduid_idp.config import IdPConfig
-from eduid_idp.util import b64encode
 from eduid_idp.error import BadRequest
-from eduid_common.api.sanitation import Sanitizer, SanitationProblem
-
+from eduid_idp.util import b64encode
 from saml2 import BINDING_HTTP_REDIRECT
-import cherrypy
 
 
 class Redirect(cherrypy.HTTPRedirect):

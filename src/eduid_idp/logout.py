@@ -12,18 +12,17 @@
 Code handling Single Log Out requests.
 """
 import pprint
-from hashlib import sha1
 
 import eduid_idp
-from eduid_idp.service import Service
-from eduid_idp.cache import ExpiringCache
-
-from saml2 import BINDING_HTTP_REDIRECT
-from saml2 import BINDING_HTTP_POST
-from saml2 import BINDING_SOAP
-from saml2.s_utils import exception_trace, error_status_factory
-import saml2.samlp
 import saml2.request
+import saml2.samlp
+from eduid_idp.cache import ExpiringCache
+from eduid_idp.service import Service
+from saml2 import BINDING_HTTP_POST
+from saml2 import BINDING_HTTP_REDIRECT
+from saml2 import BINDING_SOAP
+from saml2.s_utils import error_status_factory, exception_trace
+
 
 # -----------------------------------------------------------------------------
 # === Single log out ===
