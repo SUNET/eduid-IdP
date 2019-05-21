@@ -289,13 +289,15 @@ class IdPApplication(object):
         if self.context.common_sessions is not None:
             cookie_name = self.config.shared_session_cookie_name
             logger.debug(f'Cookie name configured {cookie_name}')
+            session = None
             if token is None:
                 token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
                 logger.debug(f'Cookie retrieved {token}')
             if token:
                 session = self.context.common_sessions.get(token)
                 logger.debug(f'Session retrieved {session}')
-            else:
+            if not token or not session:
+                logger.debug(f'Creating new common session, token {token} got session {session}')
                 session = self.context.common_sessions.new_common_session()
                 logger.debug(f'Created new common session {session}')
                 eduid_idp.mischttp.set_cookie(cookie_name, '/', self.context.logger,
