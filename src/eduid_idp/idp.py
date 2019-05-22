@@ -287,16 +287,21 @@ class IdPApplication(object):
     def _update_request_session(self, token=None):
         logger = self.context.logger
         if self.context.common_sessions is not None:
-            cookie_name = self.config.shared_session_cookie_name
-            logger.debug(f'Cookie name configured {cookie_name}')
             session = None
             if token is None:
+                cookie_name = self.config.shared_session_cookie_name
                 token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
-                logger.debug(f'Cookie retrieved {token}')
+                logger.debug(f'Cookie {cookie_name} contained token {token}')
             if token:
-                session = self.context.common_sessions.get(token)
+                try:
+                    session = self.context.common_sessions.get(token)
+                except ValueError:
+                    # Ignore errors like ValueError: Token signature check failed, seems reasonable when logging in
+                    # since we could otherwise never change the token, and it gives users a way back in if they
+                    # ever get a bad cookie value somehow.
+                    logger.exception(f'Failed retreiving session using token {token}')
                 logger.debug(f'Session retrieved {session}')
-            if not token or not session:
+            if not session:
                 logger.debug(f'Creating new common session, token {token} got session {session}')
                 session = self.context.common_sessions.new_common_session()
                 logger.debug(f'Created new common session {session}')
