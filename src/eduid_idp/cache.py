@@ -9,7 +9,7 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #          Roland Hedberg
 #
-
+import logging
 import time
 import uuid
 import datetime
@@ -22,6 +22,7 @@ from typing import NewType, List, Deque, AnyStr
 import six
 
 from eduid_common.session import SessionManager, RedisEncryptedSession
+from eduid_idp.config import IdPConfig
 from eduid_userdb import MongoDB
 
 _SHA1_HEXENCODED_SIZE = 160 // 8 * 2
@@ -228,7 +229,7 @@ class ExpiringCacheMem(ExpiringCache):
 
 class ExpiringCacheCommonSession(ExpiringCache):
 
-    def __init__(self, name, logger, ttl, config, secret):
+    def __init__(self, name: str, logger: logging.Logger, ttl: int, config: IdPConfig, secret: str):
         super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
 
         redis_cfg = {'REDIS_PORT': config.redis_port,
@@ -242,16 +243,16 @@ class ExpiringCacheCommonSession(ExpiringCache):
             redis_cfg['REDIS_HOST'] = config.redis_host
         self._debug = config.debug
         self._redis_cfg = redis_cfg
-        self._manager = SessionManager(redis_cfg, ttl = ttl, secret = secret)
+        self._manager = SessionManager(redis_cfg, ttl=ttl, secret=secret)
 
     def __repr__(self):
-        return '<{!s}: {!s}>'.format(self.__class__.__name__, self.__unicode__())
+        return '<{!s}: {!s}>'.format(self.__class__.__name__, self)
 
-    def __unicode__(self):
+    def __str__(self):
         if 'REDIS_SENTINEL_HOSTS' in self._redis_cfg:
-            return u'redis sentinel={!r}'.format(','.join(self._redis_cfg['REDIS_SENTINEL_HOSTS']))
+            return 'redis sentinel={!r}'.format(','.join(self._redis_cfg['REDIS_SENTINEL_HOSTS']))
         else:
-            return u'redis host={!r}'.format(self._redis_cfg['REDIS_HOST'])
+            return 'redis host={!r}'.format(self._redis_cfg['REDIS_HOST'])
 
     def add(self, key: str, info) -> RedisEncryptedSession:
         """
