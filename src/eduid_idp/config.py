@@ -467,6 +467,13 @@ class IdPConfig(object):
         return self.config.get(self.section, 'tou_version')
 
     @property
+    def tou_reaccept_interval(self):
+        """
+        The interval which a user needs to reaccept an already accepted ToU
+        """
+        return self.config.get(self.section, 'tou_reaccept_interval')
+
+    @property
     def redis_sentinel_hosts(self) -> List[str]:
         """
         Redis sentinel hosts, comma separated
