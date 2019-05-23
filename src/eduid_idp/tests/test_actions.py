@@ -413,3 +413,18 @@ class TestActions(MongoTestCase):
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 2)
+
+    def test_add_tou_action_should_reaccept(self):
+        event_id = bson.ObjectId()
+        self.test_user.tou.add(ToUEvent(
+            version = 'mock-version',
+            application = 'test_tou_plugin',
+            created_ts = datetime(2015, 9, 24, 1, 1, 1, 111111),
+            modified_ts = datetime(2015, 9, 24, 1, 1, 1, 111111),
+            event_id = event_id
+        ))
+        self.actions.remove_action_by_id(self.test_action.action_id)
+        from eduid_idp.tou_action import add_actions
+        mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
+        add_actions(self.idp_app.context, self.test_user, mock_ticket)
+        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)

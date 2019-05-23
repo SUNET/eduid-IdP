@@ -50,8 +50,9 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
     :param ticket: the SSO login data
     """
     version = context.config.tou_version
+    interval = context.config.tou_reaccept_interval
 
-    if user.tou.has_accepted(version):
+    if user.tou.has_accepted(version, interval):
         context.logger.debug('User has already accepted ToU version {!r}'.format(version))
         return
 
