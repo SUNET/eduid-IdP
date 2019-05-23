@@ -469,7 +469,7 @@ class IdPConfig(object):
     @property
     def tou_reaccept_interval(self):
         """
-        The interval which a user needs to reaccept an already accepted ToU
+        The interval which a user needs to reaccept an already accepted ToU (in seconds)
         """
         return self.config.getint(self.section, 'tou_reaccept_interval')
 
