@@ -125,7 +125,7 @@ import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
-from eduid_idp.config import IdPConfig
+from eduid_idp.config import init_config
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
@@ -185,12 +185,9 @@ class IdPApplication(object):
 
     :param logger: logging logger
     :param config: IdP configuration data
-
-    :type logger: logging.Logger
-    :type config: eduid_idp.config.IdPConfig
     """
 
-    def __init__(self, logger: Logger, config: IdPConfig, userdb: Optional[Any] = None):
+    def __init__(self, logger: Logger, config: dict, userdb: Optional[Any] = None):
         self.logger = logger
         self.config = config
         self.response_status = None
@@ -202,25 +199,25 @@ class IdPApplication(object):
 
         self._init_pysaml2()
 
-        _session_ttl = self.config.sso_session_lifetime * 60
+        _session_ttl = self.config.get('SSO_SESSION_LIFETIME') * 60
         _SSOSessions: SSOSessionCache
-        if self.config.sso_session_mongo_uri:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+        if self.config.get('SSO_SESSION_MONGO_URI'):
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.get('SSO_SESSION_MONGO_URI'),
                                                               self.logger, _session_ttl)
         else:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
-        _login_state_ttl = (self.config.login_state_ttl + 1) * 60
+        _login_state_ttl = (self.config.get('LOGIN_STATE_TTL') + 1) * 60
         _ticket_sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
                                       self.config, threading.Lock())
         self.authn_info_db = None
         _actions_db = None
 
-        if config.mongo_uri:
-            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
+        if config.get('MONGO_URI'):
+            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.get('MONGO_URI'), logger)
 
-        if config.mongo_uri and config.actions_app_uri:
-            _actions_db = ActionDB(config.mongo_uri)
+        if config.get('MONGO_URI') and config.get('ACTIONS_APP_URI'):
+            _actions_db = ActionDB(config.get('MONGO_URI'))
             self.logger.info("configured to redirect users with pending actions")
         else:
             self.logger.debug("NOT configured to redirect users with pending actions")
@@ -234,21 +231,21 @@ class IdPApplication(object):
                                 'error_page.default': self.error_page_default,
                                 })
         listen_str = 'http://'
-        if self.config.server_key:
+        if self.config.get('SERVER_KEY'):
             listen_str = 'https://'
-        if ':' in self.config.listen_addr:  # IPv6
-            listen_str += '[' + self.config.listen_addr + ']:' + str(self.config.listen_port)
+        if ':' in self.config.get('LISTEN_ADDR'):  # IPv6
+            listen_str += '[' + self.config.get('LISTEN_ADDR') + ']:' + str(self.config.get('LISTEN_PORT'))
         else:  # IPv4
-            listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
+            listen_str += self.config.get('LISTEN_ADDR') + ':' + str(self.config.get('LISTEN_PORT'))
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
         _common_sessions: Optional[ExpiringCacheCommonSession] = None
 
-        if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
-                and config.shared_session_secret_key:
+        if (config.get('REDIS_SENTINEL_HOSTS') or config.get('REDIS_HOST')) and config.get('SHARED_SESSION_COOKIE_NAME') \
+                and config.get('SHARED_SESSION_SECRET_KEY'):
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
-                                                          config.shared_session_ttl, config,
-                                                          secret=config.shared_session_secret_key)
+                                                          config.get('SHARED_SESSION_TTL'), config,
+                                                          secret=config.get('SHARED_SESSION_SECRET_KEY'))
         else:
             logger.info('eduID shared sessions not configured')
 
@@ -269,12 +266,12 @@ class IdPApplication(object):
         :return:
         """
         old_path = sys.path
-        cfgfile = self.config.pysaml2_config
+        cfgfile = self.config.get('PYSAML2_CONFIG')
         cfgdir = os.path.dirname(cfgfile)
         if cfgdir:
             # add directory part to sys.path, since pysaml2 'import's it's config
             sys.path = [cfgdir] + sys.path
-            cfgfile = os.path.basename(self.config.pysaml2_config)
+            cfgfile = os.path.basename(self.config.get('PYSAML2_CONFIG'))
 
         _path = sys.path[0]
         self.logger.debug("Loading PySAML2 server using cfgfile {!r} and path {!r}".format(cfgfile, _path))
@@ -289,7 +286,7 @@ class IdPApplication(object):
         if self.context.common_sessions is not None:
             session = None
             if token is None:
-                cookie_name = self.config.shared_session_cookie_name
+                cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
                 token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
                 logger.debug(f'Cookie {cookie_name} contained token {token}')
             if token:
@@ -398,11 +395,11 @@ class IdPApplication(object):
         if 'username' not in parsed or 'password' not in parsed:
             raise eduid_idp.error.BadRequest(logger = self.logger)
 
-        if parsed['username'] not in self.config.status_test_usernames \
-                and self.config.status_test_usernames != ['*']:
+        if parsed['username'] not in self.config.get('STATUS_TEST_USERNAMES') \
+                and self.config.get('STATUS_TEST_USERNAMES') != ['*']:
             self.logger.debug("Username {!r} in status request is not on the list "
                               "of permitted usernames : {!r}".format(parsed['username'],
-                                                                     self.config.status_test_usernames))
+                                                                     self.config.get('STATUS_TEST_USERNAMES')))
             raise eduid_idp.error.Forbidden(logger = self.logger)
 
         response = {'status': 'FAIL'}
@@ -515,12 +512,12 @@ class IdPApplication(object):
             if not session.idp_user:
                 return None
             _age = session.minutes_old
-            if _age > self.config.sso_session_lifetime:
+            if _age > self.config.get('SSO_SESSION_LIFETIME'):
                 self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
-                    _age, self.config.sso_session_lifetime))
+                    _age, self.config.get('SSO_SESSION_LIFETIME')))
                 return None
             self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-                _age, self.config.sso_session_lifetime))
+                _age, self.config.get('SSO_SESSION_LIFETIME')))
         return session
 
     def _lookup_sso_session2(self) -> Optional[eduid_idp.sso_session.SSOSession]:
@@ -685,11 +682,13 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     if not args:
         args = parse_args()
 
-    config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
+    if args.config_file:
+        config = init_config(module=args.config_file)
+    config = init_config()
 
     # This is the root log level
     level = logging.INFO
-    if config.debug:
+    if config.get('DEBUG'):
         level = logging.DEBUG
 
     root_logger = logging.getLogger()
@@ -703,47 +702,47 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
         if not sys.stderr.isatty():
             for this_h in root_logger.handlers:
                 this_h.setLevel(logging.WARNING)
-    if config.logfile:
+    if config.get('LOGFILE'):
         formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
-        file_h = logging.handlers.RotatingFileHandler(config.logfile, maxBytes=10 * 1024 * 1024)
+        file_h = logging.handlers.RotatingFileHandler(config.get('LOGFILE'), maxBytes=10 * 1024 * 1024)
         file_h.setFormatter(formatter)
         file_h.setLevel(level)
         root_logger.addHandler(file_h)
-    if config.syslog_socket:
-        syslog_h = logging.handlers.SysLogHandler(config.syslog_socket)
+    if config.get('SYSLOG_SOCKET'):
+        syslog_h = logging.handlers.SysLogHandler(config.get('SYSLOG_SOCKET'))
         formatter = logging.Formatter('%(name)s: %(message)s')
         syslog_h.setFormatter(formatter)
         syslog_h.setLevel(level)
         root_logger.addHandler(syslog_h)
-    if config.raven_dsn:
+    if config.get('RAVEN_DSN'):
         if raven and SentryHandler:
             root_logger.debug("Setting up Raven exception logging")
-            client = raven.Client(config.raven_dsn, timeout=10)
+            client = raven.Client(config.get('RAVEN_DSN'), timeout=10)
             handler = SentryHandler(client, level=logging.ERROR)
             if not raven.conf.setup_logging(handler):
                 root_logger.warning("Failed setting up Raven/Sentry logging")
         else:
             root_logger.warning("Config option raven_dsn set, but raven not available")
 
-    cherry_conf = {'server.thread_pool': config.num_threads,
-                   'server.socket_host': config.listen_addr,
-                   'server.socket_port': config.listen_port,
+    cherry_conf = {'server.thread_pool': config.get('NUM_THREADS'),
+                   'server.socket_host': config.get('LISTEN_ADDR'),
+                   'server.socket_port': config.get('LISTEN_PORT'),
                    # enables X-Forwarded-For, since BCP is to run this server
                    # behind a webserver that handles TLS
                    'tools.proxy.on': True,
-                   'request.show_tracebacks': config.debug,
+                   'request.show_tracebacks': config.get('DEBUG'),
                    }
-    if config.server_cert and config.server_key:
-        _tls_opts = {'server.ssl_module': config.ssl_adapter,
-                     'server.ssl_certificate': config.server_cert,
-                     'server.ssl_private_key': config.server_key,
+    if config.get('SERVER_CERT') and config.get('SERVER_KEY'):
+        _tls_opts = {'server.ssl_module': config.get('SSL_ADAPTER'),
+                     'server.ssl_certificate': config.get('SERVER_CERT'),
+                     'server.ssl_private_key': config.get('SERVER_KEY'),
                      #'server.ssl_certificate_chain':
                      }
         cherry_conf.update(_tls_opts)
 
-    if config.logdir:
-        cherry_conf['log.access_file'] = os.path.join(config.logdir, 'access.log')
-        cherry_conf['log.error_file'] = os.path.join(config.logdir, 'error.log')
+    if config.get('LOGDIR'):
+        cherry_conf['log.access_file'] = os.path.join(config.get('LOGDIR'), 'access.log')
+        cherry_conf['log.error_file'] = os.path.join(config.get('LOGDIR'), 'error.log')
     else:
         sys.stderr.write("NOTE: Config option 'logdir' not set.\n")
 
