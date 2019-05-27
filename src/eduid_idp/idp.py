@@ -147,7 +147,6 @@ except ImportError:
     SentryHandler = None
 
 
-default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
 
 
@@ -159,12 +158,6 @@ def parse_args():
                                      add_help = True,
                                      formatter_class = argparse.ArgumentDefaultsHelpFormatter,
                                      )
-    parser.add_argument('-c', '--config-file',
-                        dest = 'config_file',
-                        default = default_config_file,
-                        help = 'Config file',
-                        metavar = 'PATH',
-                        )
 
     parser.add_argument('--debug',
                         dest = 'debug',
@@ -682,10 +675,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     if not args:
         args = parse_args()
 
-    if args.config_file:
-        config = init_config(module=args.config_file)
-    else:
-        config = init_config()
+    config = init_config()
 
     # This is the root log level
     level = logging.INFO
