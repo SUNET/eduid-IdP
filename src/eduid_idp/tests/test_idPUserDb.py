@@ -43,6 +43,7 @@ import eduid_userdb
 import eduid_common.authn
 import vccs_client
 
+from eduid_idp.config import init_config
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_userdb.testing import MongoTestCase
 from eduid_idp.idp import IdPApplication
@@ -88,12 +89,12 @@ class TestAuthentication(MongoTestCase):
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
-        self.config_file = os.path.join(datadir, 'test_config.ini')
-        _defaults = eduid_idp.config._CONFIG_DEFAULTS
-        _defaults['mongo_uri'] = self.tmp_db.uri
-        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
-        self.config = eduid_idp.config.IdPConfig(self.config_file, debug=True, defaults=_defaults)
-
+        _defaults = {
+                'MONGO_URI': self.tmp_db.uri,
+                'PYSAML2_CONFIG': os.path.join(datadir, 'test_SSO_conf.py')
+        }
+        self.config = init_config(test_config=_defaults)
+        self.config.logger = logger
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
 

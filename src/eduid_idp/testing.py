@@ -35,8 +35,10 @@
 import os
 import pkg_resources
 from unittest import TestCase
+from copy import deepcopy
 
 import eduid_idp
+from eduid_idp.config import init_config
 from eduid_idp.idp_user import IdPUser
 from eduid_idp.idp import IdPApplication
 
@@ -49,12 +51,17 @@ __author__ = 'ft'
 
 PWHASHES = {}
 
+DEFAULTS = {
+    'LISTEN_PORT': 8000,
+    'VCCS_URL': 'dummy',
+    'MONGO_URI': None
+}
 
-def _get_idpconfig(datadir, sso_config='test_SSO_conf.py', fn='test_config.ini'):
-    _defaults = eduid_idp.config._CONFIG_DEFAULTS
-    _defaults['mongo_uri'] = None
-    _defaults['pysaml2_config'] = os.path.join(datadir, sso_config)
-    return eduid_idp.config.IdPConfig(os.path.join(datadir, fn), debug=True, defaults=_defaults)
+
+def _get_idpconfig(datadir, sso_config='test_SSO_conf.py'):
+    _defaults = deepcopy(DEFAULTS)
+    _defaults['PYSAML2_CONFIG'] = os.path.join(datadir, sso_config)
+    return init_config(test_config=_defaults)
 
 
 def _create_passwords(username, factors):
@@ -148,7 +155,8 @@ class IdPSimpleTestCase(TestCase):
         _userdb = FakeUserDb()
         datadir = pkg_resources.resource_filename(__name__, 'tests/data')
         self.config_file = os.path.join(datadir, 'test_config.ini')
-        _config = _get_idpconfig(datadir, fn='test_config.ini')
+        _config = _get_idpconfig(datadir)
+        _config.logger = logger
 
         # Create the IdP app
         _idp_app = IdPApplication(logger, _config, userdb=_userdb)

@@ -41,20 +41,19 @@ import os
 import unittest
 import pkg_resources
 
-import eduid_idp
+from eduid_idp.config import init_config
 
 
 class TestCredStore(unittest.TestCase):
 
     def setUp(self):
-        debug = False
-        datadir = pkg_resources.resource_filename(__name__, 'data')
-        self.config_file = os.path.join(datadir, 'test_config.ini')
-        self.config = eduid_idp.config.IdPConfig(self.config_file, debug)
+        self.config = init_config(test_config={})
 
     def test_static_config(self):
         """
         Verify the values we have in test_config.ini
         """
-        self.assertTrue(self.config.static_dir.startswith('/home/'))
-        self.assertEqual(self.config.listen_port, 8000)
+        self.assertTrue(self.config['LISTEN_ADDR'].startswith('0.0'))
+        self.assertTrue(self.config.listen_addr.startswith('0.0'))
+        self.assertEqual(self.config['LISTEN_PORT'], 8088)
+        self.assertEqual(self.config.listen_port, 8088)
