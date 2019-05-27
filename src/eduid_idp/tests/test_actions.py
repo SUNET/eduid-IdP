@@ -160,7 +160,7 @@ class TestActions(MongoTestCase):
             self.assertEqual(resp.status, '302 Found')
 
         # Register user acceptance for the ToU version in use
-        tou = ToUEvent(version = self.config.tou_version,
+        tou = ToUEvent(version = self.config.get('TOU_VERSION'),
                        application = 'unit test',
                        created_ts = True,
                        event_id = bson.ObjectId(),
@@ -211,7 +211,7 @@ class TestActions(MongoTestCase):
                              in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '302 Found')
-        self.assertIn(self.config.actions_app_uri, resp.location)
+        self.assertIn(self.config.get('ACTIONS_APP_URI'), resp.location)
 
     def test_add_action(self):
 
@@ -245,7 +245,7 @@ class TestActions(MongoTestCase):
                              in self.http.cookies.items()])
         resp = self.http.get(resp.location, headers={'Cookie': cookies})
         self.assertEqual(resp.status, '302 Found')
-        self.assertIn(self.config.actions_app_uri, resp.location)
+        self.assertIn(self.config.get('ACTIONS_APP_URI'), resp.location)
 
     def test_add_mfa_action_no_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)

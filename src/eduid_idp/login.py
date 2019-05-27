@@ -132,7 +132,7 @@ class SSO(Service):
                 self.logger.debug('Adding attribute {} with value from authn process: {}'.format(k, v))
             attributes[k] = v
         # Only perform expensive parse/pretty-print if debugging
-        if self.config.debug:
+        if self.config.get('DEBUG'):
             self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
                               "Response args:\n{!s},\n\nAuthn:\n{!s}\n".format(
                 user,
@@ -194,14 +194,14 @@ class SSO(Service):
         :type user_id: string
         :return: None
         """
-        if not self.config.fticks_secret_key:
+        if not self.config.get('FTICKS_SECRET_KEY'):
             return
         # Default format string:
         #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
         _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        _anon_userid = hmac.new(self.config.fticks_secret_key.encode('ascii'),
+        _anon_userid = hmac.new(self.config.get('FTICKS_SECRET_KEY').encode('ascii'),
                                 msg=user_id.encode('ascii'), digestmod=sha256).hexdigest()
-        msg = self.config.fticks_format_string.format(ts=_timestamp,
+        msg = self.config.get('FTICKS_FORMAT_STRING').format(ts=_timestamp,
                                                       rp=relying_party,
                                                       ap=self.context.idp.config.entityid,
                                                       pn=_anon_userid,
@@ -312,7 +312,7 @@ class SSO(Service):
         """ Common code for redirect() and post() endpoints. """
         _force_authn = self._should_force_authn(ticket)
         if self.sso_session and not _force_authn:
-            _ttl = self.context.config.sso_session_lifetime - self.sso_session.minutes_old
+            _ttl = self.context.config.get('SSO_SESSION_LIFETIME') - self.sso_session.minutes_old
             self.logger.info("{!s}: proceeding sso_session={!s}, ttl={:}m".format(
                 ticket.key, self.sso_session.public_id, _ttl))
             self.logger.debug(f'Continuing with Authn request {repr(ticket.saml_req.request_id)}')
@@ -558,4 +558,5 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -
 
 def _parse_SAMLRequest(context: IdPContext, info: Mapping, binding: str) -> IdP_SAMLRequest:
     return parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
-                             context.config.debug, context.config.verify_request_signatures)
+                             context.config.get('DEBUG'),
+                             context.config.get('VERIFY_REQUEST_SIGNATURES'))

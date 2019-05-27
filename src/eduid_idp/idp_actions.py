@@ -99,7 +99,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Pending actions found, redirect to the actions app
     context.logger.debug(f'There are pending actions for user {user}: {pending_actions}')
 
-    actions_uri = context.config.actions_app_uri
+    actions_uri = context.config.get('ACTIONS_APP_URI')
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
     actions = Actions.from_dict({'ts': time(), 'session': ticket.key})
@@ -122,7 +122,7 @@ def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     :param user: the authenticating user
     :param ticket: the SSO login data
     """
-    if 'mfa' in context.config.action_plugins:
+    if 'mfa' in context.config.get('ACTION_PLUGINS'):
         eduid_idp.mfa_action.add_actions(context, user, ticket)
-    if 'tou' in context.config.action_plugins:
+    if 'tou' in context.config.get('ACTION_PLUGINS'):
         eduid_idp.tou_action.add_actions(context, user, ticket)

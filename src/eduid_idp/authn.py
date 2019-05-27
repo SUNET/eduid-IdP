@@ -204,9 +204,10 @@ class IdPAuthn(object):
         pw_credentials = user.credentials.filter(Password).to_list()
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
-            if authn_info.failures_this_month() > self.config.max_authn_failures_per_month:
+            if authn_info.failures_this_month() > self.config.get('MAX_AUTHN_FAILURES_PER_MONTH'):
                 self.logger.info("User {!r} AuthN failures this month {!r} > {!r}".format(
-                    user, authn_info.failures_this_month(), self.config.max_authn_failures_per_month))
+                    user, authn_info.failures_this_month(),
+                    self.config.get('MAX_AUTHN_FAILURES_PER_MONTH')))
                 raise eduid_idp.error.TooManyRequests("Too Many Requests")
 
             # Optimize list of credentials to try based on which credentials the

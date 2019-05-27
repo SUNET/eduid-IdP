@@ -118,7 +118,8 @@ def make_login_ticket(req_class_ref, context, key=None) -> SSOLoginData:
     if key is None:
         key = 'unique-key-for-request-1'
     saml_req = parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
-                                 context.config.debug, context.config.verify_request_signatures)
+                                 context.config.get('DEBUG'),
+                                 context.config.get('VERIFY_REQUEST_SIGNATURES'))
     #context.idp.parse_authn_request(xmlstr, binding)
     return SSOLoginData(key, saml_req, xmlstr)
 
