@@ -143,6 +143,7 @@ PASSWORD_RESET_LINK: str = '#'  # for login.html
 
 # More links
 TECHNICIANS_LINK: str = '#'
+STUDENT_LINK: str = '#'
 STAFF_LINK: str = '#'
 FAQ_LINK: str = '#'
 
@@ -188,6 +189,9 @@ ACTION_PLUGINS: Optional[List[str]] = None
 
 # The current version of the terms of use agreement.
 TOU_VERSION: str = 'version1'
+
+# The interval which a user needs to reaccept an already accepted ToU (in seconds)
+TOU_REACCEPT_INTERVAL = 94608000
 
 # Name of cookie used to persist session information in the users browser.
 SHARED_SESSION_COOKIE_NAME: str = 'sessid'
