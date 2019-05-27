@@ -39,7 +39,6 @@ Configuration (file) handling for eduID IdP.
 import os
 from importlib import import_module
 from typing import Optional
-from eduid_common.config.parsers.etcd import EtcdConfigParser
 
 
 class IdPConfig(dict):
@@ -71,10 +70,11 @@ def init_config(module: str = 'eduid_idp.settings.defaults',
     for key in dir(obj):
         if key.isupper():
             config[key] = getattr(obj, key)
-    if test_config:
+    if test_config is not None:
         # Load init time settings
         config.update(test_config)
     else:
+        from eduid_common.config.parsers.etcd import EtcdConfigParser
         namespace = os.environ.get('EDUID_CONFIG_NS', '/eduid/webapp/idp/')
         parser = EtcdConfigParser(namespace)
         # Load optional app specific settings
