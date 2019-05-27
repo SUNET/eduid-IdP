@@ -125,7 +125,7 @@ import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
-from eduid_idp.config import init_config
+from eduid_idp.config import init_config, IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
@@ -180,7 +180,7 @@ class IdPApplication(object):
     :param config: IdP configuration data
     """
 
-    def __init__(self, logger: Logger, config: dict, userdb: Optional[Any] = None):
+    def __init__(self, logger: Logger, config: IdPConfig, userdb: Optional[Any] = None):
         self.logger = logger
         self.config = config
         self.response_status = None
@@ -192,7 +192,7 @@ class IdPApplication(object):
 
         self._init_pysaml2()
 
-        _session_ttl = self.config.get('SSO_SESSION_LIFETIME') * 60
+        _session_ttl = self.config['SSO_SESSION_LIFETIME'] * 60
         _SSOSessions: SSOSessionCache
         if self.config.get('SSO_SESSION_MONGO_URI'):
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.get('SSO_SESSION_MONGO_URI'),
@@ -200,7 +200,7 @@ class IdPApplication(object):
         else:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
-        _login_state_ttl = (self.config.get('LOGIN_STATE_TTL') + 1) * 60
+        _login_state_ttl = (self.config['LOGIN_STATE_TTL'] + 1) * 60
         _ticket_sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
                                       self.config, threading.Lock())
         self.authn_info_db = None
@@ -226,10 +226,10 @@ class IdPApplication(object):
         listen_str = 'http://'
         if self.config.get('SERVER_KEY'):
             listen_str = 'https://'
-        if ':' in self.config.get('LISTEN_ADDR'):  # IPv6
-            listen_str += '[' + self.config.get('LISTEN_ADDR') + ']:' + str(self.config.get('LISTEN_PORT'))
+        if ':' in self.config['LISTEN_ADDR']:  # IPv6
+            listen_str += '[' + self.config['LISTEN_ADDR'] + ']:' + str(self.config['LISTEN_PORT'])
         else:  # IPv4
-            listen_str += self.config.get('LISTEN_ADDR') + ':' + str(self.config.get('LISTEN_PORT'))
+            listen_str += self.config['LISTEN_ADDR'] + ':' + str(self.config['LISTEN_PORT'])
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
         _common_sessions: Optional[ExpiringCacheCommonSession] = None
@@ -237,8 +237,8 @@ class IdPApplication(object):
         if (config.get('REDIS_SENTINEL_HOSTS') or config.get('REDIS_HOST')) and config.get('SHARED_SESSION_COOKIE_NAME') \
                 and config.get('SHARED_SESSION_SECRET_KEY'):
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
-                                                          config.get('SHARED_SESSION_TTL'), config,
-                                                          secret=config.get('SHARED_SESSION_SECRET_KEY'))
+                                                          config['SHARED_SESSION_TTL'], config,
+                                                          secret=config['SHARED_SESSION_SECRET_KEY'])
         else:
             logger.info('eduID shared sessions not configured')
 

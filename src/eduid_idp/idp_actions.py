@@ -122,7 +122,7 @@ def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     :param user: the authenticating user
     :param ticket: the SSO login data
     """
-    if 'mfa' in context.config.get('ACTION_PLUGINS'):
+    if 'mfa' in context.config['ACTION_PLUGINS']:
         eduid_idp.mfa_action.add_actions(context, user, ticket)
-    if 'tou' in context.config.get('ACTION_PLUGINS'):
+    if 'tou' in context.config['ACTION_PLUGINS']:
         eduid_idp.tou_action.add_actions(context, user, ticket)

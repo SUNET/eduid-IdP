@@ -30,7 +30,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 DEBUG: bool = False
 DEVELOPMENT: bool = DEBUG
@@ -121,7 +121,7 @@ SSO_SESSION_LIFETIME: int = 15  # Lifetime of SSO session in minutes
 # Raven DSN (string) for logging exceptions to Sentry.
 RAVEN_DSN: Optional[str] = None
 
-CONTENT_PACKAGES = []  # List of Python packages ("name:path") with content resources
+CONTENT_PACKAGES: List[Tuple[str]] = []  # List of Python packages ("name:path") with content resources
 
 # Verify request signatures, if they exist.
 # This defaults to False since it is a trivial DoS to consume all the IdP:s
@@ -179,19 +179,19 @@ DEFAULT_SCOPED_AFFILIATION: Optional[str] = None
 # using TLS.
 VCCS_URL: str = 'http://localhost:8550/'  # VCCS backend URL
 
-INSECURE_COOKIES = False
+INSECURE_COOKIES: bool = False
 
 # URI of the actions app.
 ACTIONS_APP_URI: Optional[str] = 'http://actions.example.com/'
 
 # The plugins for pre-authentication actions that need to be loaded
-ACTION_PLUGINS: Optional[List[str]] = None
+ACTION_PLUGINS: List[str] = []
 
 # The current version of the terms of use agreement.
 TOU_VERSION: str = 'version1'
 
 # The interval which a user needs to reaccept an already accepted ToU (in seconds)
-TOU_REACCEPT_INTERVAL = 94608000
+TOU_REACCEPT_INTERVAL: int = 94608000
 
 # Name of cookie used to persist session information in the users browser.
 SHARED_SESSION_COOKIE_NAME: str = 'sessid'

@@ -558,5 +558,5 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -
 
 def _parse_SAMLRequest(context: IdPContext, info: Mapping, binding: str) -> IdP_SAMLRequest:
     return parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
-                             context.config.get('DEBUG'),
-                             context.config.get('VERIFY_REQUEST_SIGNATURES'))
+                             context.config['DEBUG'],
+                             context.config['VERIFY_REQUEST_SIGNATURES'])
