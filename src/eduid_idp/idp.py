@@ -684,7 +684,8 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
 
     if args.config_file:
         config = init_config(module=args.config_file)
-    config = init_config()
+    else:
+        config = init_config()
 
     # This is the root log level
     level = logging.INFO
@@ -748,6 +749,8 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
 
     cherrypy.log.access_log.propagate = False
     cherrypy.config.update(cherry_conf)
+
+    config.logger = logger
 
     cherrypy.quickstart(IdPApplication(logger, config))
 

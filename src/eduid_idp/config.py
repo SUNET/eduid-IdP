@@ -44,10 +44,20 @@ from eduid_common.config.parsers.etcd import EtcdConfigParser
 
 class IdPConfig(dict):
 
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.logger = kwargs.get('logger')
+
     def __getattribute__(self, attr: str):
         '''
         for the benefit of cherrypy's internal configuration
         '''
+        try:
+            return dict.__getattribute__(self, attr)
+        except AttributeError:
+            pass
+        if self.logger is not None:
+            self.logger.warning(f'DEPRECATION WARNING: {attr} config key retrieved as attr')
         upattr = attr.upper()
         if upattr in self:
             return self.get(upattr)
