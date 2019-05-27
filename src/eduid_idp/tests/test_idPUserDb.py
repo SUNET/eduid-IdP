@@ -91,7 +91,10 @@ class TestAuthentication(MongoTestCase):
         datadir = pkg_resources.resource_filename(__name__, 'data')
         _defaults = {
                 'MONGO_URI': self.tmp_db.uri,
-                'PYSAML2_CONFIG': os.path.join(datadir, 'test_SSO_conf.py')
+                'PYSAML2_CONFIG': os.path.join(datadir, 'test_SSO_conf.py'),
+                'LISTEN_PORT': 8000,
+                'STATIC_DIR': os.path.join(datadir, '../../static/'),
+                'VCCS_URL': 'dummy'
         }
         self.config = init_config(test_config=_defaults)
         self.config.logger = logger

@@ -88,7 +88,12 @@ class TestActions(MongoTestCase):
                 'SHARED_SESSION_SECRET_KEY': 'shared-session-secret-key',
                 'REDIS_HOST': 'localhost',
                 'REDIS_PORT': str(self.redis_instance.port),
-                'INSECURE_COOKIES': 1
+                'INSECURE_COOKIES': False,
+                'LISTEN_ADDR': 'unittest-idp.example.edu',
+                'LISTEN_PORT': 443,
+                'BASE_URL': 'https://unittest-idp.example.edu/',
+                'CONTENT_PACKAGES': [('eduid_idp', 'tests/static')],
+                'ACTION_PLUGINS': ['tou', 'mfa']
         }
         self.config = init_config(test_config=_defaults)
         # Create the IdP app
