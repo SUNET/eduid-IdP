@@ -49,7 +49,8 @@ class IdPConfig(dict):
 
     def __getattribute__(self, attr: str):
         '''
-        for the benefit of cherrypy's internal configuration
+        XXX Once we stop seeing the DEPRECATION WARNING's logged by this
+        we can remove this method and keep config as a simple dict
         '''
         try:
             return dict.__getattribute__(self, attr)
