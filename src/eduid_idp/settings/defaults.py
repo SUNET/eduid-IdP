@@ -77,7 +77,7 @@ LISTEN_ADDR: str = '0.0.0.0'
 LISTEN_PORT: int = 8088
 
 # pysaml2 configuration file. Separate config file with SAML related parameters.
-PYSAML2_CONFIG: str = 'eduid_webapp.idp.idp_conf'
+PYSAML2_CONFIG: str = 'eduid_idp.idp_conf'
 
 # SAML F-TICKS user anonymization key. If this is set, the IdP will log FTICKS data
 # on every login.
