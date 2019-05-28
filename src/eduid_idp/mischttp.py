@@ -96,7 +96,7 @@ def geturl(config, query = True, path = True):
 
     :type config: eduid_idp.config.IdPConfig
     """
-    url = [config.base_url]
+    url = [config['BASE_URL']]
     if not url[0]:
         # For some reason, cherrypy.request.base always have host 127.0.0.1 -
         # work around that with much more elaborate code, based on pysaml2.
@@ -184,13 +184,13 @@ def static_filename(config, path, logger):
     """
     if not isinstance(path, string_types):
         return False
-    if not config.static_dir:
+    if not config.get('STATIC_DIR'):
         return False
     if '..' in str(path):
         logger.warning("Attempted directory traversal: \'{}\'".format(path))
         return False
     try:
-        filename = os.path.join(config.static_dir, path)
+        filename = os.path.join(config.get('STATIC_DIR'), path)
         os.stat(filename)
         return filename
     except OSError:
@@ -339,7 +339,7 @@ def set_cookie(name: str, path: str, logger: logging.Logger, config: IdPConfig, 
     else:
         cookie[name] = value
     cookie[name]['path'] = path
-    if not config.insecure_cookies:
+    if not config.get('INSECURE_COOKIES'):
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
     cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
     logger.debug("Set cookie {!r} : {}".format(name, cookie))
@@ -405,14 +405,14 @@ def get_default_template_arguments(config):
     :rtype: dict
     """
     return {
-        'dashboard_link': config.dashboard_link,
-        'signup_link': config.signup_link,
-        'student_link': config.student_link,
-        'technicians_link': config.technicians_link,
-        'staff_link': config.staff_link,
-        'faq_link': config.faq_link,
-        'password_reset_link': config.password_reset_link,
-        'static_link': config.static_link,
+        'dashboard_link': config.get('DASHBOARD_LINK'),
+        'signup_link': config.get('SIGNUP_LINK'),
+        'student_link': config.get('STUDENT_LINK'),
+        'technicians_link': config.get('TECHNICIANS_LINK'),
+        'staff_link': config.get('STAFF_LINK'),
+        'faq_link': config.get('FAQ_LINK'),
+        'password_reset_link': config.get('PASSWORD_RESET_LINK'),
+        'static_link': config.get('STATIC_LINK'),
     }
 
 
@@ -446,14 +446,14 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     if logger:
         logger.debug("Client language preferences: {!r}".format(languages))
     languages = [lang for (lang, q_val) in languages[:50]]  # cap somewhere to prevent DoS
-    if config.default_language not in languages and config.default_language:
-        languages.append(config.default_language)
+    if config.get('DEFAULT_LANGUAGE') not in languages and config.get('DEFAULT_LANGUAGE'):
+        languages.append(config.get('DEFAULT_LANGUAGE'))
 
     if languages:
         logger.debug("Languages list : {!r}".format(languages))
         for lang in languages:
             if _LANGUAGE_RE.match(lang):
-                for (package, path) in config.content_packages:
+                for (package, path) in config.get('CONTENT_PACKAGES'):
                     langfile = path + '/' + lang.lower() + '/' + filename  # pkg_resources paths do not use os.path.join
                     if logger:
                         logger.debug('Looking for package {!r}, language {!r}, path: {!r}'.format(
@@ -470,7 +470,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     # default language file
     static_fn = eduid_idp.mischttp.static_filename(config, filename, logger)
     logger.debug("Looking for {!r} at default location (static_dir {!r}): {!r}".format(
-        filename, config.static_dir, static_fn))
+        filename, config.get('STATIC_DIR'), static_fn))
     if not static_fn:
         logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
         return None

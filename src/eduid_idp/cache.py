@@ -232,16 +232,16 @@ class ExpiringCacheCommonSession(ExpiringCache):
     def __init__(self, name: str, logger: logging.Logger, ttl: int, config: IdPConfig, secret: str):
         super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
 
-        redis_cfg = {'REDIS_PORT': config.redis_port,
-                     'REDIS_DB': config.redis_db,
+        redis_cfg = {'REDIS_PORT': config['REDIS_PORT'],
+                     'REDIS_DB': config['REDIS_DB'],
                      }
-        if config.redis_sentinel_hosts:
-            redis_cfg.update({'REDIS_SENTINEL_HOSTS': config.redis_sentinel_hosts,
-                              'REDIS_SENTINEL_SERVICE_NAME': config.redis_sentinel_service_name,
+        if config.get('REDIS_SENTINEL_HOSTS'):
+            redis_cfg.update({'REDIS_SENTINEL_HOSTS': config.get('REDIS_SENTINEL_HOSTS'),
+                              'REDIS_SENTINEL_SERVICE_NAME': config.get('REDIS_SENTINEL_SERVICE_NAME'),
                               })
         else:
-            redis_cfg['REDIS_HOST'] = config.redis_host
-        self._debug = config.debug
+            redis_cfg['REDIS_HOST'] = config['REDIS_HOST']
+        self._debug = config['DEBUG']
         self._redis_cfg = redis_cfg
         self._manager = SessionManager(redis_cfg, ttl=ttl, secret=secret)
 

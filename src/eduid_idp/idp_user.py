@@ -106,7 +106,7 @@ class IdPUserDb(object):
         self.logger = logger
         self.config = config
         if userdb is None:
-            userdb = UserDB(config.mongo_uri, db_name=config.userdb_mongo_database, user_class=IdPUser)
+            userdb = UserDB(config['MONGO_URI'], db_name=config['USERDB_MONGO_DATABASE'], user_class=IdPUser)
         self.userdb = userdb
 
     def lookup_user(self, username):
@@ -145,7 +145,7 @@ def _make_scoped_eppn(attributes, config):
     :rtype: dict
     """
     eppn = attributes.get('eduPersonPrincipalName')
-    scope = config.default_eppn_scope
+    scope = config.get('DEFAULT_EPPN_SCOPE')
     if not eppn or not scope:
         return attributes
     if '@' not in eppn:
@@ -170,8 +170,8 @@ def _add_scoped_affiliation(attributes, config):
     :rtype: dict
     """
     epsa = 'eduPersonScopedAffiliation'
-    if epsa not in attributes and config.default_scoped_affiliation:
-        attributes[epsa] = config.default_scoped_affiliation
+    if epsa not in attributes and config.get('DEFAULT_SCOPED_AFFILIATION'):
+        attributes[epsa] = config.get('DEFAULT_SCOPED_AFFILIATION')
     return attributes
 
 

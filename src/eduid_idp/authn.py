@@ -152,10 +152,10 @@ class IdPAuthn(object):
         self.userdb = userdb
         self.auth_client = auth_client
         if self.auth_client is None:
-            self.auth_client = get_vccs_client(config.vccs_url)
+            self.auth_client = get_vccs_client(config.get('VCCS_URL'))
         self.authn_store = authn_store
-        if self.authn_store is None and config.mongo_uri:
-            self.authn_store = AuthnInfoStoreMDB(uri = config.mongo_uri, logger = logger)
+        if self.authn_store is None and config.get('MONGO_URI'):
+            self.authn_store = AuthnInfoStoreMDB(uri = config.get('MONGO_URI'), logger = logger)
 
     def password_authn(self, data: dict) -> Optional[AuthnData]:
         """
