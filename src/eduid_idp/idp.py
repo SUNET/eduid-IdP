@@ -129,6 +129,7 @@ from eduid_idp.config import init_config, IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
+from eduid_idp.eduid_session import SessionManagerPlugin, EduIDSessionTool
 
 from eduid_userdb.actions import ActionDB
 
@@ -274,36 +275,6 @@ class IdPApplication(object):
             # restore path
             sys.path = old_path
 
-    def _update_request_session(self, token=None):
-        logger = self.context.logger
-        if self.context.common_sessions is not None:
-            session = None
-            if token is None:
-                cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
-                token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
-                logger.debug(f'Cookie {cookie_name} contained token {token}')
-            if token:
-                try:
-                    session = self.context.common_sessions.get(token)
-                except ValueError:
-                    # Ignore errors like ValueError: Token signature check failed, seems reasonable when logging in
-                    # since we could otherwise never change the token, and it gives users a way back in if they
-                    # ever get a bad cookie value somehow.
-                    logger.exception(f'Failed retreiving session using token {token}')
-                logger.debug(f'Session retrieved {session}')
-            if not session:
-                logger.debug(f'Creating new common session, token {token} got session {session}')
-                session = self.context.common_sessions.new_common_session()
-                logger.debug(f'Created new common session {session}')
-                eduid_idp.mischttp.set_cookie(cookie_name, '/', self.context.logger,
-                                              self.context.config,
-                                              session.token, b64=False,
-                                              )
-                session.commit()
-            object.__setattr__(cherrypy.request, 'session', session)
-        else:
-            logger.info('eduID shared sessions not configured')
-
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
@@ -312,7 +283,6 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        self._update_request_session()
 
         if path[1] == 'post':
             return SSO(sso_session, self._my_start_response, self.context).post()
@@ -329,7 +299,6 @@ class IdPApplication(object):
         self.logger.debug("<application> PATH: %s" % path)
 
         sso_session = self._lookup_sso_session()
-        self._update_request_session()
 
         if path[1] == 'post':
             return SLO(sso_session, self._my_start_response, self.context).post()
@@ -742,7 +711,11 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
 
     config.logger = logger
 
-    cherrypy.quickstart(IdPApplication(logger, config))
+    SessionManagerPlugin(cherrypy.engine, config, logger).subscribe()
+    session_tool = EduIDSessionTool()
+    cherrypy.tools.eduid_sessions = session_tool
+
+    cherrypy.quickstart(IdPApplication(logger, config), '', {'/': {'tools.eduid_sessions.on': True}})
 
 if __name__ == '__main__':
     try:

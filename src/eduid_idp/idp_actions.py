@@ -103,8 +103,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
     actions = Actions.from_dict({'ts': time(), 'session': ticket.key})
-    cherrypy.request.session['_actions'] = actions.to_dict()  # type: ignore
-    cherrypy.request.session.commit()  # type: ignore
+    cherrypy.request.eduid_session.actions = actions
     raise eduid_idp.mischttp.Redirect(actions_uri)
 
 

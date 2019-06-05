@@ -50,6 +50,7 @@ from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMI
 from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
 from eduid_idp.idp import IdPApplication
 from eduid_idp.config import init_config
+from eduid_idp.eduid_session import SessionManagerPlugin, EduIDSessionTool
 
 import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
@@ -100,6 +101,12 @@ class TestActions(MongoTestCase):
         self.idp_app = IdPApplication(logger, self.config)
         # Actions db
         self.actions = self.idp_app.context.actions_db
+
+
+        SessionManagerPlugin(cherrypy.engine, self.config, logger).subscribe()
+        session_tool = EduIDSessionTool()
+        cherrypy.tools.eduid_sessions = session_tool
+
         # setup some test data
         _email = 'johnsmith@example.com'
         self.test_user = self.amdb.get_user_by_mail(_email)
@@ -111,8 +118,9 @@ class TestActions(MongoTestCase):
 
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
+        cherrypy.quickstart(self.idp_app, '', {'/': {'tools.eduid_sessions.on': True}})
         # mount the IdP app in the cherrypy app server
-        cherrypy.tree.mount(self.idp_app, '/')
+        #cherrypy.tree.mount(self.idp_app, '/')
 
         # create a webtest testing environment
         from six.moves.http_cookiejar import CookieJar
@@ -124,12 +132,6 @@ class TestActions(MongoTestCase):
         # reset the testing environment
         self.http.reset()
         MongoTestCase.tearDown(self)
-
-    def _update_session(self):
-        # make sure there is a redis common session ready to be used by the IdP
-        session = self.idp_app.context.common_sessions._manager.get_session(data={'dummy':'data'})
-        session.commit()
-        self.idp_app._update_request_session(token=session.token)
 
     def test_no_actions(self):
 
@@ -184,7 +186,7 @@ class TestActions(MongoTestCase):
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
         # make sure there is a common session
-        self._update_session()
+        #self._update_session()
 
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
@@ -219,7 +221,7 @@ class TestActions(MongoTestCase):
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
         # make sure there is a common session
-        self._update_session()
+        #self._update_session()
 
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
