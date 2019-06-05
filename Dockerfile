@@ -1,4 +1,4 @@
-FROM docker.sunet.se/eduid/python3env:slim
+FROM docker.sunet.se/eduid/python3env
 
 MAINTAINER eduid-dev <eduid-dev@SEGATE.SUNET.SE>
 
