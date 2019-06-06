@@ -2,24 +2,53 @@
 from typing import Optional
 
 import cherrypy
-from cherrypy.process import wspbus, plugins
+from cherrypy.lib.sessions import Session
 
 from eduid_common.session.redis_session import SessionManager
 from eduid_common.session.redis_session import RedisEncryptedSession
 from eduid_common.session.namespaces import Common, Actions
+import eduid_idp.mischttp
 
 
-class EduIDSession:
+class EduidSession(Session):
 
-    def __init__(self, base_session: RedisEncryptedSession):
-        self._session = base_session
+    @classmethod
+    def setup(cls, **config):
+        '''
+        Initialize Redis connection pool. Only called once per process.
+        '''
+        for k, v in config.items():
+            setattr(cls, k, v)
+
+        cls.session_factory = SessionFactory(cherrypy.config)
+
+    def __init__(self, id, **kwargs):
+        self.id_observers = []
+        if 'base_session' in kwargs:
+            self._session = kwargs["base_session"]
+        else:
+            other = self.session_factory.open_session()
+            self._session = other._session
+        self._id = self._session.session_id
         self._common: Optional[Common] = None
 
-    def __getitem__(self, key, default=None):
-        return self._session.__getitem__(key, default=None)
+    def _exists(self):
+        return bool(self._session.conn.get(self.id))
 
-    def __setitem__(self, key, value):
-        return self._session.__setitem__(key, value)
+    def _load(self):
+        return self._session._data
+
+    def _save(self, expiration_time):
+        self._session.commit()
+
+    def _delete(self):
+        self._session.clear()
+
+    def acquire_lock(self, path=None):
+        pass
+
+    def release_lock(self, path=None):
+        pass
 
     @property
     def common(self) -> Optional[Common]:
@@ -44,77 +73,48 @@ class EduIDSession:
             self._actions = value
 
 
-class SessionManagerPlugin(plugins.SimplePlugin):
+class SessionFactory:
+    """
+    Session factory,
+    to provide eduID redis-based sessions to the APIs.
+    """
 
-    def __init__(self, bus, config, logger):
-        """
-        The plugin is registered to the CherryPy engine and therefore
-        is part of the bus (the engine *is* a bus) registery.
-
-        We use this plugin to create the eduID session manager.
-        """
-        plugins.SimplePlugin.__init__(self, bus)
-        self.session_manager = None
+    def __init__(self, config: dict):
         self.config = config
-        self.logger = logger
+        ttl = config.get('SHARED_SESSION_TTL')
+        secret = config.get('SHARED_SESSION_SECRET_KEY')
+        self.manager = SessionManager(config, ttl=ttl, secret=secret)
 
-    def start(self):
-        self.logger.info('Starting up session manager')
-        self.session_manager = SessionManager(cfg=self.config,
-                                              ttl=self.config.get('SHARED_SESSION_TTL'),
-                                              secret=self.config.get('SHARED_SESSION_SECRET_KEY'))
-        self.bus.subscribe("bind-session", self.bind)
-
-    def stop(self):
-        self.logger.info('Stopping down session manager')
-        self.bus.unsubscribe("bind-session", self.bind)
-        self.session_manager = None
-
-    def bind(self) -> EduIDSession:
+    def open_session(self) -> EduidSession:
         """
-        Whenever this plugin receives the 'bind-session' command, it applies
-        this method to retrieve session data from redis.
-
-        It then returns the session to the caller.
         """
-        cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
-        token = eduid_idp.mischttp.read_cookie(cookie_name, self.logger)
-        base_session = self.session_manager.get_session(token=token)
-        return EduIDSession(base_session)
+        logger = cherrypy.config.logger
+        debug = self.config.get('DEBUG')
+        try:
+            cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
+        except KeyError:
+            logger.error('SHARED_SESSION_COOKIE_NAME not set in config')
+            raise BadConfiguration('SHARED_SESSION_COOKIE_NAME not set in config')
 
+        # Load token from cookie
+        token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
+        if debug:
+            logger.debug('Session cookie {} == {}'.format(cookie_name, token))
 
-class EduIDSessionTool(cherrypy.Tool):
+        if token:
+            # Existing session
+            try:
+                base_session = self.manager.get_session(token=token, debug=debug)
+                sess = EduidSession(base_session.session_id, base_session=base_session)
+                if debug:
+                    logger.debug('Loaded existing session {}'.format(sess))
+                return sess
+            except (KeyError, ValueError) as exc:
+                logger.warning(f'Failed to load session from token {token}: {exc}')
 
-    def __init__(self):
-        """
-        This tool is responsible for keeping an eduID session manager
-        and attaching sessions to the current request.
-
-        This tools binds an eduid redis session to the request each time
-        a request starts and commits whenever the request terminates.
-        """
-        cherrypy.Tool.__init__(self, 'on_start_resource',
-                               self.bind_session,
-                               priority=20)
-
-    def _setup(self):
-        cherrypy.Tool._setup(self)
-        cherrypy.request.hooks.attach('on_end_resource',
-                                      self.commit_transaction,
-                                      priority=80)
-
-    def bind_session(self):
-        """
-        Attaches a session to the request's scope by requesting
-        the Session to bind a session to the SA engine.
-        """
-        session = cherrypy.engine.publish('bind-session').pop()
-        cherrypy.request.eduid_session = session
-
-    def commit_transaction(self):
-        """
-        Commits to redis the current changes to the session.
-        """
-        if not hasattr(cherrypy.request, 'eduid_session'):
-            return
-        cherrypy.request.eduid_session.commit()
+        # New session
+        base_session = self.manager.get_session(data={}, debug=debug)
+        sess = EduidSession(base_session.session_id, base_session=base_session)
+        if debug:
+            logger.debug('Created new session {}'.format(sess))
+        return sess

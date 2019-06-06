@@ -79,7 +79,7 @@ class SSO(Service):
         resp_args = self._validate_login_request(ticket)
 
         if self.context.common_sessions is not None:
-            cherrypy.request.eduid_session['user_eppn'] = user.eppn
+            cherrypy.session['user_eppn'] = user.eppn
 
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions

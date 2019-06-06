@@ -50,7 +50,7 @@ from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMI
 from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
 from eduid_idp.idp import IdPApplication
 from eduid_idp.config import init_config
-from eduid_idp.eduid_session import SessionManagerPlugin, EduIDSessionTool
+from eduid_idp.eduid_session import EduidSession
 
 import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
@@ -94,19 +94,14 @@ class TestActions(MongoTestCase):
                 'LISTEN_PORT': 443,
                 'BASE_URL': 'https://unittest-idp.example.edu/',
                 'CONTENT_PACKAGES': [('eduid_idp', 'tests/static')],
-                'ACTION_PLUGINS': ['tou', 'mfa']
+                'ACTION_PLUGINS': ['tou', 'mfa'],
         }
         self.config = init_config(test_config=_defaults)
+        cherrypy.config.logger = logger
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
         # Actions db
         self.actions = self.idp_app.context.actions_db
-
-
-        SessionManagerPlugin(cherrypy.engine, self.config, logger).subscribe()
-        session_tool = EduIDSessionTool()
-        cherrypy.tools.eduid_sessions = session_tool
-
         # setup some test data
         _email = 'johnsmith@example.com'
         self.test_user = self.amdb.get_user_by_mail(_email)
@@ -115,12 +110,16 @@ class TestActions(MongoTestCase):
                                                    preference = 100,
                                                    params = {})
 
-
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
-        cherrypy.quickstart(self.idp_app, '', {'/': {'tools.eduid_sessions.on': True}})
         # mount the IdP app in the cherrypy app server
-        #cherrypy.tree.mount(self.idp_app, '/')
+        cherry_conf = {
+                'tools.sessions.on': True,
+                'tools.sessions.storage_class': EduidSession
+                }
+        cherry_conf.update(self.config)
+        cherrypy.config.update(cherry_conf)
+        cherrypy.tree.mount(self.idp_app, '', {'/': cherry_conf})
 
         # create a webtest testing environment
         from six.moves.http_cookiejar import CookieJar
