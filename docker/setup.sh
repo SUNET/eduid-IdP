@@ -30,7 +30,6 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 
 PYPI="https://pypi.sunet.se/simple/"
-ping -c 1 -q pypiserver.docker && PYPI="http://pypiserver.docker:8080/simple/"
 
 echo "#############################################################"
 echo "$0: Using PyPi URL ${PYPI}"
@@ -42,6 +41,5 @@ echo "#############################################################"
 /opt/eduid/bin/pip install       -i ${PYPI} pykcs11==1.3.0
 /opt/eduid/bin/pip install --pre -i ${PYPI} pyXMLSecurity[PKCS11]
 /opt/eduid/bin/pip install       -i ${PYPI} requests
-#/opt/eduid/bin/pip install --pre -i ${PYPI} eduid-action
 
 /opt/eduid/bin/pip freeze
