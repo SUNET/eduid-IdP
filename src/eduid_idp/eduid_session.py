@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 from typing import Optional
 
 import cherrypy
@@ -31,17 +32,29 @@ class EduidSession(Session):
             self._session = other._session
         self._id = self._session.session_id
         self._common: Optional[Common] = None
+        self._actions: Optional[Actions] = None
 
     def _exists(self):
         return bool(self._session.conn.get(self.id))
 
     def _load(self):
-        return self._session._data
+        ttl = cherrypy.config.get('SHARED_SESSION_TTL')
+        expires = self.now() + datetime.timedelta(seconds=ttl)
+        return (self._session._data, expires)
 
     def _save(self, expiration_time):
+        if self._common is not None:
+            self._data['_common'] = self._common.to_dict()
+        if self._actions is not None:
+            self._data['_actions'] = self._actions.to_dict()
+        self._session._data = self._data
         self._session.commit()
+        self._session.conn.expire(self.id, int(expiration_time.timestamp()))
 
     def _delete(self):
+        self._data = None
+        self._common = None
+        self._actions = None
         self._session.clear()
 
     def acquire_lock(self, path=None):
