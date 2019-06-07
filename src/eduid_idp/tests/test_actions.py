@@ -94,7 +94,7 @@ class TestActions(MongoTestCase):
                 'LISTEN_PORT': 443,
                 'BASE_URL': 'https://unittest-idp.example.edu/',
                 'CONTENT_PACKAGES': [('eduid_idp', 'tests/static')],
-                'ACTION_PLUGINS': ['tou', 'mfa'],
+                'ACTION_PLUGINS': ['tou', 'mfa']
         }
         self.config = init_config(test_config=_defaults)
         cherrypy.config.logger = logger
@@ -184,9 +184,6 @@ class TestActions(MongoTestCase):
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
-        # make sure there is a common session
-        #self._update_session()
-
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
@@ -218,9 +215,6 @@ class TestActions(MongoTestCase):
 
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
-
-        # make sure there is a common session
-        #self._update_session()
 
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
