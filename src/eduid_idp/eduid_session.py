@@ -25,11 +25,7 @@ class EduidSession(Session):
 
     def __init__(self, id, **kwargs):
         self.id_observers = []
-        if 'base_session' in kwargs:
-            self._session = kwargs["base_session"]
-        else:
-            other = self.session_factory.open_session()
-            self._session = other._session
+        self._session = self.session_factory.get_base_session(**kwargs)
         self._id = self._session.session_id
         self._common: Optional[Common] = None
         self._actions: Optional[Actions] = None
@@ -43,10 +39,8 @@ class EduidSession(Session):
         return (self._session._data, expires)
 
     def _save(self, expiration_time):
-        if self._common is not None:
-            self._data['_common'] = self._common.to_dict()
-        if self._actions is not None:
-            self._data['_actions'] = self._actions.to_dict()
+        self._data['_common'] = self.common.to_dict()
+        self._data['_actions'] = self.actions.to_dict()
         self._session._data = self._data
         self._session.commit()
         self._session.conn.expire(self.id, int(expiration_time.timestamp()))
@@ -98,6 +92,19 @@ class SessionFactory:
         secret = config.get('SHARED_SESSION_SECRET_KEY')
         self.manager = SessionManager(config, ttl=ttl, secret=secret)
 
+    def get_base_session(self, **kwargs):
+        logger = cherrypy.config.logger
+        debug = self.config.get('DEBUG')
+        if 'token' in kwargs:
+            token = kwargs['token']
+            try:
+                return self.manager.get_session(token=token, debug=debug)
+            except (KeyError, ValueError) as exc:
+                logger.warning(f'Failed to load session from token {token}: {exc}')
+
+        return self.manager.get_session(data={}, debug=debug)
+
+
     def open_session(self) -> EduidSession:
         """
         """
@@ -114,19 +121,7 @@ class SessionFactory:
         if debug:
             logger.debug('Session cookie {} == {}'.format(cookie_name, token))
 
-        if token:
-            # Existing session
-            try:
-                base_session = self.manager.get_session(token=token, debug=debug)
-                sess = EduidSession(base_session.session_id, base_session=base_session)
-                if debug:
-                    logger.debug('Loaded existing session {}'.format(sess))
-                return sess
-            except (KeyError, ValueError) as exc:
-                logger.warning(f'Failed to load session from token {token}: {exc}')
-
-        # New session
-        base_session = self.manager.get_session(data={}, debug=debug)
+        base_session = self.get_base_session(token=token)
         sess = EduidSession(base_session.session_id, base_session=base_session)
         if debug:
             logger.debug('Created new session {}'.format(sess))
