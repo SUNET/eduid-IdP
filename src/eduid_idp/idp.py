@@ -713,7 +713,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
 
     config.logger = logger
 
-    cherrypy.quickstart(IdPApplication(logger, config), '', cherry_conf)
+    cherrypy.quickstart(IdPApplication(logger, config))
 
 if __name__ == '__main__':
     try:
