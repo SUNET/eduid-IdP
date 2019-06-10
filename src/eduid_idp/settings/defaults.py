@@ -50,8 +50,11 @@ REDIS_SENTINEL_HOSTS: Optional[List[str]] = None
 # The Redis sentinel 'service name'.
 REDIS_SENTINEL_SERVICE_NAME: Optional[str] = None
 
-# The Redis session encrypted application key.
-SESSION_APP_KEY: Optional[str] = None
+# session cookie
+SESSION_COOKIE_NAME: str = 'sessid'
+SESSION_COOKIE_DOMAIN: str = ''
+SESSION_COOKIE_SECURE: bool = True
+SESSION_COOKIE_HTTPS: bool = True
 
 # Secret key
 SECRET_KEY: Optional[str] = None

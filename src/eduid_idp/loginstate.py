@@ -150,8 +150,8 @@ class SSOLoginDataCache(object):
     def __init__(self, name: str, logger: Logger, ttl: int, config: IdPConfig, lock = None):
         self.logger = logger
         self._cache: ExpiringCache
-        if (config.get('REDIS_SENTINEL_HOSTS') or config.get('REDIS_HOST')) and config.get('SESSION_APP_KEY'):
-            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config, secret=config['SESSION_APP_KEY'])
+        if (config.get('REDIS_SENTINEL_HOSTS') or config.get('REDIS_HOST')) and config.get('SHARED_SESSION_SECRET_KEY'):
+            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config, secret=config['SHARED_SESSION_SECRET_KEY'])
         else:
             # This is used in tests
             self._cache = ExpiringCacheMem(name, logger, ttl, lock)

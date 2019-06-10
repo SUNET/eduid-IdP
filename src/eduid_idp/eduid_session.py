@@ -26,7 +26,7 @@ class EduidSession(Session):
     def __init__(self, id, **kwargs):
         self.id_observers = []
         self._session = self.session_factory.get_base_session(**kwargs)
-        self._id = self._session.session_id
+        self._id = self._session.token
         self._common: Optional[Common] = None
         self._actions: Optional[Actions] = None
 
@@ -93,6 +93,8 @@ class SessionFactory:
         self.manager = SessionManager(config, ttl=ttl, secret=secret)
 
     def get_base_session(self, **kwargs):
+        if 'base_session' in kwargs:
+            return kwargs['base_session']
         logger = cherrypy.config.logger
         debug = self.config.get('DEBUG')
         if 'token' in kwargs:
@@ -119,10 +121,10 @@ class SessionFactory:
         # Load token from cookie
         token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
         if debug:
-            logger.debug('Session cookie {} == {}'.format(cookie_name, token))
+            logger.debug(f'Session cookie {cookie_name} == {token}')
 
         base_session = self.get_base_session(token=token)
         sess = EduidSession(base_session.session_id, base_session=base_session)
         if debug:
-            logger.debug('Created new session {}'.format(sess))
+            logger.debug(f'Created new session {sess}')
         return sess

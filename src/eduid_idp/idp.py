@@ -129,6 +129,7 @@ from eduid_idp.config import init_config, IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
+from eduid_idp.eduid_session import EduidSession
 
 from eduid_userdb.actions import ActionDB
 
@@ -706,14 +707,19 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
         sys.stderr.write("NOTE: Config option 'logdir' not set.\n")
 
     cherry_conf['tools.sessions.on'] = True
-    cherry_conf['tools.sessions.storage_class'] = "eduid_idp.eduid_session.EduidSession"
+    cherry_conf['tools.sessions.name'] = config.get('SESSION_COOKIE_NAME')
+    cherry_conf['tools.sessions.domain'] = config.get('SESSION_COOKIE_DOMAIN')
+    cherry_conf['tools.sessions.secure'] = config.get('SESSION_COOKIE_SECURE')
+    cherry_conf['tools.sessions.storage_class'] = EduidSession
+    cherry_conf.update(config)
 
     cherrypy.log.access_log.propagate = False
     cherrypy.config.update(cherry_conf)
 
-    config.logger = logger
+    cherrypy.config.logger = logger
 
     cherrypy.quickstart(IdPApplication(logger, config))
+    #cherrypy.quickstart(IdPApplication(logger, config), '', {'/': cherry_conf})
 
 if __name__ == '__main__':
     try:
