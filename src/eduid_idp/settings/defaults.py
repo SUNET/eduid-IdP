@@ -48,7 +48,7 @@ REDIS_DB: int = 0
 REDIS_SENTINEL_HOSTS: Optional[List[str]] = None
 
 # The Redis sentinel 'service name'.
-REDIS_SENTINEL_SERVICE_NAME: Optional[str] = None
+REDIS_SENTINEL_SERVICE_NAME: str = 'redis-cluster'
 
 # The Redis session encrypted application key.
 SESSION_APP_KEY: Optional[str] = None
@@ -62,13 +62,13 @@ LOG_LEVEL: str = 'DEBUG'
 # IdP specific
 SYSLOG_DEBUG: bool = False
 
-NUM_THREADS = 8
+NUM_THREADS: int = 8
 
-LOGDIR = None
+LOGDIR: Optional[str] = None
 
-LOGFILE = None
+LOGFILE: Optional[str] = None
 
-SYSLOG_SOCKET = None            # syslog socket to log to (/dev/log maybe)
+SYSLOG_SOCKET: Optional[str] = None            # syslog socket to log to (/dev/log maybe)
 
 # IP address to listen on.
 LISTEN_ADDR: str = '0.0.0.0'
@@ -86,11 +86,11 @@ FTICKS_SECRET_KEY: Optional[str] = None
 # Get SAML F-TICKS format string.
 FTICKS_FORMAT_STRING: str = 'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#'
 
-STATIC_DIR = None   # directory for local static files
+STATIC_DIR: Optional[str] = None   # directory for local static files
 
-STATIC_LINK = '#'   # URL to static resources that can be used in templates
+STATIC_LINK: str = '#'   # URL to static resources that can be used in templates
 
-SSL_ADAPTER = 'builtin'  # one of cherrypy.wsgiserver.ssl_adapters
+SSL_ADAPTER: str = 'builtin'  # one of cherrypy.wsgiserver.ssl_adapters
 
 # SSL certificate filename (None == SSL disabled)
 SERVER_CERT: Optional[str] = None  # SSL cert filename
@@ -130,7 +130,7 @@ VERIFY_REQUEST_SIGNATURES: bool = False
 
 # Get list of usernames valid for use with the /status URL.
 # If this list is ['*'], all usernames are allowed for /status.
-STATUS_TEST_USERNAMES: Optional[List[str]] = None
+STATUS_TEST_USERNAMES: List[str] = []
 
 # URL (string) for use in simple templating of login.html.
 SIGNUP_LINK: str = '#'          # for login.html

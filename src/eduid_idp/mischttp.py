@@ -190,7 +190,7 @@ def static_filename(config, path, logger):
         logger.warning("Attempted directory traversal: \'{}\'".format(path))
         return False
     try:
-        filename = os.path.join(config.get('STATIC_DIR'), path)
+        filename = os.path.join(config['STATIC_DIR'], path)
         os.stat(filename)
         return filename
     except OSError:
@@ -339,7 +339,7 @@ def set_cookie(name: str, path: str, logger: logging.Logger, config: IdPConfig, 
     else:
         cookie[name] = value
     cookie[name]['path'] = path
-    if not config.get('INSECURE_COOKIES'):
+    if config['INSECURE_COOKIES'] is False:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
     cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
     logger.debug("Set cookie {!r} : {}".format(name, cookie))
@@ -405,14 +405,14 @@ def get_default_template_arguments(config):
     :rtype: dict
     """
     return {
-        'dashboard_link': config.get('DASHBOARD_LINK'),
-        'signup_link': config.get('SIGNUP_LINK'),
-        'student_link': config.get('STUDENT_LINK'),
-        'technicians_link': config.get('TECHNICIANS_LINK'),
-        'staff_link': config.get('STAFF_LINK'),
-        'faq_link': config.get('FAQ_LINK'),
-        'password_reset_link': config.get('PASSWORD_RESET_LINK'),
-        'static_link': config.get('STATIC_LINK'),
+        'dashboard_link': config['DASHBOARD_LINK'],
+        'signup_link': config['SIGNUP_LINK'],
+        'student_link': config['STUDENT_LINK'],
+        'technicians_link': config['TECHNICIANS_LINK'],
+        'staff_link': config['STAFF_LINK'],
+        'faq_link': config['FAQ_LINK'],
+        'password_reset_link': config['PASSWORD_RESET_LINK'],
+        'static_link': config['STATIC_LINK'],
     }
 
 
@@ -446,14 +446,14 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     if logger:
         logger.debug("Client language preferences: {!r}".format(languages))
     languages = [lang for (lang, q_val) in languages[:50]]  # cap somewhere to prevent DoS
-    if config.get('DEFAULT_LANGUAGE') not in languages and config.get('DEFAULT_LANGUAGE'):
-        languages.append(config.get('DEFAULT_LANGUAGE'))
+    if config['DEFAULT_LANGUAGE'] not in languages:
+        languages.append(config['DEFAULT_LANGUAGE'])
 
     if languages:
         logger.debug("Languages list : {!r}".format(languages))
         for lang in languages:
             if _LANGUAGE_RE.match(lang):
-                for (package, path) in config.get('CONTENT_PACKAGES'):
+                for (package, path) in config['CONTENT_PACKAGES']:
                     langfile = path + '/' + lang.lower() + '/' + filename  # pkg_resources paths do not use os.path.join
                     if logger:
                         logger.debug('Looking for package {!r}, language {!r}, path: {!r}'.format(

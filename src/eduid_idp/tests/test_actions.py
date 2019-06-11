@@ -160,7 +160,7 @@ class TestActions(MongoTestCase):
             self.assertEqual(resp.status, '302 Found')
 
         # Register user acceptance for the ToU version in use
-        tou = ToUEvent(version = self.config.get('TOU_VERSION'),
+        tou = ToUEvent(version = self.config['TOU_VERSION'],
                        application = 'unit test',
                        created_ts = True,
                        event_id = bson.ObjectId(),

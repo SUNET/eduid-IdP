@@ -230,7 +230,7 @@ class SLO(Service):
         response = self.context.idp.create_logout_response(req_info.message, bindings, status, sign = sign_response,
                                                    issuer = issuer)
         # Only perform expensive parse/pretty-print if debugging
-        if self.config.get('DEBUG'):
+        if self.config['DEBUG']:
             xmlstr = eduid_idp.util.maybe_xml_to_string(response, logger=self.logger)
             self.logger.debug("Logout SAMLResponse :\n\n{!s}\n\n".format(xmlstr))
 
