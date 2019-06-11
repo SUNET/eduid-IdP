@@ -43,7 +43,7 @@ class EduidSession(Session):
         self._data['_actions'] = self.actions.to_dict()
         self._session._data = self._data
         self._session.commit()
-        self._session.conn.expire(self.id, int(expiration_time.timestamp()))
+        self._session.conn.expire(self._session.session_id, int(expiration_time.timestamp()))
 
     def _delete(self):
         self._data = None
@@ -99,32 +99,19 @@ class SessionFactory:
         debug = self.config.get('DEBUG')
         if 'token' in kwargs:
             token = kwargs['token']
+        else:
+            try:
+                cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
+            except KeyError:
+                logger.error('SHARED_SESSION_COOKIE_NAME not set in config')
+                raise BadConfiguration('SHARED_SESSION_COOKIE_NAME not set in config')
+
+            # Load token from cookie
+            token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
+        if token:
             try:
                 return self.manager.get_session(token=token, debug=debug)
             except (KeyError, ValueError) as exc:
                 logger.warning(f'Failed to load session from token {token}: {exc}')
 
         return self.manager.get_session(data={}, debug=debug)
-
-
-    def open_session(self) -> EduidSession:
-        """
-        """
-        logger = cherrypy.config.logger
-        debug = self.config.get('DEBUG')
-        try:
-            cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
-        except KeyError:
-            logger.error('SHARED_SESSION_COOKIE_NAME not set in config')
-            raise BadConfiguration('SHARED_SESSION_COOKIE_NAME not set in config')
-
-        # Load token from cookie
-        token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
-        if debug:
-            logger.debug(f'Session cookie {cookie_name} == {token}')
-
-        base_session = self.get_base_session(token=token)
-        sess = EduidSession(base_session.session_id, base_session=base_session)
-        if debug:
-            logger.debug(f'Created new session {sess}')
-        return sess
