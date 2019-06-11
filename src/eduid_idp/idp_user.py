@@ -145,7 +145,7 @@ def _make_scoped_eppn(attributes, config):
     :rtype: dict
     """
     eppn = attributes.get('eduPersonPrincipalName')
-    scope = config.get('DEFAULT_EPPN_SCOPE')
+    scope = config['DEFAULT_EPPN_SCOPE']
     if not eppn or not scope:
         return attributes
     if '@' not in eppn:
@@ -171,7 +171,7 @@ def _add_scoped_affiliation(attributes, config):
     """
     epsa = 'eduPersonScopedAffiliation'
     if epsa not in attributes and config.get('DEFAULT_SCOPED_AFFILIATION'):
-        attributes[epsa] = config.get('DEFAULT_SCOPED_AFFILIATION')
+        attributes[epsa] = config['DEFAULT_SCOPED_AFFILIATION']
     return attributes
 
 

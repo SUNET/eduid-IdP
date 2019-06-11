@@ -152,10 +152,10 @@ class IdPAuthn(object):
         self.userdb = userdb
         self.auth_client = auth_client
         if self.auth_client is None:
-            self.auth_client = get_vccs_client(config.get('VCCS_URL'))
+            self.auth_client = get_vccs_client(config['VCCS_URL'])
         self.authn_store = authn_store
         if self.authn_store is None and config.get('MONGO_URI'):
-            self.authn_store = AuthnInfoStoreMDB(uri = config.get('MONGO_URI'), logger = logger)
+            self.authn_store = AuthnInfoStoreMDB(uri = config['MONGO_URI'], logger = logger)
 
     def password_authn(self, data: dict) -> Optional[AuthnData]:
         """
@@ -204,10 +204,10 @@ class IdPAuthn(object):
         pw_credentials = user.credentials.filter(Password).to_list()
         if self.authn_store:  # requires optional configuration
             authn_info = self.authn_store.get_user_authn_info(user)
-            if authn_info.failures_this_month() > self.config.get('MAX_AUTHN_FAILURES_PER_MONTH'):
+            if authn_info.failures_this_month() > self.config['MAX_AUTHN_FAILURES_PER_MONTH']:
                 self.logger.info("User {!r} AuthN failures this month {!r} > {!r}".format(
                     user, authn_info.failures_this_month(),
-                    self.config.get('MAX_AUTHN_FAILURES_PER_MONTH')))
+                    self.config['MAX_AUTHN_FAILURES_PER_MONTH']))
                 raise eduid_idp.error.TooManyRequests("Too Many Requests")
 
             # Optimize list of credentials to try based on which credentials the

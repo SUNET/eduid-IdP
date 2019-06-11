@@ -196,7 +196,7 @@ class IdPApplication(object):
         _session_ttl = self.config['SSO_SESSION_LIFETIME'] * 60
         _SSOSessions: SSOSessionCache
         if self.config.get('SSO_SESSION_MONGO_URI'):
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.get('SSO_SESSION_MONGO_URI'),
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config['SSO_SESSION_MONGO_URI'],
                                                               self.logger, _session_ttl)
         else:
             _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
@@ -208,11 +208,11 @@ class IdPApplication(object):
         _actions_db = None
 
         if config.get('MONGO_URI'):
-            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.get('MONGO_URI'), logger)
+            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config['MONGO_URI'], logger)
 
-        if config.get('MONGO_URI') and config.get('ACTIONS_APP_URI'):
-            _actions_db = ActionDB(config.get('MONGO_URI'))
-            self.logger.info("configured to redirect users with pending actions")
+            if config.get('ACTIONS_APP_URI'):
+                _actions_db = ActionDB(config['MONGO_URI'])
+                self.logger.info("configured to redirect users with pending actions")
         else:
             self.logger.debug("NOT configured to redirect users with pending actions")
 
@@ -235,7 +235,7 @@ class IdPApplication(object):
 
         _common_sessions: Optional[ExpiringCacheCommonSession] = None
 
-        if (config.get('REDIS_SENTINEL_HOSTS') or config.get('REDIS_HOST')) and config.get('SHARED_SESSION_COOKIE_NAME') \
+        if (config.get('REDIS_SENTINEL_HOSTS') or config.get('REDIS_HOST')) and 'SHARED_SESSION_COOKIE_NAME' in config \
                 and config.get('SHARED_SESSION_SECRET_KEY'):
             _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
                                                           config['SHARED_SESSION_TTL'], config,
@@ -260,12 +260,12 @@ class IdPApplication(object):
         :return:
         """
         old_path = sys.path
-        cfgfile = self.config.get('PYSAML2_CONFIG')
+        cfgfile = self.config['PYSAML2_CONFIG']
         cfgdir = os.path.dirname(cfgfile)
         if cfgdir:
             # add directory part to sys.path, since pysaml2 'import's it's config
             sys.path = [cfgdir] + sys.path
-            cfgfile = os.path.basename(self.config.get('PYSAML2_CONFIG'))
+            cfgfile = os.path.basename(self.config['PYSAML2_CONFIG'])
 
         _path = sys.path[0]
         self.logger.debug("Loading PySAML2 server using cfgfile {!r} and path {!r}".format(cfgfile, _path))
@@ -357,11 +357,11 @@ class IdPApplication(object):
         if 'username' not in parsed or 'password' not in parsed:
             raise eduid_idp.error.BadRequest(logger = self.logger)
 
-        if parsed['username'] not in self.config.get('STATUS_TEST_USERNAMES') \
-                and self.config.get('STATUS_TEST_USERNAMES') != ['*']:
+        if parsed['username'] not in self.config['STATUS_TEST_USERNAMES'] \
+                and self.config['STATUS_TEST_USERNAMES'] != ['*']:
             self.logger.debug("Username {!r} in status request is not on the list "
                               "of permitted usernames : {!r}".format(parsed['username'],
-                                                                     self.config.get('STATUS_TEST_USERNAMES')))
+                                                                     self.config['STATUS_TEST_USERNAMES']))
             raise eduid_idp.error.Forbidden(logger = self.logger)
 
         response = {'status': 'FAIL'}
@@ -474,12 +474,12 @@ class IdPApplication(object):
             if not session.idp_user:
                 return None
             _age = session.minutes_old
-            if _age > self.config.get('SSO_SESSION_LIFETIME'):
+            if _age > self.config['SSO_SESSION_LIFETIME']:
                 self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
-                    _age, self.config.get('SSO_SESSION_LIFETIME')))
+                    _age, self.config['SSO_SESSION_LIFETIME']))
                 return None
             self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-                _age, self.config.get('SSO_SESSION_LIFETIME')))
+                _age, self.config['SSO_SESSION_LIFETIME']))
         return session
 
     def _lookup_sso_session2(self) -> Optional[eduid_idp.sso_session.SSOSession]:
@@ -648,7 +648,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
 
     # This is the root log level
     level = logging.INFO
-    if config.get('DEBUG'):
+    if config['DEBUG']:
         level = logging.DEBUG
 
     root_logger = logging.getLogger()
@@ -664,12 +664,12 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
                 this_h.setLevel(logging.WARNING)
     if config.get('LOGFILE'):
         formatter = logging.Formatter('%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
-        file_h = logging.handlers.RotatingFileHandler(config.get('LOGFILE'), maxBytes=10 * 1024 * 1024)
+        file_h = logging.handlers.RotatingFileHandler(config['LOGFILE'], maxBytes=10 * 1024 * 1024)
         file_h.setFormatter(formatter)
         file_h.setLevel(level)
         root_logger.addHandler(file_h)
     if config.get('SYSLOG_SOCKET'):
-        syslog_h = logging.handlers.SysLogHandler(config.get('SYSLOG_SOCKET'))
+        syslog_h = logging.handlers.SysLogHandler(config['SYSLOG_SOCKET'])
         formatter = logging.Formatter('%(name)s: %(message)s')
         syslog_h.setFormatter(formatter)
         syslog_h.setLevel(level)
@@ -677,34 +677,34 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     if config.get('RAVEN_DSN'):
         if raven and SentryHandler:
             root_logger.debug("Setting up Raven exception logging")
-            client = raven.Client(config.get('RAVEN_DSN'), timeout=10)
+            client = raven.Client(config['RAVEN_DSN'], timeout=10)
             handler = SentryHandler(client, level=logging.ERROR)
             if not raven.conf.setup_logging(handler):
                 root_logger.warning("Failed setting up Raven/Sentry logging")
         else:
             root_logger.warning("Config option raven_dsn set, but raven not available")
 
-    cherry_conf = {'server.thread_pool': config.get('NUM_THREADS'),
-                   'server.socket_host': config.get('LISTEN_ADDR'),
-                   'server.socket_port': config.get('LISTEN_PORT'),
+    cherry_conf = {'server.thread_pool': config['NUM_THREADS'],
+                   'server.socket_host': config['LISTEN_ADDR'],
+                   'server.socket_port': config['LISTEN_PORT'],
                    # enables X-Forwarded-For, since BCP is to run this server
                    # behind a webserver that handles TLS
                    'tools.proxy.on': True,
-                   'request.show_tracebacks': config.get('DEBUG'),
+                   'request.show_tracebacks': config['DEBUG'],
                    }
     if config.get('SERVER_CERT') and config.get('SERVER_KEY'):
-        _tls_opts = {'server.ssl_module': config.get('SSL_ADAPTER'),
-                     'server.ssl_certificate': config.get('SERVER_CERT'),
-                     'server.ssl_private_key': config.get('SERVER_KEY'),
+        _tls_opts = {'server.ssl_module': config['SSL_ADAPTER'],
+                     'server.ssl_certificate': config['SERVER_CERT'],
+                     'server.ssl_private_key': config['SERVER_KEY'],
                      #'server.ssl_certificate_chain':
                      }
         cherry_conf.update(_tls_opts)
 
     if config.get('LOGDIR'):
-        cherry_conf['log.access_file'] = os.path.join(config.get('LOGDIR'), 'access.log')
-        cherry_conf['log.error_file'] = os.path.join(config.get('LOGDIR'), 'error.log')
+        cherry_conf['log.access_file'] = os.path.join(config['LOGDIR'], 'access.log')
+        cherry_conf['log.error_file'] = os.path.join(config['LOGDIR'], 'error.log')
     else:
-        sys.stderr.write("NOTE: Config option 'logdir' not set.\n")
+        sys.stderr.write("NOTE: Config option 'LOGDIR' not set.\n")
 
     cherry_conf['tools.sessions.on'] = True
     cherry_conf['tools.sessions.name'] = config.get('SESSION_COOKIE_NAME')

@@ -19,8 +19,6 @@ extra_args=${extra_args-''}
 
 chown eduid: "${log_dir}" "${state_dir}"
 
-# || true to not fail on read-only cfg_dir
-
 # Look for executable in developers environment
 if [ "x${PYTHONPATH}" != "x" ]; then
     found=0

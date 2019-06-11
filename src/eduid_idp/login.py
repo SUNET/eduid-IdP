@@ -131,7 +131,7 @@ class SSO(Service):
                 self.logger.debug('Adding attribute {} with value from authn process: {}'.format(k, v))
             attributes[k] = v
         # Only perform expensive parse/pretty-print if debugging
-        if self.config.get('DEBUG'):
+        if self.config['DEBUG']:
             self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
                               "Response args:\n{!s},\n\nAuthn:\n{!s}\n".format(
                 user,
@@ -193,14 +193,14 @@ class SSO(Service):
         :type user_id: string
         :return: None
         """
-        if not self.config.get('FTICKS_SECRET_KEY'):
+        if not self.config.get('FTICKS_SECRET_KEY') or not self.config.get('FTICKS_FORMAT_STRING'):
             return
         # Default format string:
         #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
         _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        _anon_userid = hmac.new(self.config.get('FTICKS_SECRET_KEY').encode('ascii'),
+        _anon_userid = hmac.new(self.config['FTICKS_SECRET_KEY'].encode('ascii'),
                                 msg=user_id.encode('ascii'), digestmod=sha256).hexdigest()
-        msg = self.config.get('FTICKS_FORMAT_STRING').format(ts=_timestamp,
+        msg = self.config['FTICKS_FORMAT_STRING'].format(ts=_timestamp,
                                                       rp=relying_party,
                                                       ap=self.context.idp.config.entityid,
                                                       pn=_anon_userid,
@@ -311,7 +311,7 @@ class SSO(Service):
         """ Common code for redirect() and post() endpoints. """
         _force_authn = self._should_force_authn(ticket)
         if self.sso_session and not _force_authn:
-            _ttl = self.context.config.get('SSO_SESSION_LIFETIME') - self.sso_session.minutes_old
+            _ttl = self.context.config['SSO_SESSION_LIFETIME'] - self.sso_session.minutes_old
             self.logger.info("{!s}: proceeding sso_session={!s}, ttl={:}m".format(
                 ticket.key, self.sso_session.public_id, _ttl))
             self.logger.debug(f'Continuing with Authn request {repr(ticket.saml_req.request_id)}')

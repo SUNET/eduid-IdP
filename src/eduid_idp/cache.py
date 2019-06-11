@@ -236,8 +236,8 @@ class ExpiringCacheCommonSession(ExpiringCache):
                      'REDIS_DB': config['REDIS_DB'],
                      }
         if config.get('REDIS_SENTINEL_HOSTS'):
-            redis_cfg.update({'REDIS_SENTINEL_HOSTS': config.get('REDIS_SENTINEL_HOSTS'),
-                              'REDIS_SENTINEL_SERVICE_NAME': config.get('REDIS_SENTINEL_SERVICE_NAME'),
+            redis_cfg.update({'REDIS_SENTINEL_HOSTS': config['REDIS_SENTINEL_HOSTS'],
+                              'REDIS_SENTINEL_SERVICE_NAME': config['REDIS_SENTINEL_SERVICE_NAME'],
                               })
         else:
             redis_cfg['REDIS_HOST'] = config['REDIS_HOST']

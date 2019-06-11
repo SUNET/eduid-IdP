@@ -49,8 +49,8 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
     :param user: the authenticating user
     :param ticket: the SSO login data
     """
-    version = context.config.get('TOU_VERSION')
-    interval = context.config.get('TOU_REACCEPT_INTERVAL')
+    version = context.config['TOU_VERSION']
+    interval = context.config['TOU_REACCEPT_INTERVAL']
 
     if user.tou.has_accepted(version, interval):
         context.logger.debug('User has already accepted ToU version {!r}'.format(version))
