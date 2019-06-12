@@ -719,7 +719,6 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     cherrypy.config.logger = logger
 
     cherrypy.quickstart(IdPApplication(logger, config))
-    #cherrypy.quickstart(IdPApplication(logger, config), '', {'/': cherry_conf})
 
 if __name__ == '__main__':
     try:
