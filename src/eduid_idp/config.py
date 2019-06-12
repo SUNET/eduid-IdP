@@ -77,7 +77,8 @@ def init_config(module: str = 'eduid_idp.settings.defaults',
     else:
         from eduid_common.config.parsers.etcd import EtcdConfigParser
 
-        common_parser = EtcdConfigParser('/eduid/webapp/common/')
+        common_namespace = os.environ.get('EDUID_CONFIG_COMMON_NS', '/eduid/webapp/common/')
+        common_parser = EtcdConfigParser(common_namespace)
         config.update(common_parser.read_configuration(silent=True))
 
         namespace = os.environ.get('EDUID_CONFIG_NS', '/eduid/webapp/idp/')
