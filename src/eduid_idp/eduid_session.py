@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
 import cherrypy
 from cherrypy.lib.sessions import Session
 
+from eduid_common.api.exceptions import BadConfiguration
 from eduid_common.session.redis_session import SessionManager
 from eduid_common.session.redis_session import RedisEncryptedSession
 from eduid_common.session.namespaces import Common, Actions
@@ -12,18 +13,24 @@ import eduid_idp.mischttp
 
 
 class EduidSession(Session):
+    '''
+    Cherrypy session that keeps data encrypted in Redis,
+    shared with the rest of the eduid apps by way of a
+    shared encryption key.
+    '''
 
     @classmethod
     def setup(cls, **config):
         '''
         Initialize Redis connection pool. Only called once per process.
+        See cherrypy.lib.sessions.init
         '''
         for k, v in config.items():
             setattr(cls, k, v)
 
         cls.session_factory = SessionFactory(cherrypy.config)
 
-    def __init__(self, id, token=None, **kwargs):
+    def __init__(self, id: str, token: str = None, **kwargs):
         self._session = self.session_factory.get_base_session(token=token)
         token = self._session.token
         if isinstance(token, bytes):
@@ -34,17 +41,19 @@ class EduidSession(Session):
         self._common: Optional[Common] = None
         self._actions: Optional[Actions] = None
 
-    def _exists(self):
+    def _exists(self) -> bool:
         return bool(self._session.conn.get(self._session.session_id))
 
-    def _load(self):
+    def _load(self) -> Tuple[dict, datetime.datetime]:
         ttl = cherrypy.config.get('SHARED_SESSION_TTL')
         expires = self.now() + datetime.timedelta(seconds=ttl)
         return (self._session._data, expires)
 
-    def _save(self, expiration_time):
-        self._data['_common'] = self.common.to_dict()
-        self._data['_actions'] = self.actions.to_dict()
+    def _save(self, expiration_time: datetime.datetime):
+        if isinstance(self.common, Common):
+            self._data['_common'] = self.common.to_dict()
+        if isinstance(self.actions, Actions):
+            self._data['_actions'] = self.actions.to_dict()
         self._session._data = self._data
         self._session.commit()
         self._session.conn.expire(self.id, int(expiration_time.timestamp()))
@@ -87,8 +96,8 @@ class EduidSession(Session):
 
 class SessionFactory:
     """
-    Session factory,
-    to provide eduID redis-based sessions to the APIs.
+    Session factory, to provide eduID's IdP
+    encrypted redis-based sessions shared with the APIs.
     """
 
     def __init__(self, config: dict):
@@ -96,11 +105,11 @@ class SessionFactory:
         ttl = config['SHARED_SESSION_TTL']
         secret = config['SHARED_SESSION_SECRET_KEY']
         if secret is None:
-            logger.error('SHARED_SESSION_SECRET_KEY not set in config')
+            cherrypy.config.logger.error('SHARED_SESSION_SECRET_KEY not set in config')
             raise BadConfiguration('SHARED_SESSION_SECRET_KEY not set in config')
         self.manager = SessionManager(config, ttl=ttl, secret=secret)
 
-    def get_base_session(self, token=None):
+    def get_base_session(self, token: str = None) -> RedisEncryptedSession:
         logger = cherrypy.config.logger
         debug = self.config['DEBUG']
         if token is None:
