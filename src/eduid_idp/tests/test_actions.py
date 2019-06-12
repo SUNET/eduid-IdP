@@ -115,7 +115,11 @@ class TestActions(MongoTestCase):
         # mount the IdP app in the cherrypy app server
         cherry_conf = {
                 'tools.sessions.on': True,
-                'tools.sessions.storage_class': EduidSession
+                'tools.sessions.storage_class': EduidSession,
+                'tools.sessions.name': 'sessid',
+                'tools.sessions.domain': 'unittest-idp.example.edu',
+                'tools.sessions.secure': True,
+                'tools.sessions.httponly': False,
                 }
         cherry_conf.update(self.config)
         cherrypy.config.update(cherry_conf)

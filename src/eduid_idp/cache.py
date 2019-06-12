@@ -244,6 +244,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
         self._debug = config['DEBUG']
         self._redis_cfg = redis_cfg
         self._manager = SessionManager(redis_cfg, ttl=ttl, secret=secret)
+        self.logger = logger
 
     def __repr__(self):
         return '<{!s}: {!s}>'.format(self.__class__.__name__, self)
@@ -288,6 +289,7 @@ class ExpiringCacheCommonSession(ExpiringCache):
 
         :returns: The previously added session
         """
+        self.logger.debug(f'Getting redis encrypted session for {key}')
         try:
             if len(key) == _SHA1_HEXENCODED_SIZE:
                 _session_id = unhexlify(key)
