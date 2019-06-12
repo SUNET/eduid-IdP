@@ -26,7 +26,10 @@ class EduidSession(Session):
     def __init__(self, id, **kwargs):
         self.id_observers = []
         self._session = self.session_factory.get_base_session(**kwargs)
-        self._id = self._session.token
+        token = self._session.token
+        if isinstance(token, bytes):
+            token = token.decode('ascii')
+        self._id = token
         self._common: Optional[Common] = None
         self._actions: Optional[Actions] = None
 
