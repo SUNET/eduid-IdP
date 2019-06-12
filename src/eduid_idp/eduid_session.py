@@ -23,18 +23,19 @@ class EduidSession(Session):
 
         cls.session_factory = SessionFactory(cherrypy.config)
 
-    def __init__(self, id, **kwargs):
-        self.id_observers = []
-        self._session = self.session_factory.get_base_session(**kwargs)
+    def __init__(self, id, token=None, **kwargs):
+        self._session = self.session_factory.get_base_session(token=token)
         token = self._session.token
         if isinstance(token, bytes):
             token = token.decode('ascii')
-        self._id = token
+        super(EduidSession, self).__init__(id=token, **kwargs)
+
+        # namespaces
         self._common: Optional[Common] = None
         self._actions: Optional[Actions] = None
 
     def _exists(self):
-        return bool(self._session.conn.get(self.id))
+        return bool(self._session.conn.get(self._session.session_id))
 
     def _load(self):
         ttl = cherrypy.config.get('SHARED_SESSION_TTL')
@@ -46,7 +47,7 @@ class EduidSession(Session):
         self._data['_actions'] = self.actions.to_dict()
         self._session._data = self._data
         self._session.commit()
-        self._session.conn.expire(self._session.session_id, int(expiration_time.timestamp()))
+        self._session.conn.expire(self.id, int(expiration_time.timestamp()))
 
     def _delete(self):
         self._data = None
@@ -92,14 +93,10 @@ class SessionFactory:
             raise BadConfiguration('SHARED_SESSION_SECRET_KEY not set in config')
         self.manager = SessionManager(config, ttl=ttl, secret=secret)
 
-    def get_base_session(self, **kwargs):
-        if 'base_session' in kwargs:
-            return kwargs['base_session']
+    def get_base_session(self, token=None):
         logger = cherrypy.config.logger
         debug = self.config['DEBUG']
-        if 'token' in kwargs:
-            token = kwargs['token']
-        else:
+        if token is None:
             cookie_name = self.config['SHARED_SESSION_COOKIE_NAME']
             # Load token from cookie
             token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
