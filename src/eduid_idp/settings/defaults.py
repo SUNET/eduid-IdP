@@ -52,9 +52,12 @@ REDIS_SENTINEL_SERVICE_NAME: str = 'redis-cluster'
 
 # session cookie
 SESSION_COOKIE_NAME: str = 'sessid'
+SESSION_COOKIE_PATH: str = '/'
+SESSION_COOKIE_TIMEOUT: int = 60  # in minutes
 SESSION_COOKIE_DOMAIN: str = ''
 SESSION_COOKIE_SECURE: bool = True
-SESSION_COOKIE_HTTPS: bool = True
+SESSION_COOKIE_PERSISTENT: bool = True
+SESSION_COOKIE_HTTPONLY: bool = False
 
 # Secret key
 SECRET_KEY: Optional[str] = None

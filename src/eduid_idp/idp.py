@@ -707,10 +707,14 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
         sys.stderr.write("NOTE: Config option 'LOGDIR' not set.\n")
 
     cherry_conf['tools.sessions.on'] = True
-    cherry_conf['tools.sessions.name'] = config.get('SESSION_COOKIE_NAME')
-    cherry_conf['tools.sessions.domain'] = config.get('SESSION_COOKIE_DOMAIN')
-    cherry_conf['tools.sessions.secure'] = config.get('SESSION_COOKIE_SECURE')
     cherry_conf['tools.sessions.storage_class'] = EduidSession
+    cherry_conf['tools.sessions.name'] = config['SESSION_COOKIE_NAME']
+    cherry_conf['tools.sessions.domain'] = config['SESSION_COOKIE_DOMAIN']
+    cherry_conf['tools.sessions.path'] = config['SESSION_COOKIE_PATH']
+    cherry_conf['tools.sessions.timeout'] = config['SESSION_COOKIE_TIMEOUT']
+    cherry_conf['tools.sessions.secure'] = config['SESSION_COOKIE_SECURE']
+    cherry_conf['tools.sessions.httponly'] = config['SESSION_COOKIE_HTTPONLY']
+    cherry_conf['tools.sessions.persistent'] = config['SESSION_COOKIE_PERSISTENT']
     cherry_conf.update(config)
 
     cherrypy.log.access_log.propagate = False
