@@ -91,24 +91,22 @@ class SessionFactory:
 
     def __init__(self, config: dict):
         self.config = config
-        ttl = config.get('SHARED_SESSION_TTL')
-        secret = config.get('SHARED_SESSION_SECRET_KEY')
+        ttl = config['SHARED_SESSION_TTL']
+        secret = config['SHARED_SESSION_SECRET_KEY']
+        if secret is None:
+            logger.error('SHARED_SESSION_SECRET_KEY not set in config')
+            raise BadConfiguration('SHARED_SESSION_SECRET_KEY not set in config')
         self.manager = SessionManager(config, ttl=ttl, secret=secret)
 
     def get_base_session(self, **kwargs):
         if 'base_session' in kwargs:
             return kwargs['base_session']
         logger = cherrypy.config.logger
-        debug = self.config.get('DEBUG')
+        debug = self.config['DEBUG']
         if 'token' in kwargs:
             token = kwargs['token']
         else:
-            try:
-                cookie_name = self.config.get('SHARED_SESSION_COOKIE_NAME')
-            except KeyError:
-                logger.error('SHARED_SESSION_COOKIE_NAME not set in config')
-                raise BadConfiguration('SHARED_SESSION_COOKIE_NAME not set in config')
-
+            cookie_name = self.config['SHARED_SESSION_COOKIE_NAME']
             # Load token from cookie
             token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
         if token:
