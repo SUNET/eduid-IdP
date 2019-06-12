@@ -83,6 +83,7 @@ def init_config(module: str = 'eduid_idp.settings.defaults',
 
         namespace = os.environ.get('EDUID_CONFIG_NS', '/eduid/webapp/idp/')
         parser = EtcdConfigParser(namespace)
+        # Load optional app specific settings
         config.update(parser.read_configuration(silent=True))
 
     return config
