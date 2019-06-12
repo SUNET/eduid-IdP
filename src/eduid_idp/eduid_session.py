@@ -54,12 +54,6 @@ class EduidSession(Session):
         self._actions = None
         self._session.clear()
 
-    def acquire_lock(self, path=None):
-        pass
-
-    def release_lock(self, path=None):
-        pass
-
     @property
     def common(self) -> Optional[Common]:
         if not self._common:

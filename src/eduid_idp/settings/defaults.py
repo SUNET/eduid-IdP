@@ -58,6 +58,7 @@ SESSION_COOKIE_DOMAIN: str = ''
 SESSION_COOKIE_SECURE: bool = True
 SESSION_COOKIE_PERSISTENT: bool = True
 SESSION_COOKIE_HTTPONLY: bool = False
+SESSION_COOKIE_LOCKING: str = 'explicit'
 
 # Secret key
 SECRET_KEY: Optional[str] = None
