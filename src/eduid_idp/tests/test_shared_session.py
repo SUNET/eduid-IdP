@@ -35,11 +35,11 @@
 import os
 import logging
 import pkg_resources
+import unittest
 
 import cherrypy
 from cherrypy.lib.sessions import init
 
-from eduid_userdb.testing import MongoTestCase
 from eduid_common.session.testing import RedisTemporaryInstance
 from eduid_common.session.redis_session import RedisEncryptedSession
 
@@ -51,17 +51,13 @@ logger = logging.getLogger(__name__)
 
 
 # noinspection PyProtectedMember
-class TestSessions(MongoTestCase):
+class TestSessions(unittest.TestCase):
 
     def setUp(self):
-        MongoTestCase.setUp(self)
-
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
         self.redis_instance = RedisTemporaryInstance.get_instance()
         _defaults = {
-                'MONGO_URI': self.tmp_db.uri,
-                'PYSAML2_CONFIG': os.path.join(datadir, 'test_SSO_conf.py'),
                 'TOU_VERSION': 'mock-version',
                 'SHARED_SESSION_SECRET_KEY': 'shared-session-secret-key',
                 'REDIS_HOST': 'localhost',
@@ -71,7 +67,6 @@ class TestSessions(MongoTestCase):
                 'LISTEN_PORT': 443,
                 'BASE_URL': 'https://unittest-idp.example.edu/',
                 'CONTENT_PACKAGES': [('eduid_idp', 'tests/static')],
-                'ACTION_PLUGINS': ['tou', 'mfa']
         }
         self.config = init_config(test_config=_defaults)
         cherrypy.config.logger = logger
