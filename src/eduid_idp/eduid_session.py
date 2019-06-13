@@ -31,6 +31,8 @@ class EduidSession(Session):
         cls.session_factory = SessionFactory(cherrypy.config)
 
     def __init__(self, id: str, token: str = None, **kwargs):
+        if id and not token:
+            token = id
         self._session = self.session_factory.get_base_session(token=token)
         token = self._session.token
         if isinstance(token, bytes):
@@ -50,16 +52,16 @@ class EduidSession(Session):
         return (self._session._data, expires)
 
     def _save(self, expiration_time: datetime.datetime):
-        if isinstance(self.common, Common):
+        if isinstance(self._common, Common):
             self._data['_common'] = self.common.to_dict()
-        if isinstance(self.actions, Actions):
+        if isinstance(self._actions, Actions):
             self._data['_actions'] = self.actions.to_dict()
         self._session._data = self._data
         self._session.commit()
-        self._session.conn.expire(self.id, int(expiration_time.timestamp()))
+        self._session.conn.expire(self._session.session_id, int(expiration_time.timestamp()))
 
     def _delete(self):
-        self._data = None
+        self._data = {}
         self._common = None
         self._actions = None
         self._session.clear()

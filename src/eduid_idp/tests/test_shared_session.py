@@ -34,14 +34,14 @@
 
 import os
 import logging
-import pkg_resources
 import unittest
 
 import cherrypy
-from cherrypy.lib.sessions import init
+from cherrypy.lib.sessions import init, expire
 
 from eduid_common.session.testing import RedisTemporaryInstance
 from eduid_common.session.redis_session import RedisEncryptedSession
+from eduid_common.session.namespaces import Common, LoginApplication
 
 from eduid_idp.config import init_config
 from eduid_idp.eduid_session import EduidSession
@@ -55,7 +55,6 @@ class TestSessions(unittest.TestCase):
 
     def setUp(self):
         # load the IdP configuration
-        datadir = pkg_resources.resource_filename(__name__, 'data')
         self.redis_instance = RedisTemporaryInstance.get_instance()
         _defaults = {
                 'TOU_VERSION': 'mock-version',
@@ -82,17 +81,38 @@ class TestSessions(unittest.TestCase):
         cherry_conf.update(self.config)
         cherrypy.config.update(cherry_conf)
 
-        init(storage_class=EduidSession, path='/', name="sessid",
+        name = 'sessid'
+
+        init(storage_class=EduidSession, path='/', name=name,
              domain="unittest-idp.example.edu")
+
+    def tearDown(self):
+        cherrypy.session.delete()
+        del cherrypy.session
+        del cherrypy.serving.request._session_init_flag
 
     def test_session(self):
         cherrypy.session['test'] = 'test'
         self.assertEquals(cherrypy.session._session._data['test'], 'test')
         self.assertTrue(isinstance(cherrypy.session._session, RedisEncryptedSession))
+        cherrypy.session.load()
+        cherrypy.session.save()
 
         token = cherrypy.session._session.token.encode('ascii')
         session_id, sig = RedisEncryptedSession.decode_token(token)
-        cherrypy.session._session.commit()
         encrypted_session = cherrypy.session._session.conn.get(session_id.hex())
         session_data = cherrypy.session._session.verify_data(encrypted_session)
-        self.assertEquals(session_data, {'test': 'test'})
+        self.assertEquals(session_data['test'], 'test')
+
+    def test_session_namespace(self):
+        cherrypy.session._common = Common(eppn='hubba-dubba',
+                                         is_logged_in=True,
+                                         login_source=LoginApplication(value='idp'))
+        cherrypy.session.load()
+        cherrypy.session.save()
+
+        token = cherrypy.session._session.token.encode('ascii')
+        session_id, sig = RedisEncryptedSession.decode_token(token)
+        encrypted_session = cherrypy.session._session.conn.get(session_id.hex())
+        session_data = cherrypy.session._session.verify_data(encrypted_session)
+        self.assertEquals(session_data['_common']['eppn'], 'hubba-dubba')
