@@ -37,7 +37,7 @@ import time
 import logging
 from unittest import TestCase
 
-import eduid_idp
+import eduid_common.session
 
 logger = logging.getLogger()
 
@@ -57,7 +57,7 @@ class BusyLock(object):
 class TestExpiringCache(TestCase):
     def test_add(self):
         ttl = 30
-        c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl)
+        c = eduid_common.session.idp_cache.ExpiringCacheMem('TestCache', logger, ttl)
         now = int(time.time())
         c.add('one', 'ett', now = now - 60)
         self.assertEqual('ett', c.get('one'))
@@ -67,7 +67,7 @@ class TestExpiringCache(TestCase):
 
     def test_add_locked(self):
         ttl = 30
-        c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl, lock = BusyLock())
+        c = eduid_common.session.idp_cache.ExpiringCacheMem('TestCache', logger, ttl, lock = BusyLock())
         now = int(time.time())
         c.add('one', 'ett', now = now - 60)
         self.assertEqual('ett', c.get('one'))
@@ -78,19 +78,19 @@ class TestExpiringCache(TestCase):
 
     def test_items(self):
         ttl = 30
-        c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl)
+        c = eduid_common.session.idp_cache.ExpiringCacheMem('TestCache', logger, ttl)
         c.add(1, 'one')
         c.add(2, 'two')
         self.assertEqual({1: 'one', 2: 'two'}, c.items())
 
     def test_key(self):
         ttl = 30
-        c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl)
+        c = eduid_common.session.idp_cache.ExpiringCacheMem('TestCache', logger, ttl)
         self.assertNotEqual(c.key('1'), c.key('2'))
 
     def test_delete(self):
         ttl = 30
-        c = eduid_idp.cache.ExpiringCacheMem('TestCache', logger, ttl)
+        c = eduid_common.session.idp_cache.ExpiringCacheMem('TestCache', logger, ttl)
         c.add(1, 'one')
         c.add(2, 'two')
         c.delete(3)

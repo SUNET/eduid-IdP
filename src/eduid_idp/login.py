@@ -25,7 +25,7 @@ from defusedxml import ElementTree as DefusedElementTree
 from eduid_userdb.idp import IdPUser
 import eduid_idp
 from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_idp.cache import ExpiringCache
+from eduid_common.session.idp_cache import ExpiringCache
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest

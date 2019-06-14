@@ -38,7 +38,6 @@ __license__ = 'BSD'
 __authors__ = ['Fredrik Thulin']
 
 import eduid_idp.service
-import eduid_idp.cache
 import eduid_idp.login
 import eduid_idp.logout
 import eduid_idp.mischttp

@@ -9,7 +9,8 @@ from logging import Logger
 from eduid_common.config.cherrypy_idp import IdPConfig
 from eduid_idp.authn import IdPAuthn
 from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
+from eduid_common.session.idp_cache import ExpiringCacheCommonSession, SSOSessionCache
+from eduid_common.session.redis_session import RedisEncryptedSession
 
 from eduid_userdb.actions import ActionDB
 

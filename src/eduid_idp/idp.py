@@ -120,6 +120,7 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
+import eduid_common.session.idp_cache
 from eduid_common.config.cherrypy_idp import init_config, IdPConfig
 import eduid_userdb.idp
 import eduid_idp.mischttp
@@ -129,7 +130,7 @@ from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
+from eduid_common.session.idp_cache import ExpiringCacheCommonSession, SSOSessionCache
 from eduid_idp.eduid_session import EduidSession
 
 from eduid_userdb.actions import ActionDB
@@ -197,10 +198,10 @@ class IdPApplication(object):
         _session_ttl = self.config['SSO_SESSION_LIFETIME'] * 60
         _SSOSessions: SSOSessionCache
         if self.config.get('SSO_SESSION_MONGO_URI'):
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config['SSO_SESSION_MONGO_URI'],
+            _SSOSessions = eduid_common.session.idp_cache.SSOSessionCacheMDB(self.config['SSO_SESSION_MONGO_URI'],
                                                               self.logger, _session_ttl)
         else:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
+            _SSOSessions = eduid_common.session.idp_cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
         _login_state_ttl = (self.config['LOGIN_STATE_TTL'] + 1) * 60
         _ticket_sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
@@ -493,7 +494,7 @@ class IdPApplication(object):
         _data = None
         _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         if _session_id:
-            _data = self.context.sso_sessions.get_session(eduid_idp.cache.SSOSessionId(_session_id))
+            _data = self.context.sso_sessions.get_session(eduid_common.session.idp_cache.SSOSessionId(_session_id))
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
             query = eduid_idp.mischttp.parse_query_string(self.logger)

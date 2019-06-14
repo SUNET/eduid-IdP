@@ -15,10 +15,10 @@ from logging import Logger
 from typing import Dict, Mapping, Optional, Union
 from urllib.parse import urlencode
 
-from eduid_idp.authn import ExternalMfaData
-from eduid_idp.cache import ExpiringCache, ExpiringCacheCommonSession, ExpiringCacheMem
-from eduid_idp.idp_saml import IdP_SAMLRequest
 from eduid_common.config.cherrypy_idp import IdPConfig
+from eduid_common.session.idp_cache import ExpiringCache, ExpiringCacheCommonSession, ExpiringCacheMem
+from eduid_idp.authn import ExternalMfaData
+from eduid_idp.idp_saml import IdP_SAMLRequest
 from eduid_userdb.credentials import Credential
 
 
