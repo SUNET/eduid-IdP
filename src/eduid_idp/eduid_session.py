@@ -53,9 +53,9 @@ class EduidSession(Session):
 
     def _save(self, expiration_time: datetime.datetime):
         if isinstance(self._common, Common):
-            self._data['_common'] = self.common.to_dict()
+            self._data['_common'] = self.common.to_dict()  # type: ignore
         if isinstance(self._actions, Actions):
-            self._data['_actions'] = self.actions.to_dict()
+            self._data['_actions'] = self.actions.to_dict()  # type: ignore
         self._session._data = self._data
         self._session.commit()
         self._session.conn.expire(self._session.session_id, int(expiration_time.timestamp()))
