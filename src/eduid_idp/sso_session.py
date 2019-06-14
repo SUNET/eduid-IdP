@@ -34,7 +34,7 @@
 from typing import Optional, Dict
 
 import time
-import eduid_idp.idp_user
+import eduid_userdb.idp
 import eduid_idp.assurance
 from eduid_idp.authn import AuthnData, ExternalMfaData
 
@@ -157,7 +157,7 @@ class SSOSession(object):
 
         :type user: IdPUser
         """
-        assert isinstance(user, eduid_idp.idp_user.IdPUser)
+        assert isinstance(user, eduid_userdb.idp.IdPUser)
         self._idp_user = user
 
     @property

@@ -120,6 +120,7 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
+import eduid_userdb.idp
 import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
@@ -217,7 +218,7 @@ class IdPApplication(object):
             self.logger.debug("NOT configured to redirect users with pending actions")
 
         if userdb is None:
-            userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
+            userdb = eduid_userdb.idp.IdPUserDb(logger, config)
         self.userdb = userdb
         self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.userdb)
 
