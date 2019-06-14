@@ -105,7 +105,7 @@ class TestSessions(unittest.TestCase):
         self.assertEquals(session_data['test'], 'test')
 
     def test_session_namespace(self):
-        cherrypy.session._common = Common(eppn='hubba-dubba',
+        cherrypy.session.common = Common(eppn='hubba-dubba',
                                          is_logged_in=True,
                                          login_source=LoginApplication(value='idp'))
         cherrypy.session.load()
