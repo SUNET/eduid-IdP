@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Optional
 from logging import Logger
 
+from eduid_common.config.cherrypy_idp import IdPConfig
 from eduid_idp.authn import IdPAuthn
-from eduid_idp.config import IdPConfig
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache, RedisEncryptedSession
 

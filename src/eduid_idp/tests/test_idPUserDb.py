@@ -43,7 +43,7 @@ import eduid_userdb
 import eduid_common.authn
 import vccs_client
 
-from eduid_idp.config import init_config
+from eduid_common.config.cherrypy_idp import init_config
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_userdb.testing import MongoTestCase
 from eduid_idp.idp import IdPApplication

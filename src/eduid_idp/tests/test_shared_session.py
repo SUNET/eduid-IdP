@@ -43,7 +43,7 @@ from eduid_common.session.testing import RedisTemporaryInstance
 from eduid_common.session.redis_session import RedisEncryptedSession
 from eduid_common.session.namespaces import Common, LoginApplication
 
-from eduid_idp.config import init_config
+from eduid_common.config.cherrypy_idp import init_config
 from eduid_idp.eduid_session import EduidSession
 
 

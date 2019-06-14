@@ -40,7 +40,7 @@ from copy import deepcopy
 import eduid_userdb.idp
 from eduid_userdb.idp import IdPUser
 import eduid_idp.authn
-from eduid_idp.config import init_config
+from eduid_common.config.cherrypy_idp import init_config
 from eduid_idp.idp import IdPApplication
 
 from vccs_client import VCCSPasswordFactor

@@ -49,7 +49,7 @@ import eduid_idp
 from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMID_AL2
 from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
 from eduid_idp.idp import IdPApplication
-from eduid_idp.config import init_config
+from eduid_common.config.cherrypy_idp import init_config
 from eduid_idp.eduid_session import EduidSession
 
 import eduid_userdb

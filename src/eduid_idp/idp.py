@@ -120,13 +120,13 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
+from eduid_common.config.cherrypy_idp import init_config, IdPConfig
 import eduid_userdb.idp
 import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
-from eduid_idp.config import init_config, IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
