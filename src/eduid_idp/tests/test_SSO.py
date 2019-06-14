@@ -39,7 +39,7 @@ import eduid_idp
 import saml2.time_util
 from eduid_idp.authn import AuthnData, ExternalMfaData
 from eduid_idp.error import Forbidden
-from eduid_idp.idp_saml import parse_SAMLRequest
+from eduid_common.authn.idp_saml import parse_SAMLRequest
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode

@@ -28,7 +28,7 @@ from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMul
 from eduid_common.session.idp_cache import ExpiringCache
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_idp.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
+from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
