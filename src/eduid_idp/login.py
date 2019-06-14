@@ -23,14 +23,14 @@ import cherrypy
 from defusedxml import ElementTree as DefusedElementTree
 
 from eduid_userdb.idp import IdPUser
-import eduid_idp
 import eduid_common.authn.assurance
 from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
 from eduid_common.session.idp_cache import ExpiringCache
+from eduid_common.session.loginstate import SSOLoginData
+from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
+import eduid_idp
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
-from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context

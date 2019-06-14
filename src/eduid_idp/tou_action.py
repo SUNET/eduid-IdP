@@ -34,7 +34,7 @@ __author__ = 'eperez'
 
 from eduid_userdb.idp import IdPUser
 from eduid_idp.context import IdPContext
-from eduid_idp.loginstate import SSOLoginData
+from eduid_common.session.loginstate import SSOLoginData
 
 
 def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> None:
