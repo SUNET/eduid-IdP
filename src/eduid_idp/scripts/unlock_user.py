@@ -7,6 +7,7 @@ import os
 import sys
 import logging
 import eduid_common.config
+import eduid_common.authn
 import eduid_userdb.idp
 import eduid_idp
 import eduid_idp.idp
@@ -18,7 +19,7 @@ default_debug = True
 def main(myname='unlock_user', cfgfile=default_config_file, debug=default_debug):
     logger = logging.getLogger(myname)
     config = eduid_common.config.cherrypy_idp.IdPConfig(cfgfile, debug)
-    authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
+    authn_info_db = eduid_common.authn.idp_authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
     idp_userdb = eduid_userdb.idp.IdPUserDb(logger, config)
 
     user = idp_userdb.lookup_user(sys.argv[1])

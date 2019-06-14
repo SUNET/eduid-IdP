@@ -35,7 +35,7 @@ from typing import Optional, Dict
 
 import time
 import eduid_userdb.idp
-from eduid_idp.authn import AuthnData, ExternalMfaData
+from eduid_common.authn.idp_authn import AuthnData, ExternalMfaData
 
 
 class SSOSession(object):

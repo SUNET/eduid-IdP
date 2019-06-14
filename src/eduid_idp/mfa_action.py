@@ -29,7 +29,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-from eduid_idp.authn import ExternalMfaData
+from eduid_common.authn.idp_authn import ExternalMfaData
 from eduid_idp.util import get_requested_authn_context
 
 __author__ = 'ft'

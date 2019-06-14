@@ -121,6 +121,7 @@ from logging import Logger
 from typing import Optional, Any
 
 import eduid_common.session.idp_cache
+import eduid_common.authn.idp_authn
 from eduid_common.config.cherrypy_idp import init_config, IdPConfig
 import eduid_userdb.idp
 import eduid_idp.mischttp
@@ -210,7 +211,7 @@ class IdPApplication(object):
         _actions_db = None
 
         if config.get('MONGO_URI'):
-            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config['MONGO_URI'], logger)
+            self.authn_info_db = eduid_common.authn.idp_authn.AuthnInfoStoreMDB(config['MONGO_URI'], logger)
 
             if config.get('ACTIONS_APP_URI'):
                 _actions_db = ActionDB(config['MONGO_URI'])

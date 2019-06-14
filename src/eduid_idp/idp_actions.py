@@ -37,6 +37,7 @@ from time import time
 from datetime import datetime
 
 from eduid_common.session.namespaces import Actions
+from eduid_common.authn.idp_authn import AuthnData
 from eduid_userdb.idp import IdPUser
 
 import eduid_idp.util
@@ -45,7 +46,6 @@ import eduid_idp.mischttp
 import eduid_idp.mfa_action
 import eduid_idp.tou_action
 
-from eduid_idp.authn import AuthnData
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginData
 from eduid_idp.sso_session import SSOSession
