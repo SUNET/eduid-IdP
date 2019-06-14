@@ -16,6 +16,7 @@ import pprint
 import eduid_idp
 import saml2.request
 import saml2.samlp
+import eduid_common.authn.utils
 import eduid_common.session
 from eduid_common.session.idp_cache import ExpiringCache
 from eduid_idp.service import Service
@@ -232,7 +233,7 @@ class SLO(Service):
                                                    issuer = issuer)
         # Only perform expensive parse/pretty-print if debugging
         if self.config['DEBUG']:
-            xmlstr = eduid_idp.util.maybe_xml_to_string(response, logger=self.logger)
+            xmlstr = eduid_common.authn.utils.maybe_xml_to_string(response, logger=self.logger)
             self.logger.debug("Logout SAMLResponse :\n\n{!s}\n\n".format(xmlstr))
 
         ht_args = self.context.idp.apply_binding(bindings[0], str(response), destination, req_info.relay_state,

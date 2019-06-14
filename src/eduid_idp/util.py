@@ -49,34 +49,6 @@ def b64encode(source):
     return base64.b64encode(source).decode('utf-8')
 
 
-def maybe_xml_to_string(message, logger=None):
-    """
-    Try to parse message as an XML string, and then return it pretty-printed.
-
-    If message couldn't be parsed, return string representation of it instead.
-
-    This is used to (debug-)log SAML requests/responses in a readable way.
-
-    :param message: XML string typically
-    :param logger: logging logger
-    :return: something ready for logging
-    :rtype: string
-    """
-    if isinstance(message, six.binary_type):
-        # message is returned as binary from pysaml2 in python3
-        message = message.decode('utf-8')
-    message = str(message)
-    try:
-        from defusedxml import ElementTree as DefusedElementTree
-        parser = DefusedElementTree.DefusedXMLParser()
-        xml = DefusedElementTree.XML(message, parser)
-        return DefusedElementTree.tostring(xml)
-    except Exception as exc:
-        if logger is not None:
-            logger.debug("Could not parse message of type {!r} as XML: {!r}".format(type(message), exc))
-        return message
-
-
 def get_requested_authn_context(idp: Saml2Server, saml_req: IdP_SAMLRequest, logger: Logger) -> Optional[str]:
     """
     Check if the SP has explicit Authn preferences in the metadata (some SPs are not

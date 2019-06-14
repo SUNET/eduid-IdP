@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from typing import Mapping, NewType, Optional
 
-import eduid_idp.util
+import eduid_common.authn.utils
 import saml2.server
 from eduid_common.session.idp_cache import ExpiringCache
 from saml2.s_utils import UnknownPrincipal, UnknownSystemEntity, UnravelError, UnsupportedBinding
@@ -47,7 +47,7 @@ class IdP_SAMLRequest(object):
 
         # Only perform expensive parse/pretty-print if debugging
         if debug:
-            xmlstr = eduid_idp.util.maybe_xml_to_string(self._req_info.message)
+            xmlstr = eduid_common.authn.utils.maybe_xml_to_string(self._req_info.message)
             logger.debug(f'Decoded SAMLRequest into AuthnRequest {repr(self._req_info.message)}:\n\n{xmlstr}\n\n')
 
     @property
