@@ -42,7 +42,7 @@ from dataclasses import asdict, dataclass
 from typing import Dict
 from typing import Optional
 
-import eduid_idp.assurance
+import eduid_common.authn.assurance
 import eduid_idp.error
 import vccs_client
 from eduid_common.authn import get_vccs_client

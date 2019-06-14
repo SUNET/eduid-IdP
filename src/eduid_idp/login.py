@@ -24,7 +24,8 @@ from defusedxml import ElementTree as DefusedElementTree
 
 from eduid_userdb.idp import IdPUser
 import eduid_idp
-from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
+import eduid_common.authn.assurance
+from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
 from eduid_common.session.idp_cache import ExpiringCache
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
@@ -258,7 +259,7 @@ class SSO(Service):
         req_authn_context = get_requested_authn_context(self.context.idp, ticket.saml_req, self.logger)
 
         try:
-            resp_authn = eduid_idp.assurance.response_authn(req_authn_context, user, self.sso_session, self.logger)
+            resp_authn = eduid_common.authn.assurance.response_authn(req_authn_context, user, self.sso_session, self.logger)
         except WrongMultiFactor as exc:
             self.logger.info('Assurance not possible: {!r}'.format(exc))
             raise eduid_idp.error.Forbidden('SWAMID_MFA_REQUIRED')

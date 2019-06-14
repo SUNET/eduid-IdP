@@ -35,7 +35,6 @@ from typing import Optional, Dict
 
 import time
 import eduid_userdb.idp
-import eduid_idp.assurance
 from eduid_idp.authn import AuthnData, ExternalMfaData
 
 
