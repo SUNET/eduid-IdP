@@ -33,7 +33,7 @@ import eduid_idp
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
-from eduid_idp.util import get_requested_authn_context
+from eduid_common.authn.utils import get_requested_authn_context
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
 

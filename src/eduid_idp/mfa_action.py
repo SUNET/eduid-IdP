@@ -29,8 +29,6 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-from eduid_common.authn.idp_authn import ExternalMfaData
-from eduid_idp.util import get_requested_authn_context
 
 __author__ = 'ft'
 
@@ -40,8 +38,10 @@ from typing import List
 from eduid_userdb.idp import IdPUser
 from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.actions import Action
-from eduid_idp.context import IdPContext
+from eduid_common.authn.utils import get_requested_authn_context
 from eduid_common.session.loginstate import SSOLoginData
+from eduid_common.authn.idp_authn import ExternalMfaData
+from eduid_idp.context import IdPContext
 
 
 RESULT_CREDENTIAL_KEY_NAME = 'cred_key'

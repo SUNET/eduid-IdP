@@ -47,7 +47,7 @@ from eduid_common.authn.idp_saml import parse_SAMLRequest
 from eduid_common.session.loginstate import SSOLoginData
 from eduid_idp.error import Forbidden
 from eduid_idp.testing import IdPSimpleTestCase
-from eduid_idp.util import b64encode
+from eduid_common.authn.utils import b64encode
 
 SWAMID_AL1 = 'http://www.swamid.se/policy/assurance/al1'
 SWAMID_AL2 = 'http://www.swamid.se/policy/assurance/al2'

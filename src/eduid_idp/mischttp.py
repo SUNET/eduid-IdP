@@ -32,8 +32,8 @@ import eduid_idp
 import eduid_idp.thirdparty
 from eduid_common.api.sanitation import SanitationProblem, Sanitizer
 from eduid_common.config.cherrypy_idp import IdPConfig
+from eduid_common.authn.utils import b64encode
 from eduid_idp.error import BadRequest
-from eduid_idp.util import b64encode
 from saml2 import BINDING_HTTP_REDIRECT
 
 
