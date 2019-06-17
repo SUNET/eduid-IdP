@@ -28,11 +28,11 @@ from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor,
 from eduid_common.session.idp_cache import ExpiringCache
 from eduid_common.session.loginstate import SSOLoginData
 from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
+from eduid_common.session.sso_session import SSOSession
 import eduid_idp
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
-from eduid_idp.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
@@ -73,7 +73,7 @@ class SSO(Service):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
+        assert isinstance(self.sso_session, SSOSession)
 
         user = self.sso_session.idp_user
 

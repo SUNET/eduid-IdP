@@ -48,7 +48,7 @@ import eduid_idp.mfa_action
 import eduid_idp.tou_action
 
 from eduid_idp.context import IdPContext
-from eduid_idp.sso_session import SSOSession
+from eduid_common.session.sso_session import SSOSession
 
 
 def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData,

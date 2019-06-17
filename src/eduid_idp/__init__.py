@@ -43,6 +43,5 @@ import eduid_idp.logout
 import eduid_idp.mischttp
 import eduid_idp.error
 import eduid_idp.thirdparty
-import eduid_idp.sso_session
 import eduid_idp.authn
 import eduid_idp.util

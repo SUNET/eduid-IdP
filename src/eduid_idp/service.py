@@ -15,9 +15,9 @@ Common code for SSO login/logout requests.
 
 from typing import Callable
 
+from eduid_common.session.sso_session import SSOSession
 import eduid_idp.mischttp
 from eduid_idp.context import IdPContext
-from eduid_idp.sso_session import SSOSession
 
 
 class Service(object):

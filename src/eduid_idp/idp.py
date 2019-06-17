@@ -19,7 +19,7 @@ Stored state :
      'tickets', and are currently stored in memory of the IdP instance
      processing a request.
 
-  2) Single Sign On sessions are stored in eduid_idp.sso_session.SSOSession
+  2) Single Sign On sessions are stored in eduid_common.authn.sso_session.SSOSession
      objects. A unique reference to the SSOSession is sent to the user in a
      browser cookie. The user will generally not have to authenticate again
      as long as the cookie is sent from the users browser and the SSOSession
@@ -121,14 +121,13 @@ from logging import Logger
 from typing import Optional, Any
 
 import eduid_common.session.idp_cache
-import eduid_common.authn.idp_authn
+import eduid_common.authn
 from eduid_common.config.cherrypy_idp import init_config, IdPConfig
 from eduid_common.session.loginstate import SSOLoginDataCache
 from eduid_common.session.idp_cache import ExpiringCacheCommonSession, SSOSessionCache
 import eduid_userdb.idp
 import eduid_idp.mischttp
 import eduid_idp.authn
-import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 from eduid_idp.context import IdPContext
@@ -485,7 +484,7 @@ class IdPApplication(object):
                 _age, self.config['SSO_SESSION_LIFETIME']))
         return session
 
-    def _lookup_sso_session2(self) -> Optional[eduid_idp.sso_session.SSOSession]:
+    def _lookup_sso_session2(self) -> Optional[eduid_common.session.sso_session.SSOSession]:
         """
         See if a SSO session exists for this request, and return the data about
         the currently logged in user from the session store.
@@ -511,7 +510,7 @@ class IdPApplication(object):
         if not _data:
             self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
             return None
-        _sso = eduid_idp.sso_session.from_dict(_data)
+        _sso = eduid_common.session.sso_session.from_dict(_data)
         self.logger.debug("Re-created SSO session {!r}".format(_sso))
         return _sso
 
