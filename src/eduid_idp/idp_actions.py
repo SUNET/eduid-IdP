@@ -41,7 +41,6 @@ from eduid_common.session.namespaces import Actions
 from eduid_common.authn.idp_authn import AuthnData
 from eduid_userdb.idp import IdPUser
 
-import eduid_idp.util
 import eduid_idp.mischttp
 
 import eduid_idp.mfa_action
