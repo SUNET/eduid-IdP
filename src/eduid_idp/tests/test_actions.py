@@ -44,19 +44,18 @@ import webtest
 import cherrypy
 
 from mock import patch
-
-import eduid_idp
-from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMID_AL2
-from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
-from eduid_idp.idp import IdPApplication
+from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
 
 import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.tou import ToUEvent
 from eduid_userdb.testing import MongoTestCase
 from eduid_common.session.testing import RedisTemporaryInstance
+from eduid_common.config.idp import IdPConfig, init_config
 
-from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
+from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMID_AL2
+from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
+from eduid_idp.idp import IdPApplication
 
 
 logger = logging.getLogger(__name__)
@@ -79,19 +78,18 @@ class TestActions(MongoTestCase):
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
-        self.config_file = os.path.join(datadir, 'test_actions.ini')
-        _defaults = eduid_idp.config._CONFIG_DEFAULTS
-        _defaults['mongo_uri'] = self.tmp_db.uri
-        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
-        _defaults['tou_version'] = 'mock-version'
+        _defaults = IdPConfig.defaults()
+        _defaults['MONGO_URI'] = self.tmp_db.uri
+        _defaults['PYSAML2_CONFIG'] = os.path.join(datadir, 'test_SSO_conf.py')
+        _defaults['TOU_VERSION'] = 'mock-version'
 
         self.redis_instance = RedisTemporaryInstance.get_instance()
-        _defaults['shared_session_secret_key'] = 'shared-session-secret-key'
-        _defaults['redis_host'] = 'localhost'
-        _defaults['redis_port'] = str(self.redis_instance.port)
-        _defaults['insecure_cookies'] = 1
+        _defaults['SHARED_SESSION_SECRET_KEY'] = 'shared-session-secret-key'
+        _defaults['REDIS_HOST'] = 'localhost'
+        _defaults['REDIS_PORT'] = str(self.redis_instance.port)
+        _defaults['INSECURE_COOKIES'] = 1
 
-        self.config = eduid_idp.config.IdPConfig(self.config_file, debug=False, defaults=_defaults)
+        self.config = init_config(test_config=_defaults, debug=False)
 
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)

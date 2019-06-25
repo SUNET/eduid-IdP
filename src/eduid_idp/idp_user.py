@@ -71,7 +71,7 @@ class IdPUser(User):
         :param logger: logging logger
         :param filter_attributes: Filter to apply
 
-        :type config: eduid_idp.config.IdPConfig
+        :type config: IdPConfig
         :type logger: logging.Logger
         :type filter_attributes: [str | unicode]
 
@@ -98,7 +98,7 @@ class IdPUserDb(object):
     :param userdb: User database
 
     :type logger: logging.Logger
-    :type config: eduid_idp.config.IdPConfig
+    :type config: IdPConfig
     :type userdb: eduid_userdb.UserDB
     """
 

@@ -41,20 +41,24 @@ import os
 import unittest
 import pkg_resources
 
-import eduid_idp
+from eduid_common.config.idp import init_config
+
+
+TEST_CONFIG = {
+        'listen_port': 8000,
+        'static_dir': '/home/ft/work/NORDUnet/eduid-IdP/static/',
+        'vccs_url': 'dummy'
+        }
 
 
 class TestCredStore(unittest.TestCase):
 
     def setUp(self):
-        debug = False
-        datadir = pkg_resources.resource_filename(__name__, 'data')
-        self.config_file = os.path.join(datadir, 'test_config.ini')
-        self.config = eduid_idp.config.IdPConfig(self.config_file, debug)
+        self.config = init_config(test_config=TEST_CONFIG, debug=False)
 
     def test_static_config(self):
         """
-        Verify the values we have in test_config.ini
+        Verify setting test values
         """
         self.assertTrue(self.config.static_dir.startswith('/home/'))
         self.assertEqual(self.config.listen_port, 8000)

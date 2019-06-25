@@ -15,11 +15,11 @@ from logging import Logger
 from typing import Dict, Mapping, Optional, Union
 from urllib.parse import urlencode
 
+from eduid_userdb.credentials import Credential
+from eduid_common.config.idp import IdPConfig
 from eduid_idp.authn import ExternalMfaData
 from eduid_idp.cache import ExpiringCache, ExpiringCacheCommonSession, ExpiringCacheMem
-from eduid_idp.config import IdPConfig
 from eduid_idp.idp_saml import IdP_SAMLRequest
-from eduid_userdb.credentials import Credential
 
 
 class SSOLoginData(object):
@@ -150,8 +150,8 @@ class SSOLoginDataCache(object):
     def __init__(self, name: str, logger: Logger, ttl: int, config: IdPConfig, lock = None):
         self.logger = logger
         self._cache: ExpiringCache
-        if (config.redis_sentinel_hosts or config.redis_host) and config.session_app_key:
-            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config, secret=config.session_app_key)
+        if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_secret_key:
+            self._cache = ExpiringCacheCommonSession(name, logger, ttl, config, secret=config.shared_session_secret_key)
         else:
             # This is used in tests
             self._cache = ExpiringCacheMem(name, logger, ttl, lock)

@@ -31,7 +31,7 @@ from six.moves.urllib.parse import parse_qs
 import eduid_idp
 import eduid_idp.thirdparty
 from eduid_common.api.sanitation import SanitationProblem, Sanitizer
-from eduid_idp.config import IdPConfig
+from eduid_common.config.idp import IdPConfig
 from eduid_idp.error import BadRequest
 from eduid_idp.util import b64encode
 from saml2 import BINDING_HTTP_REDIRECT
@@ -94,7 +94,7 @@ def geturl(config, query = True, path = True):
     :param query: Is QUERY_STRING included in URI (default: True)
     :param path: Is path included in URI (default: True)
 
-    :type config: eduid_idp.config.IdPConfig
+    :type config: IdPConfig
     """
     url = [config.base_url]
     if not url[0]:
@@ -178,7 +178,7 @@ def static_filename(config, path, logger):
     :param logger: Logging logger
     :return: False, None or filename as string
 
-    :type config: eduid_idp.config.IdPConfig
+    :type config: IdPConfig
     :type path: string
     :rtype: False | None | string
     """
@@ -431,7 +431,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
 
     :type start_response: function
     :type filename: string
-    :type config: eduid_idp.config.IdPConfig
+    :type config: IdPConfig
     :type logger: logging.Logger
     :type status: string
     :rtype: string
