@@ -45,9 +45,9 @@ from eduid_common.config.idp import init_config
 
 
 TEST_CONFIG = {
-        'listen_port': 8000,
-        'static_dir': '/home/ft/work/NORDUnet/eduid-IdP/static/',
-        'vccs_url': 'dummy'
+        'LISTEN_PORT': 8000,
+        'STATIC_DIR': '/home/ft/work/NORDUnet/eduid-IdP/static/',
+        'VCCS_URL': 'dummy'
         }
 
 

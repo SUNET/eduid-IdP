@@ -110,7 +110,7 @@ class TestAuthentication(MongoTestCase):
         assert isinstance(self.test_user, eduid_userdb.User)
         cred_id = ObjectId()
         factor = vccs_client.VCCSPasswordFactor('foo', str(cred_id), salt=None)
-        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'bar',
                 }
@@ -120,7 +120,7 @@ class TestAuthentication(MongoTestCase):
         assert isinstance(self.test_user, eduid_userdb.User)
         passwords = self.test_user.passwords.to_list()
         factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
-        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'foo',
                 }
@@ -130,7 +130,7 @@ class TestAuthentication(MongoTestCase):
         assert isinstance(self.test_user, eduid_userdb.User)
         passwords = self.test_user.passwords.to_list()
         factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
-        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'foo',
                 }
