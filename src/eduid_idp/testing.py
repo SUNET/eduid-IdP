@@ -52,9 +52,8 @@ PWHASHES = {}
 
 
 def _get_idpconfig(datadir, sso_config='test_SSO_conf.py'):
-    _defaults = IdPConfig.defaults()
-    _defaults['MONGO_URI'] = None
-    _defaults['PYSAML2_CONFIG'] = os.path.join(datadir, sso_config)
+    _defaults = {'mongo_uri': None,
+                 'pysaml2_config': os.path.join(datadir, sso_config)}
     return init_config(test_config=_defaults, debug=True)
 
 

@@ -75,19 +75,19 @@ class TestActions(MongoTestCase):
 
     def setUp(self):
         MongoTestCase.setUp(self)
-
-        # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
-        _defaults = IdPConfig.defaults()
-        _defaults['MONGO_URI'] = self.tmp_db.uri
-        _defaults['PYSAML2_CONFIG'] = os.path.join(datadir, 'test_SSO_conf.py')
-        _defaults['TOU_VERSION'] = 'mock-version'
-
+        staticdir = pkg_resources.resource_filename(__name__, 'static/en')
         self.redis_instance = RedisTemporaryInstance.get_instance()
-        _defaults['SHARED_SESSION_SECRET_KEY'] = 'shared-session-secret-key'
-        _defaults['REDIS_HOST'] = 'localhost'
-        _defaults['REDIS_PORT'] = str(self.redis_instance.port)
-        _defaults['INSECURE_COOKIES'] = 1
+        # load the IdP configuration
+        _defaults = {'mongo_uri': self.tmp_db.uri,
+                     'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
+                     'static_dir': staticdir,
+                     'tou_version': 'mock-version',
+                     'shared_session_secret_key': 'shared-session-secret-key',
+                     'redis_host': 'localhost',
+                     'redis_port': str(self.redis_instance.port),
+                     'insecure_cookies': 1,
+                     }
 
         self.config = init_config(test_config=_defaults, debug=False)
 

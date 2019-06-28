@@ -478,7 +478,7 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     res = eduid_idp.mischttp.static_file(start_response, static_fn, logger, status=status)
     if six.PY2:
         return res
-    return res.decode('UTF-8')
+    return res
 
 
 def get_http_method():

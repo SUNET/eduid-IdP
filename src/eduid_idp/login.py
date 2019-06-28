@@ -514,7 +514,7 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
             # RedisEncryptedSession dict-like object. Need to re-create an SSOLoginData from
             # it using _create_ticket() below.
             if binding is None:
-                binding = info['binding']
+                binding = ticket.get('binding')
             if binding is None:
                 raise eduid_idp.error.BadRequest('Bad request, no binding')
             return _create_ticket(context, ticket, binding, _key)
