@@ -147,7 +147,6 @@ except ImportError:
     SentryHandler = None
 
 
-default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
 
 
@@ -159,13 +158,6 @@ def parse_args():
                                      add_help = True,
                                      formatter_class = argparse.ArgumentDefaultsHelpFormatter,
                                      )
-    parser.add_argument('-c', '--config-file',
-                        dest = 'config_file',
-                        default = default_config_file,
-                        help = 'Config file',
-                        metavar = 'PATH',
-                        )
-
     parser.add_argument('--debug',
                         dest = 'debug',
                         action = 'store_true', default = default_debug,
@@ -185,9 +177,6 @@ class IdPApplication(object):
 
     :param logger: logging logger
     :param config: IdP configuration data
-
-    :type logger: logging.Logger
-    :type config: IdPConfig
     """
 
     def __init__(self, logger: Logger, config: IdPConfig, userdb: Optional[Any] = None):
