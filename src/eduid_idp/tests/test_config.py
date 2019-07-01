@@ -41,7 +41,7 @@ import os
 import unittest
 import pkg_resources
 
-from eduid_common.config.idp import init_config
+from eduid_common.config.idp import IdPConfig
 
 
 TEST_CONFIG = {
@@ -54,7 +54,7 @@ TEST_CONFIG = {
 class TestCredStore(unittest.TestCase):
 
     def setUp(self):
-        self.config = init_config(test_config=TEST_CONFIG, debug=False)
+        self.config = IdPConfig.init_config(test_config=TEST_CONFIG, debug=False)
 
     def test_static_config(self):
         """

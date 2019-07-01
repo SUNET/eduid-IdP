@@ -46,7 +46,7 @@ import vccs_client
 
 from eduid_userdb.testing import MongoTestCase
 from eduid_common.session.testing import RedisTemporaryInstance
-from eduid_common.config.idp import IdPConfig, init_config
+from eduid_common.config.idp import IdPConfig
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.idp import IdPApplication
 
@@ -100,7 +100,7 @@ class TestAuthentication(MongoTestCase):
                      'redis_port': str(self.redis_instance.port),
                      'insecure_cookies': 1
                      }
-        self.config = init_config(test_config=_defaults, debug=True)
+        self.config = IdPConfig.init_config(test_config=_defaults, debug=True)
 
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)

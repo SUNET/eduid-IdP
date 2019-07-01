@@ -120,7 +120,7 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
-from eduid_common.config.idp import IdPConfig, init_config
+from eduid_common.config.idp import IdPConfig
 import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
@@ -685,7 +685,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     if not args:
         args = parse_args()
 
-    config = init_config(debug=args.debug)
+    config = IdPConfig.init_config(debug=args.debug)
 
     # This is the root log level
     level = logging.INFO
