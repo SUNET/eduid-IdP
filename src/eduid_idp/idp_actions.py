@@ -103,8 +103,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     context.logger.info("Redirecting user {!s} to actions app {!s}".format(user, actions_uri))
 
     actions = Actions.from_dict({'ts': time(), 'session': ticket.key})
-    cherrypy.request.session['_actions'] = actions.to_dict()  # type: ignore
-    cherrypy.request.session.commit()  # type: ignore
+    cherrypy.session.actions = actions
     raise eduid_idp.mischttp.Redirect(actions_uri)
 
 
@@ -122,7 +121,5 @@ def add_idp_initiated_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     :param user: the authenticating user
     :param ticket: the SSO login data
     """
-    if 'mfa' in context.config.action_plugins:
-        eduid_idp.mfa_action.add_actions(context, user, ticket)
-    if 'tou' in context.config.action_plugins:
-        eduid_idp.tou_action.add_actions(context, user, ticket)
+    for action in context.config.action_plugins:
+        getattr(eduid_idp, action + "_action").add_actions(context, user, ticket)

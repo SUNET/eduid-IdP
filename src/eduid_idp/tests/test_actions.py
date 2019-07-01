@@ -56,6 +56,7 @@ from eduid_common.config.idp import IdPConfig
 from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMID_AL2
 from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
 from eduid_idp.idp import IdPApplication
+from eduid_idp.shared_session import EduidSession
 
 
 logger = logging.getLogger(__name__)
@@ -79,17 +80,23 @@ class TestActions(MongoTestCase):
         staticdir = pkg_resources.resource_filename(__name__, 'static/en')
         self.redis_instance = RedisTemporaryInstance.get_instance()
         # load the IdP configuration
-        _defaults = {'mongo_uri': self.tmp_db.uri,
-                     'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
-                     'static_dir': staticdir,
-                     'tou_version': 'mock-version',
-                     'shared_session_secret_key': 'shared-session-secret-key',
-                     'redis_host': 'localhost',
-                     'redis_port': str(self.redis_instance.port),
-                     'insecure_cookies': 1,
-                     }
+        _test_config = {'mongo_uri': self.tmp_db.uri,
+                        'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
+                        'static_dir': staticdir,
+                        'tou_version': 'mock-version',
+                        'shared_session_secret_key': 'shared-session-secret-key',
+                        'redis_host': 'localhost',
+                        'redis_port': str(self.redis_instance.port),
+                        'insecure_cookies': 1,
+                        'listen_addr': 'unittest-idp.example.edu',
+                        'listen_port': 443,
+                        'base_url': 'https://unittest-idp.example.edu/',
+                        'content_packages': [('eduid_idp', 'tests/static')],
+                        'action_plugins': ['tou', 'mfa']
+                        }
 
-        self.config = IdPConfig.init_config(test_config=_defaults, debug=False)
+        self.config = IdPConfig.init_config(test_config=_test_config, debug=False)
+        cherrypy.config.logger = logger
 
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
@@ -108,7 +115,16 @@ class TestActions(MongoTestCase):
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
         # mount the IdP app in the cherrypy app server
-        cherrypy.tree.mount(self.idp_app, '/')
+        cherry_conf = {
+                'tools.sessions.on': True,
+                'tools.sessions.storage_class': EduidSession,
+                'tools.sessions.name': 'sessid',
+                'tools.sessions.domain': 'unittest-idp.example.edu',
+                'tools.sessions.secure': True,
+                'tools.sessions.httponly': False,
+                }
+        cherrypy.config.update(cherry_conf)
+        cherrypy.tree.mount(self.idp_app, '', {'/': cherry_conf})
 
         # create a webtest testing environment
         from six.moves.http_cookiejar import CookieJar
@@ -120,12 +136,6 @@ class TestActions(MongoTestCase):
         # reset the testing environment
         self.http.reset()
         MongoTestCase.tearDown(self)
-
-    def _update_session(self):
-        # make sure there is a redis common session ready to be used by the IdP
-        session = self.idp_app.context.common_sessions._manager.get_session(data={'dummy':'data'})
-        session.commit()
-        self.idp_app._update_request_session(token=session.token)
 
     def test_no_actions(self):
 
@@ -179,9 +189,6 @@ class TestActions(MongoTestCase):
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
 
-        # make sure there is a common session
-        self._update_session()
-
         # post the request to the test environment
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
@@ -213,9 +220,6 @@ class TestActions(MongoTestCase):
 
         # make the SAML authn request
         req = make_SAML_request(PASSWORDPROTECTEDTRANSPORT)
-
-        # make sure there is a common session
-        self._update_session()
 
         resp = self.http.post('/sso/post', {'SAMLRequest': req})
 
