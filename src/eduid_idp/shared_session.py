@@ -55,7 +55,7 @@ class EduidSession(Session):
         return bool(self._session.conn.get(self._session.session_id))
 
     def _load(self) -> Tuple[dict, datetime.datetime]:
-        ttl = cherrypy.config.shared_session_ttl
+        ttl = cherrypy.config['shared_session_ttl']
         expires = self.now() + datetime.timedelta(seconds=ttl)
         return (self._session._data, expires)
 

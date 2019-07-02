@@ -81,18 +81,21 @@ class TestActions(MongoTestCase):
         self.redis_instance = RedisTemporaryInstance.get_instance()
         # load the IdP configuration
         _test_config = {'mongo_uri': self.tmp_db.uri,
+                        'environment': 'test_suite',
                         'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
                         'static_dir': staticdir,
                         'tou_version': 'mock-version',
                         'shared_session_secret_key': 'shared-session-secret-key',
                         'redis_host': 'localhost',
                         'redis_port': str(self.redis_instance.port),
+                        'redis_db': '0',
                         'insecure_cookies': 1,
                         'listen_addr': 'unittest-idp.example.edu',
                         'listen_port': 443,
                         'base_url': 'https://unittest-idp.example.edu/',
                         'content_packages': [('eduid_idp', 'tests/static')],
-                        'action_plugins': ['tou', 'mfa']
+                        'action_plugins': ['tou', 'mfa'],
+                        'debug': False
                         }
 
         self.config = IdPConfig.init_config(test_config=_test_config, debug=False)
@@ -123,6 +126,7 @@ class TestActions(MongoTestCase):
                 'tools.sessions.secure': True,
                 'tools.sessions.httponly': False,
                 }
+        cherry_conf.update(self.config.to_dict())
         cherrypy.config.update(cherry_conf)
         cherrypy.tree.mount(self.idp_app, '', {'/': cherry_conf})
 

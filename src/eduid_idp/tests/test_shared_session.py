@@ -57,15 +57,18 @@ class TestSessions(unittest.TestCase):
         # load the IdP configuration
         self.redis_instance = RedisTemporaryInstance.get_instance()
         _defaults = {
+                'environment': 'test_suite',
                 'tou_version': 'mock-version',
                 'shared_session_secret_key': 'shared-session-secret-key',
                 'redis_host': 'localhost',
                 'redis_port': str(self.redis_instance.port),
+                'redis_db': '0',
                 'insecure_cookies': False,
                 'listen_addr': 'unittest-idp.example.edu',
                 'listen_port': 443,
                 'base_url': 'https://unittest-idp.example.edu/',
                 'content_packages': [('eduid_idp', 'tests/static')],
+                'debug': False
         }
         self.config = IdPConfig.init_config(test_config=_defaults)
         cherrypy.config.logger = logger
@@ -78,8 +81,7 @@ class TestSessions(unittest.TestCase):
                 'tools.sessions.secure': True,
                 'tools.sessions.httponly': False,
                 }
-        cherry_conf.update(self.config.defaults())
-        cherry_conf['shared_session_secret_key'] = 'supersecretkey'
+        cherry_conf.update(self.config.to_dict())
         cherrypy.config.update(cherry_conf)
 
         name = 'sessid'

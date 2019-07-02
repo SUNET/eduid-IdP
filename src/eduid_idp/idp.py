@@ -715,7 +715,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     cherry_conf['tools.sessions.httponly'] = config.session_cookie_httponly
     cherry_conf['tools.sessions.persistent'] = config.session_cookie_persistent
     cherry_conf['tools.sessions.locking'] = config.session_cookie_locking
-    cherry_conf.update(config)
+    cherry_conf.update(config.to_dict())
 
     cherrypy.log.access_log.propagate = False
     cherrypy.config.update(cherry_conf)
