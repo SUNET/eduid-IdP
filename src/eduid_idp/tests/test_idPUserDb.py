@@ -38,13 +38,16 @@ import logging
 import datetime
 import pkg_resources
 
+from mock import patch
 import eduid_idp
 import eduid_userdb
 import eduid_common.authn
 import vccs_client
 
-from eduid_idp.testing import IdPSimpleTestCase
 from eduid_userdb.testing import MongoTestCase
+from eduid_common.session.testing import RedisTemporaryInstance
+from eduid_common.config.idp import IdPConfig
+from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.idp import IdPApplication
 
 from bson import ObjectId
@@ -85,14 +88,19 @@ class TestAuthentication(MongoTestCase):
 
     def setUp(self):
         super(TestAuthentication, self).setUp()
+        self.redis_instance = RedisTemporaryInstance.get_instance()
 
         # load the IdP configuration
         datadir = pkg_resources.resource_filename(__name__, 'data')
-        self.config_file = os.path.join(datadir, 'test_config.ini')
-        _defaults = eduid_idp.config._CONFIG_DEFAULTS
-        _defaults['mongo_uri'] = self.tmp_db.uri
-        _defaults['pysaml2_config'] = os.path.join(datadir, 'test_SSO_conf.py')
-        self.config = eduid_idp.config.IdPConfig(self.config_file, debug=True, defaults=_defaults)
+        _defaults = {'mongo_uri': self.tmp_db.uri,
+                     'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
+                     'tou_version': 'mock-version',
+                     'shared_session_secret_key': 'shared-session-secret-key',
+                     'redis_host': 'localhost',
+                     'redis_port': str(self.redis_instance.port),
+                     'insecure_cookies': 1
+                     }
+        self.config = IdPConfig.init_config(test_config=_defaults, debug=True)
 
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
@@ -106,31 +114,41 @@ class TestAuthentication(MongoTestCase):
                 }
         self.assertFalse(self.idp_app.authn.password_authn(data))
 
-    def test_authn_known_user_wrong_password(self):
+    @patch('vccs_client.VCCSClient.add_credentials')
+    def test_authn_known_user_wrong_password(self, mock_add_credentials):
+        mock_add_credentials.return_value = False
         assert isinstance(self.test_user, eduid_userdb.User)
         cred_id = ObjectId()
         factor = vccs_client.VCCSPasswordFactor('foo', str(cred_id), salt=None)
-        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'bar',
                 }
         self.assertFalse(self.idp_app.authn.password_authn(data))
 
-    def test_authn_known_user_right_password(self):
+    @patch('vccs_client.VCCSClient.authenticate')
+    @patch('vccs_client.VCCSClient.add_credentials')
+    def test_authn_known_user_right_password(self, mock_add_credentials, mock_authenticate):
+        mock_add_credentials.return_value = True
+        mock_authenticate.return_value = True
         assert isinstance(self.test_user, eduid_userdb.User)
         passwords = self.test_user.passwords.to_list()
         factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
-        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'foo',
                 }
         self.assertTrue(self.idp_app.authn.password_authn(data))
 
-    def test_authn_expired_credential(self):
+    @patch('vccs_client.VCCSClient.authenticate')
+    @patch('vccs_client.VCCSClient.add_credentials')
+    def test_authn_expired_credential(self, mock_add_credentials, mock_authenticate):
+        mock_add_credentials.return_value = False
+        mock_authenticate.return_value = True
         assert isinstance(self.test_user, eduid_userdb.User)
         passwords = self.test_user.passwords.to_list()
         factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
-        self.idp_app.authn.auth_client.add_credentials(self.test_user.user_id, [factor])
+        self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {'username': self.test_user.mail_addresses.primary.email,
                 'password': 'foo',
                 }

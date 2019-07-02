@@ -143,7 +143,7 @@ class IdPAuthn(object):
     :param config: IdP configuration data
 
     :type logger: logging.Logger
-    :type config: eduid_idp.config.IdPConfig
+    :type config: IdPConfig
     """
 
     def __init__(self, logger, config, userdb, auth_client=None, authn_store=None):

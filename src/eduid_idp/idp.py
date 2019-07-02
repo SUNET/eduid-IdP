@@ -120,12 +120,12 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
+from eduid_common.config.idp import IdPConfig
 import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
-from eduid_idp.config import IdPConfig
 from eduid_idp.context import IdPContext
 from eduid_idp.loginstate import SSOLoginDataCache
 from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
@@ -147,7 +147,6 @@ except ImportError:
     SentryHandler = None
 
 
-default_config_file = "/opt/eduid/IdP/conf/idp.ini"
 default_debug = False
 
 
@@ -159,13 +158,6 @@ def parse_args():
                                      add_help = True,
                                      formatter_class = argparse.ArgumentDefaultsHelpFormatter,
                                      )
-    parser.add_argument('-c', '--config-file',
-                        dest = 'config_file',
-                        default = default_config_file,
-                        help = 'Config file',
-                        metavar = 'PATH',
-                        )
-
     parser.add_argument('--debug',
                         dest = 'debug',
                         action = 'store_true', default = default_debug,
@@ -185,9 +177,6 @@ class IdPApplication(object):
 
     :param logger: logging logger
     :param config: IdP configuration data
-
-    :type logger: logging.Logger
-    :type config: eduid_idp.config.IdPConfig
     """
 
     def __init__(self, logger: Logger, config: IdPConfig, userdb: Optional[Any] = None):
@@ -685,7 +674,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     if not args:
         args = parse_args()
 
-    config = eduid_idp.config.IdPConfig(args.config_file, args.debug)
+    config = IdPConfig.init_config(debug=args.debug)
 
     # This is the root log level
     level = logging.INFO

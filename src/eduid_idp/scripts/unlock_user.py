@@ -6,6 +6,7 @@
 import os
 import sys
 import logging
+from eduid_common.config.idp import IdPConfig
 import eduid_idp
 import eduid_idp.idp
 
@@ -15,7 +16,7 @@ default_debug = True
 
 def main(myname='unlock_user', cfgfile=default_config_file, debug=default_debug):
     logger = logging.getLogger(myname)
-    config = eduid_idp.config.IdPConfig(cfgfile, debug)
+    config = IdPConfig.init_config(debug=debug)
     authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
     idp_userdb = eduid_idp.idp_user.IdPUserDb(logger, config)
 

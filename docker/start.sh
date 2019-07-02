@@ -13,16 +13,11 @@ cfg_dir=${cfg_dir-"${base_dir}/etc"}
 log_dir=${log_dir-'/var/log/eduid'}
 state_dir=${state_dir-"${base_dir}/run"}
 metadata=${metadata-"${state_dir}/metadata.xml"}
-ini=${ini-"${cfg_dir}/${eduid_name}.ini"}
 pysaml2_settings=${pysaml2_settings-"${cfg_dir}/idp_pysaml2_settings.py"}
 run=${run-'/opt/eduid/bin/eduid_idp'}
 extra_args=${extra_args-''}
 
 chown eduid: "${log_dir}" "${state_dir}"
-
-# || true to not fail on read-only cfg_dir
-chgrp eduid "${ini}" || true
-chmod 640 "${ini}" || true
 
 # Look for executable in developers environment
 if [ "x${PYTHONPATH}" != "x" ]; then
@@ -56,8 +51,7 @@ if [ ! -s "${metadata}" ]; then
 fi
 
 echo ""
-echo "$0: Starting ${run} with config ${ini}"
+echo "$0: Starting ${run}"
 exec start-stop-daemon --start -c eduid:eduid --exec \
     /opt/eduid/bin/python -- "${run}" \
-    --config-file "${ini}" \
     ${extra_args}
