@@ -15,7 +15,7 @@ eduID IdP application
 Stored state :
 
   1) State regarding the SAMLRequest currently being processed is stored in
-     eduid_idp.login.SSOLoginData() objects. These are by tradition called
+     eduid_common.session.loginstate.SSOLoginData() objects. These are by tradition called
      'tickets', and are currently stored in memory of the IdP instance
      processing a request.
 
@@ -121,14 +121,14 @@ from logging import Logger
 from typing import Optional, Any
 
 from eduid_common.config.idp import IdPConfig
+from eduid_common.session.idp_cache import ExpiringCacheCommonSession, SSOSessionCache
+from eduid_common.session import idp_cache
 import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 from eduid_idp.context import IdPContext
-from eduid_idp.loginstate import SSOLoginDataCache
-from eduid_idp.cache import ExpiringCacheCommonSession, SSOSessionCache
 from eduid_idp.shared_session import EduidSession
 
 from eduid_userdb.actions import ActionDB
@@ -195,14 +195,12 @@ class IdPApplication(object):
         _session_ttl = self.config.sso_session_lifetime * 60
         _SSOSessions: SSOSessionCache
         if self.config.sso_session_mongo_uri:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+            _SSOSessions = idp_cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               self.logger, _session_ttl)
         else:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
+            _SSOSessions = idp_cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
-        _ticket_sessions = SSOLoginDataCache('TicketCache', self.logger, _login_state_ttl,
-                                      self.config, threading.Lock())
         self.authn_info_db = None
         _actions_db = None
 
@@ -246,7 +244,6 @@ class IdPApplication(object):
                                   idp=self.IDP,
                                   logger=self.logger,
                                   sso_sessions=_SSOSessions,
-                                  ticket_sessions=_ticket_sessions,
                                   common_sessions=_common_sessions,
                                   actions_db=_actions_db,
                                   authn=self.authn,
@@ -491,7 +488,7 @@ class IdPApplication(object):
         _data = None
         _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         if _session_id:
-            _data = self.context.sso_sessions.get_session(eduid_idp.cache.SSOSessionId(_session_id))
+            _data = self.context.sso_sessions.get_session(idp_cache.SSOSessionId(_session_id))
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
             query = eduid_idp.mischttp.parse_query_string(self.logger)

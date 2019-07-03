@@ -16,7 +16,7 @@ import pprint
 import eduid_idp
 import saml2.request
 import saml2.samlp
-from eduid_idp.cache import ExpiringCache
+from eduid_common.session.idp_cache import ExpiringCache
 from eduid_idp.service import Service
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_HTTP_REDIRECT

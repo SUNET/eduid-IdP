@@ -47,7 +47,7 @@ import eduid_idp.tou_action
 from eduid_idp.authn import AuthnData
 from eduid_idp.idp_user import IdPUser
 from eduid_idp.context import IdPContext
-from eduid_idp.loginstate import SSOLoginData
+from eduid_common.session.loginstate import SSOLoginData
 from eduid_idp.sso_session import SSOSession
 
 

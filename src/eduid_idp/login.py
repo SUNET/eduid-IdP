@@ -24,12 +24,12 @@ from defusedxml import ElementTree as DefusedElementTree
 
 import eduid_idp
 from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_idp.cache import ExpiringCache
+from eduid_common.session.idp_cache import ExpiringCache
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_idp.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
+from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
 from eduid_idp.idp_user import IdPUser
-from eduid_idp.loginstate import SSOLoginData
+from eduid_common.session.loginstate import SSOLoginData
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context
@@ -460,7 +460,7 @@ def do_verify(context: IdPContext):
 
     if not authninfo:
         _ticket.FailCount += 1
-        context.ticket_sessions.store_ticket(_ticket)
+        cherrypy.session.sso_ticket = _ticket
         lox = f'{query["redirect_uri"]}?{_ticket.query_string}'
         context.logger.debug(f'Unknown user or wrong password. Redirect => {lox}')
         raise eduid_idp.mischttp.Redirect(lox)
@@ -496,6 +496,9 @@ def do_verify(context: IdPContext):
 # ----------------------------------------------------------------------------
 def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
+
+    ticket = cherrypy.session.sso_ticket
+
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
     _key = info.get('key')
@@ -506,25 +509,18 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
         _key = ExpiringCache.key(info['SAMLRequest'])
         logger.debug(f"No 'key' in info, hashed SAMLRequest into key {_key}")
 
-    ticket = context.ticket_sessions.get_ticket(_key)
-    if ticket:
-        if not isinstance(ticket, SSOLoginData):
-            # If context.ticket_sessions is ExpiringCacheCommonSession, this will be an
-            # RedisEncryptedSession dict-like object. Need to re-create an SSOLoginData from
-            # it using _create_ticket() below.
-            if binding is None:
-                binding = ticket.get('binding')
-            if binding is None:
-                raise eduid_idp.error.BadRequest('Bad request, no binding')
-            return _create_ticket(context, ticket, binding, _key)
-        return ticket
-    # cache miss, parse SAMLRequest
-    if binding is None:
-        binding = info['binding']
-    if binding is None:
-        raise eduid_idp.error.BadRequest('Bad request, no binding')
-    ticket = _create_ticket(context, info, binding, _key)
-    context.ticket_sessions.store_ticket(ticket)
+        if ticket and _key != ticket.key:
+            raise eduid_idp.error.BadRequest('Corrupted SAMLRequest, please re-initiate login',
+                                             logger = logger, extra = {'info': info, 'binding': binding})
+
+    if not ticket:
+        # cache miss, parse SAMLRequest
+        if binding is None:
+            binding = info['binding']
+        if binding is None:
+            raise eduid_idp.error.BadRequest('Bad request, no binding')
+        ticket = _create_ticket(context, info, binding, _key)
+        cherrypy.session.sso_ticket = ticket
 
     return ticket
 

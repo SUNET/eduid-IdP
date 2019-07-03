@@ -38,8 +38,6 @@ such as rate limiting.
 """
 
 import datetime
-from dataclasses import asdict, dataclass
-from typing import Dict
 from typing import Optional
 
 import eduid_idp.assurance
@@ -118,23 +116,6 @@ class AuthnData(object):
         return {'cred_id': self.credential.key,
                 'authn_ts': self.timestamp,
                 }
-
-
-@dataclass
-class ExternalMfaData(object):
-    """
-    Data about a successful external authentication as a multi factor.
-    """
-    issuer: str
-    authn_context: str
-    timestamp: datetime.datetime
-
-    def to_session_dict(self):
-        return asdict(self)
-
-    @classmethod
-    def from_session_dict(cls, data: Dict):
-        return cls(**data)
 
 
 class IdPAuthn(object):

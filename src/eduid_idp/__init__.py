@@ -39,7 +39,6 @@ __authors__ = ['Fredrik Thulin']
 
 import eduid_idp.idp_user
 import eduid_idp.service
-import eduid_idp.cache
 import eduid_idp.login
 import eduid_idp.logout
 import eduid_idp.mischttp
@@ -50,4 +49,3 @@ import eduid_idp.thirdparty
 import eduid_idp.sso_session
 import eduid_idp.authn
 import eduid_idp.util
-import eduid_idp.loginstate
