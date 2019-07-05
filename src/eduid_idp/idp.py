@@ -121,8 +121,8 @@ from logging import Logger
 from typing import Optional, Any
 
 from eduid_common.config.idp import IdPConfig
-from eduid_common.session.idp_cache import ExpiringCacheCommonSession, SSOSessionCache
-from eduid_common.session import idp_cache
+from eduid_idp.cache import SSOSessionCache
+import eduid_idp.cache
 import eduid_idp.mischttp
 import eduid_idp.authn
 import eduid_idp.sso_session
@@ -195,10 +195,10 @@ class IdPApplication(object):
         _session_ttl = self.config.sso_session_lifetime * 60
         _SSOSessions: SSOSessionCache
         if self.config.sso_session_mongo_uri:
-            _SSOSessions = idp_cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               self.logger, _session_ttl)
         else:
-            _SSOSessions = idp_cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
+            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
         self.authn_info_db = None
@@ -230,21 +230,10 @@ class IdPApplication(object):
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
-        _common_sessions: Optional[ExpiringCacheCommonSession] = None
-
-        if (config.redis_sentinel_hosts or config.redis_host) and config.shared_session_cookie_name \
-                and config.shared_session_secret_key:
-            _common_sessions = ExpiringCacheCommonSession('CommonSessions', logger,
-                                                          config.shared_session_ttl, config,
-                                                          secret=config.shared_session_secret_key)
-        else:
-            logger.info('eduID shared sessions not configured')
-
         self.context = IdPContext(config=self.config,
                                   idp=self.IDP,
                                   logger=self.logger,
                                   sso_sessions=_SSOSessions,
-                                  common_sessions=_common_sessions,
                                   actions_db=_actions_db,
                                   authn=self.authn,
                                   )
@@ -488,7 +477,7 @@ class IdPApplication(object):
         _data = None
         _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         if _session_id:
-            _data = self.context.sso_sessions.get_session(idp_cache.SSOSessionId(_session_id))
+            _data = self.context.sso_sessions.get_session(eduid_idp.cache.SSOSessionId(_session_id))
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
             query = eduid_idp.mischttp.parse_query_string(self.logger)

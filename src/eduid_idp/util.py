@@ -32,11 +32,12 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
+import six
 import base64
 from logging import Logger
 from typing import Optional
-
-import six
+from typing import AnyStr
+from hashlib import sha1
 
 from eduid_common.authn.idp_saml import IdP_SAMLRequest
 from saml2.server import Server as Saml2Server
@@ -94,3 +95,15 @@ def get_requested_authn_context(idp: Saml2Server, saml_req: IdP_SAMLRequest, log
         res = new_authn
 
     return res
+
+
+def gen_key(something: AnyStr) -> str:
+    """
+    Generate a unique (not strictly guaranteed) key based on `something'.
+
+    :param something: object
+    :return:
+    """
+    if isinstance(something, six.binary_type):
+        return sha1(something).hexdigest()
+    return sha1(something.encode('UTF-8')).hexdigest()

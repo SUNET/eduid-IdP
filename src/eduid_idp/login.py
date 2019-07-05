@@ -24,7 +24,7 @@ from defusedxml import ElementTree as DefusedElementTree
 
 import eduid_idp
 from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_common.session.idp_cache import ExpiringCache
+from eduid_idp.util import gen_key
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
@@ -78,15 +78,10 @@ class SSO(Service):
 
         resp_args = self._validate_login_request(ticket)
 
-        if self.context.common_sessions is not None:
-            cherrypy.session['user_eppn'] = user.eppn
+        cherrypy.session['user_eppn'] = user.eppn
 
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
-
-        #  if self.context.common_sessions is not None:
-        #      cherrypy.request.session['is_logged_in'] = True
-        #      cherrypy.request.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 
@@ -506,7 +501,7 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
         if 'SAMLRequest' not in info:
             raise eduid_idp.error.BadRequest('Missing SAMLRequest, please re-initiate login',
                                              logger = logger, extra = {'info': info, 'binding': binding})
-        _key = ExpiringCache.key(info['SAMLRequest'])
+        _key = gen_key(info['SAMLRequest'])
         logger.debug(f"No 'key' in info, hashed SAMLRequest into key {_key}")
 
         if ticket and _key != ticket.key:
