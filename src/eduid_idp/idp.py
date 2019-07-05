@@ -15,7 +15,7 @@ eduID IdP application
 Stored state :
 
   1) State regarding the SAMLRequest currently being processed is stored in
-     eduid_common.session.loginstate.SSOLoginData() objects. These are by tradition called
+     eduid_common.session.logindata.SSOLoginData() objects. These are by tradition called
      'tickets', and are currently stored in memory of the IdP instance
      processing a request.
 

@@ -37,10 +37,11 @@ import datetime
 
 import eduid_idp
 import saml2.time_util
-from eduid_idp.authn import AuthnData, ExternalMfaData
+from eduid_idp.authn import AuthnData
+from eduid_common.session.logindata import ExternalMfaData
 from eduid_idp.error import Forbidden
 from eduid_common.authn.idp_saml import parse_SAMLRequest
-from eduid_common.session.loginstate import SSOLoginData
+from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode
 from eduid_userdb.credentials import METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI, Password, U2F, u2f_from_dict

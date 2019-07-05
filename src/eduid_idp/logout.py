@@ -16,7 +16,7 @@ import pprint
 import eduid_idp
 import saml2.request
 import saml2.samlp
-from eduid_idp.util import gen_key
+from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.service import Service
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_HTTP_REDIRECT

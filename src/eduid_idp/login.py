@@ -24,12 +24,12 @@ from defusedxml import ElementTree as DefusedElementTree
 
 import eduid_idp
 from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_idp.util import gen_key
+from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
 from eduid_idp.idp_user import IdPUser
-from eduid_common.session.loginstate import SSOLoginData
+from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context

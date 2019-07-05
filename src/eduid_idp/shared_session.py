@@ -13,6 +13,7 @@ from typing import Optional, Tuple
 import cherrypy
 from cherrypy.lib.sessions import Session
 
+from eduid_common.session.logindata import SSOLoginData
 from eduid_common.api.exceptions import BadConfiguration
 from eduid_common.session.redis_session import SessionManager
 from eduid_common.session.redis_session import RedisEncryptedSession
@@ -50,6 +51,7 @@ class EduidSession(Session):
         # namespaces
         self._common: Optional[Common] = None
         self._actions: Optional[Actions] = None
+        self._sso_ticket: Optional[SSOLoginData] = None
 
     def _exists(self) -> bool:
         return bool(self._session.conn.get(self._session.session_id))
@@ -102,6 +104,17 @@ class EduidSession(Session):
     def actions(self, value: Optional[Actions]):
         if not self._actions:
             self._actions = value
+
+    @property
+    def sso_ticket(self) -> Optional[SSOLoginData]:
+        if not self._sso_ticket:
+            self._sso_ticket = SSOLoginData.from_dict(self._session.get('_sso_ticket', {}))
+        return self._sso_ticket
+
+    @sso_ticket.setter
+    def sso_ticket(self, value: Optional[SSOLoginData]):
+        if not self._sso_ticket:
+            self._sso_ticket = value
 
 class _UCAdapter(dict):
     def __getitem__(self, key):
