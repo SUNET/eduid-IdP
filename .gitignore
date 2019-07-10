@@ -16,3 +16,7 @@ metadata.xml
 revision.txt
 .mypy_cache
 .tox
+coverage.xml
+# Project exclude paths
+venv/
+env/
