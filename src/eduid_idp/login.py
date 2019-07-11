@@ -300,6 +300,7 @@ class SSO(Service):
         _info = self.unpack_either()
 
         ticket = _get_ticket(self.context, _info, BINDING_HTTP_POST)
+        cherrypy.session.sso_ticket = ticket
         return self._redirect_or_post(ticket)
 
     def _redirect_or_post(self, ticket: SSOLoginData) -> bytes:
@@ -488,11 +489,19 @@ def do_verify(context: IdPContext):
     raise eduid_idp.mischttp.Redirect(lox)
 
 
+def _ticket_from_session(ticket, binding, context):
+    if ticket:
+        saml_req = IdP_SAMLRequest(ticket.SAMLRequest, binding or ticket.binding,
+                context.idp, context.logger, context.config['debug'])
+        ticket.saml_req = saml_req
+    return ticket
+
+
 # ----------------------------------------------------------------------------
 def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
 
-    ticket = cherrypy.session.sso_ticket
+    ticket = _ticket_from_session(cherrypy.session.sso_ticket, binding, context)
 
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
@@ -515,6 +524,7 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
         if binding is None:
             raise eduid_idp.error.BadRequest('Bad request, no binding')
         ticket = _create_ticket(context, info, binding, _key)
+        ticket = _ticket_from_session(ticket, binding, context)
         cherrypy.session.sso_ticket = ticket
 
     return ticket
@@ -537,12 +547,17 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -
     """
     if not binding:
         raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = context.logger)
-    saml_req = _parse_SAMLRequest(context, info, binding)
-    ticket = SSOLoginData(key, saml_req,
+    ticket = SSOLoginData(key,
+                          info.get('SAMLRequest', ''),
+                          binding,
                           info.get('RelayState', ''),
                           int(info.get('FailCount', 0)),
                           )
+    ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, ticket.binding,
+            context.idp, context.logger, context.config['debug'])
+
     context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
+    cherrypy.session.sso_ticket = ticket
     return ticket
 
 

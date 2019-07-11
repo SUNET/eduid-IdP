@@ -71,7 +71,7 @@ class TestSessions(unittest.TestCase):
                 'debug': False
         }
         self.config = IdPConfig.init_config(test_config=_defaults)
-        cherrypy.config.logger = logger
+        cherrypy.config['logger'] = logger
         # mount the IdP app in the cherrypy app server
         cherry_conf = {
                 'tools.sessions.on': True,

@@ -45,6 +45,7 @@ import cherrypy
 
 from mock import patch
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
+from cherrypy.lib.sessions import init
 
 import eduid_userdb
 from eduid_userdb.credentials import U2F, Webauthn
@@ -65,12 +66,6 @@ local = cherrypy.lib.httputil.Host('127.0.0.1', 50000, "")
 remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
 
 
-class MockTicket:
-    def __init__(self, key):
-        self.key = key
-        self.mfa_action_creds = {}
-
-
 # noinspection PyProtectedMember
 class TestActions(MongoTestCase):
 
@@ -86,6 +81,7 @@ class TestActions(MongoTestCase):
                         'static_dir': staticdir,
                         'tou_version': 'mock-version',
                         'shared_session_secret_key': 'shared-session-secret-key',
+                        'shared_session_ttl': 30,
                         'redis_host': 'localhost',
                         'redis_port': str(self.redis_instance.port),
                         'redis_db': '0',
@@ -95,12 +91,28 @@ class TestActions(MongoTestCase):
                         'base_url': 'https://unittest-idp.example.edu/',
                         'content_packages': [('eduid_idp', 'tests/static')],
                         'action_plugins': ['tou', 'mfa'],
-                        'debug': False
+                        'debug': True
                         }
 
+        cherry_conf = {
+                'tools.sessions.on': True,
+                'tools.sessions.storage_class': EduidSession,
+                'tools.sessions.name': 'sessid',
+                'tools.sessions.domain': 'unittest-idp.example.edu',
+                'tools.sessions.secure': True,
+                'tools.sessions.persistent': True,
+                'tools.sessions.httponly': False,
+                }
+
         self.config = IdPConfig.init_config(test_config=_test_config, debug=False)
+        cherry_conf.update(self.config.to_dict())
+        cherrypy.config.update(cherry_conf)
         cherrypy.config.logger = logger
 
+        if hasattr(cherrypy.request, '_session_init_flag'):
+            del cherrypy.request._session_init_flag
+        init(storage_class=EduidSession, path='/', name='sessid',
+             domain="unittest-idp.example.edu")
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
 
@@ -118,16 +130,6 @@ class TestActions(MongoTestCase):
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
         # mount the IdP app in the cherrypy app server
-        cherry_conf = {
-                'tools.sessions.on': True,
-                'tools.sessions.storage_class': EduidSession,
-                'tools.sessions.name': 'sessid',
-                'tools.sessions.domain': 'unittest-idp.example.edu',
-                'tools.sessions.secure': True,
-                'tools.sessions.httponly': False,
-                }
-        cherry_conf.update(self.config.to_dict())
-        cherrypy.config.update(cherry_conf)
         cherrypy.tree.mount(self.idp_app, '', {'/': cherry_conf})
 
         # create a webtest testing environment
@@ -159,6 +161,9 @@ class TestActions(MongoTestCase):
         _email = 'johnsmith@example.com'
         form['username'].value = _email
         form['password'].value = '123456'
+        # set the cookies manually,
+        # for some reason webtest doesn't set them in the request
+        cookies = resp.headers.get('Set-Cookie')
 
         # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient
@@ -166,7 +171,7 @@ class TestActions(MongoTestCase):
             VCCSClient.authenticate.return_value = True
 
             # post the login form to the test env
-            resp = form.submit()
+            resp = form.submit(headers={'Cookie': cookies})
             self.assertEqual(resp.status, '302 Found')
 
         # Register user acceptance for the ToU version in use
@@ -182,9 +187,8 @@ class TestActions(MongoTestCase):
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
-        cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                             in self.http.cookies.items()])
-        resp = self.http.get(resp.location, headers={'Cookie': cookies})
+        cookies = resp.headers.getall('Set-Cookie')
+        resp = self.http.get(resp.location, headers={'Cookie': c for c in cookies})
         self.assertEqual(resp.status, '200 Ok')
         self.assertIn(six.b('action="https://sp.example.edu/saml2/acs/"'), resp.body)
 

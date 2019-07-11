@@ -218,9 +218,6 @@ class IdPApplication(object):
         self.userdb = userdb
         self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.userdb)
 
-        cherrypy.config.update({'request.error_response': self.handle_error,
-                                'error_page.default': self.error_page_default,
-                                })
         listen_str = 'http://'
         if self.config.server_key:
             listen_str = 'https://'

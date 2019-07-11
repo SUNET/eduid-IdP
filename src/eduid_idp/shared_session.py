@@ -37,16 +37,15 @@ class EduidSession(Session):
         for k, v in config.items():
             setattr(cls, k, v)
 
-        cls.session_factory = SessionFactory(cherrypy.config)
+        cls.session_factory = SessionFactory()
 
-    def __init__(self, id: str, token: str = None, **kwargs):
-        if id and not token:
-            token = id
-        self._session = self.session_factory.get_base_session(token=token)
-        token = self._session.token
-        if isinstance(token, bytes):
-            token = token.decode('ascii')
-        super(EduidSession, self).__init__(id=token, **kwargs)
+    def __init__(self, id: str = None, **kwargs):
+        self._session = self.session_factory.get_base_session(token=id)
+        if not id:
+            id = self._session.token
+        if isinstance(id, bytes):
+            id = id.decode('ascii')
+        super(EduidSession, self).__init__(id=id, **kwargs)
 
         # namespaces
         self._common: Optional[Common] = None
@@ -54,7 +53,7 @@ class EduidSession(Session):
         self._sso_ticket: Optional[SSOLoginData] = None
 
     def _exists(self) -> bool:
-        return bool(self._session.conn.get(self._session.session_id))
+        return bool(self._session.token)
 
     def _load(self) -> Tuple[dict, datetime.datetime]:
         ttl = cherrypy.config['shared_session_ttl']
@@ -66,7 +65,9 @@ class EduidSession(Session):
             self._data['_common'] = self.common.to_dict()  # type: ignore
         if isinstance(self._actions, Actions):
             self._data['_actions'] = self.actions.to_dict()  # type: ignore
-        self._session._data = self._data
+        if isinstance(self._sso_ticket, SSOLoginData):
+            self._data['_sso_ticket'] = self.sso_ticket.to_dict()  # type: ignore
+        self._session._data.update(self._data)
         self._session.commit()
         self._session.conn.expire(self._session.session_id, int(expiration_time.timestamp()))
 
@@ -93,6 +94,7 @@ class EduidSession(Session):
     def common(self, value: Optional[Common]):
         if not self._common:
             self._common = value
+        self['flag'] = 'dirty'
 
     @property
     def actions(self) -> Optional[Actions]:
@@ -104,17 +106,19 @@ class EduidSession(Session):
     def actions(self, value: Optional[Actions]):
         if not self._actions:
             self._actions = value
+        self['flag'] = 'dirty'
 
     @property
     def sso_ticket(self) -> Optional[SSOLoginData]:
-        if not self._sso_ticket:
-            self._sso_ticket = SSOLoginData.from_dict(self._session.get('_sso_ticket', {}))
+        if not self._sso_ticket and '_sso_ticket' in self._session:
+            self._sso_ticket = SSOLoginData.from_dict(self._session['_sso_ticket'])
         return self._sso_ticket
 
     @sso_ticket.setter
     def sso_ticket(self, value: Optional[SSOLoginData]):
         if not self._sso_ticket:
             self._sso_ticket = value
+        self['flag'] = 'dirty'
 
 class _UCAdapter(dict):
     def __getitem__(self, key):
@@ -127,14 +131,14 @@ class SessionFactory:
     encrypted redis-based sessions shared with the APIs.
     """
 
-    def __init__(self, config: dict):
-        self.config = config
+    def __init__(self):
         ttl = cherrypy.config['shared_session_ttl']
         secret = cherrypy.config['shared_session_secret_key']
         if secret is None:
-            cherrypy.config.logger.error('shared_session_secret_key not set in config')
+            cherrypy.config['logger'].error('shared_session_secret_key not set in config')
             raise BadConfiguration('shared_session_secret_key not set in config')
-        self.manager = SessionManager(_UCAdapter(cherrypy.config), ttl=ttl, secret=secret)
+        uc_config = _UCAdapter(cherrypy.config)
+        self.manager = SessionManager(uc_config, ttl=ttl, secret=secret)
 
     def get_base_session(self, token: str = None) -> RedisEncryptedSession:
         logger = cherrypy.config.logger
