@@ -91,6 +91,7 @@ class TestActions(MongoTestCase):
                         'base_url': 'https://unittest-idp.example.edu/',
                         'content_packages': [('eduid_idp', 'tests/static')],
                         'action_plugins': ['tou', 'mfa'],
+                        'insecure_cookies': False,
                         'debug': True
                         }
 
@@ -188,7 +189,11 @@ class TestActions(MongoTestCase):
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
         cookies = resp.headers.getall('Set-Cookie')
-        resp = self.http.get(resp.location, headers={'Cookie': c for c in cookies})
+        cookie_1 = cookies[0].split(';')[0]
+        cookie_2 = cookies[1].split(';')[0]
+        cookie = f'{cookie_1};{cookie_2}'
+
+        resp = self.http.get(resp.location, headers={'Cookie': cookie})
         self.assertEqual(resp.status, '200 Ok')
         self.assertIn(six.b('action="https://sp.example.edu/saml2/acs/"'), resp.body)
 
