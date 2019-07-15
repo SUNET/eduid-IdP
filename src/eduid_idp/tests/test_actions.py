@@ -223,9 +223,12 @@ class TestActions(MongoTestCase):
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
-        cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                             in self.http.cookies.items()])
-        resp = self.http.get(resp.location, headers={'Cookie': cookies})
+        cookies = resp.headers.getall('Set-Cookie')
+        cookie_1 = cookies[0].split(';')[0]
+        cookie_2 = cookies[1].split(';')[0]
+        cookie = f'{cookie_1};{cookie_2}'
+
+        resp = self.http.get(resp.location, headers={'Cookie': cookie})
         self.assertEqual(resp.status, '302 Found')
         self.assertIn(self.config.actions_app_uri, resp.location)
 
@@ -254,9 +257,12 @@ class TestActions(MongoTestCase):
 
         # get the redirect url. set the cookies manually,
         # for some reason webtest doesn't set them in the request
-        cookies = '; '.join(['{}={}'.format(k, v) for k, v
-                             in self.http.cookies.items()])
-        resp = self.http.get(resp.location, headers={'Cookie': cookies})
+        cookies = resp.headers.getall('Set-Cookie')
+        cookie_1 = cookies[0].split(';')[0]
+        cookie_2 = cookies[1].split(';')[0]
+        cookie = f'{cookie_1};{cookie_2}'
+
+        resp = self.http.get(resp.location, headers={'Cookie': cookie})
         self.assertEqual(resp.status, '302 Found')
         self.assertIn(self.config.actions_app_uri, resp.location)
 

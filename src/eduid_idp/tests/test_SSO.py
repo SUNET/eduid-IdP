@@ -121,7 +121,9 @@ def make_login_ticket(req_class_ref, context, key=None) -> SSOLoginData:
     saml_req = parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
                                  context.config.debug, context.config.verify_request_signatures)
     #context.idp.parse_authn_request(xmlstr, binding)
-    return SSOLoginData(key, xmlstr, binding)
+    ticket = SSOLoginData(key, xmlstr, binding)
+    ticket.saml_req = saml_req
+    return ticket
 
 
 # noinspection PyProtectedMember

@@ -121,6 +121,7 @@ from logging import Logger
 from typing import Optional, Any
 
 from eduid_common.config.idp import IdPConfig
+from eduid_common.authn.utils import init_pysaml2
 from eduid_idp.cache import SSOSessionCache
 import eduid_idp.cache
 import eduid_idp.mischttp
@@ -132,8 +133,6 @@ from eduid_idp.context import IdPContext
 from eduid_idp.shared_session import EduidSession
 
 from eduid_userdb.actions import ActionDB
-
-from saml2 import server
 
 from bson import ObjectId
 
@@ -190,7 +189,8 @@ class IdPApplication(object):
         # Log both 'starting' and 'started' messages.
         self.logger.info("eduid-IdP server starting")
 
-        self._init_pysaml2()
+        logger.debug(f"Loading PySAML2 server using cfgfile {config.pysaml2_config}")
+        self.IDP = init_pysaml2(self.config.pysaml2_config)
 
         _session_ttl = self.config.sso_session_lifetime * 60
         _SSOSessions: SSOSessionCache
@@ -234,28 +234,6 @@ class IdPApplication(object):
                                   actions_db=_actions_db,
                                   authn=self.authn,
                                   )
-
-    def _init_pysaml2(self):
-        """
-        Initialization of PySAML2. Part of __init__().
-
-        :return:
-        """
-        old_path = sys.path
-        cfgfile = self.config.pysaml2_config
-        cfgdir = os.path.dirname(cfgfile)
-        if cfgdir:
-            # add directory part to sys.path, since pysaml2 'import's it's config
-            sys.path = [cfgdir] + sys.path
-            cfgfile = os.path.basename(self.config.pysaml2_config)
-
-        _path = sys.path[0]
-        self.logger.debug("Loading PySAML2 server using cfgfile {!r} and path {!r}".format(cfgfile, _path))
-        try:
-            self.IDP = server.Server(cfgfile)
-        finally:
-            # restore path
-            sys.path = old_path
 
     @cherrypy.expose
     def sso(self, *_args, **_kwargs):
