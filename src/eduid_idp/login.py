@@ -513,6 +513,9 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
         _key = gen_key(info['SAMLRequest'])
         logger.debug(f"No 'key' in info, hashed SAMLRequest into key {_key}")
 
+        if ticket and info['SAMLRequest'] != ticket.SAMLRequest:
+            ticket = cherrypy.session.sso_ticket = None
+
         if ticket and _key != ticket.key:
             raise eduid_idp.error.BadRequest('Corrupted SAMLRequest, please re-initiate login',
                                              logger = logger, extra = {'info': info, 'binding': binding})

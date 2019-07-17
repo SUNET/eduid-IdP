@@ -94,7 +94,7 @@ class EduidSession(Session):
     def common(self, value: Optional[Common]):
         if not self._common:
             self._common = value
-        self['flag'] = 'dirty'
+        self['flag'] = 'dirty session to force saving to redis'
 
     @property
     def actions(self) -> Optional[Actions]:
@@ -116,8 +116,11 @@ class EduidSession(Session):
 
     @sso_ticket.setter
     def sso_ticket(self, value: Optional[SSOLoginData]):
-        if not self._sso_ticket:
-            self._sso_ticket = value
+        self._sso_ticket = value
+        if value is None:
+            del self._session._data['_sso_ticket']
+        else:
+            self._session._data['_sso_ticket'] = value.to_dict()
         self['flag'] = 'dirty'
 
 class _UCAdapter(dict):
