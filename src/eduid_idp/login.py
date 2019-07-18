@@ -28,7 +28,7 @@ from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
-from eduid_idp.idp_user import IdPUser
+from eduid_common.idp.user import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession

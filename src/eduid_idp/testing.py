@@ -38,7 +38,7 @@ from unittest import TestCase
 
 from eduid_common.config.idp import IdPConfig
 import eduid_idp
-from eduid_idp.idp_user import IdPUser
+from eduid_userdb.idp.user import IdPUser
 from eduid_idp.idp import IdPApplication
 
 from vccs_client import VCCSPasswordFactor

@@ -38,7 +38,7 @@ import datetime
 from typing import List
 
 from eduid_idp.context import IdPContext
-from eduid_idp.idp_user import IdPUser
+from eduid_userdb.idp.user import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.actions import Action

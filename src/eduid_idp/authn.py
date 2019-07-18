@@ -44,7 +44,7 @@ import eduid_idp.assurance
 import eduid_idp.error
 import vccs_client
 from eduid_common.authn import get_vccs_client
-from eduid_idp.idp_user import IdPUser
+from eduid_common.idp.user import IdPUser
 from eduid_userdb import MongoDB
 from eduid_userdb.credentials import Password, U2F
 from eduid_userdb.exceptions import UserHasNotCompletedSignup
