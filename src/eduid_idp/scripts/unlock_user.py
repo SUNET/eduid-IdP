@@ -6,6 +6,7 @@
 import os
 import sys
 import logging
+from eduid_common.authn import idp_authn
 from eduid_common.config.idp import IdPConfig
 import eduid_idp
 import eduid_idp.idp

@@ -37,7 +37,7 @@ import datetime
 
 import eduid_idp
 import saml2.time_util
-from eduid_idp.authn import AuthnData
+from eduid_common.authn.idp_authn import AuthnData
 from eduid_common.session.logindata import ExternalMfaData
 from eduid_idp.error import Forbidden
 from eduid_common.session.logindata import SSOLoginData

@@ -120,6 +120,7 @@ import logging.handlers
 from logging import Logger
 from typing import Optional, Any
 
+from eduid_common.authn import idp_authn
 from eduid_common.config.idp import IdPConfig
 from eduid_common.authn.utils import init_pysaml2
 from eduid_idp.cache import SSOSessionCache
@@ -205,7 +206,7 @@ class IdPApplication(object):
         _actions_db = None
 
         if config.mongo_uri:
-            self.authn_info_db = eduid_idp.authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
+            self.authn_info_db = idp_authn.AuthnInfoStoreMDB(config.mongo_uri, logger)
 
         if config.mongo_uri and config.actions_app_uri:
             _actions_db = ActionDB(config.mongo_uri)
