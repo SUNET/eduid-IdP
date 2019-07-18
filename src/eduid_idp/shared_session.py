@@ -9,6 +9,7 @@
 
 import datetime
 from typing import Optional, Tuple
+from random import random
 
 import cherrypy
 from cherrypy.lib.sessions import Session
@@ -94,7 +95,7 @@ class EduidSession(Session):
     def common(self, value: Optional[Common]):
         if not self._common:
             self._common = value
-        self['flag'] = 'dirty session to force saving to redis'
+        self['flag'] = f'dirty session to force saving to redis {random()}'
 
     @property
     def actions(self) -> Optional[Actions]:
@@ -106,7 +107,7 @@ class EduidSession(Session):
     def actions(self, value: Optional[Actions]):
         if not self._actions:
             self._actions = value
-        self['flag'] = 'dirty'
+        self['flag'] = f'dirty session to force saving to redis {random()}'
 
     @property
     def sso_ticket(self) -> Optional[SSOLoginData]:
@@ -121,7 +122,7 @@ class EduidSession(Session):
             del self._session._data['_sso_ticket']
         else:
             self._session._data['_sso_ticket'] = value.to_dict()
-        self['flag'] = 'dirty'
+        self['flag'] = f'dirty session to force saving to redis {random()}'
 
 class _UCAdapter(dict):
     def __getitem__(self, key):
