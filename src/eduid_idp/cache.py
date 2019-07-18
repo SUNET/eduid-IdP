@@ -21,7 +21,7 @@ from typing import NewType, List, Deque, AnyStr
 
 import six
 
-from eduid_common.session import SessionManager, RedisEncryptedSession
+from eduid_common.session.redis_session import SessionManager, RedisEncryptedSession
 from eduid_common.config.idp import IdPConfig
 from eduid_userdb import MongoDB
 
@@ -52,73 +52,7 @@ class NoOpLock(object):
         pass
 
 
-class ExpiringCache(object):
-    """
-    Base class of caches with a TTL.
-
-    :param name: name of cache as string, only used for debugging
-    :param logger: logging logger instance
-    :param ttl: data time to live in this cache, as seconds (integer)
-    :param lock: threading.Lock compatible locking instance
-    """
-
-    def __init__(self, name, logger, ttl, lock = None):
-        self.logger = logger
-        self.ttl = ttl
-        self.name = name
-
-    @staticmethod
-    def key(something: AnyStr) -> str:
-        """
-        Generate a unique (not strictly guaranteed) key based on `something'.
-
-        :param something: object
-        :return:
-        """
-        if isinstance(something, six.binary_type):
-            return sha1(something).hexdigest()
-        return sha1(something.encode('UTF-8')).hexdigest()
-
-    def add(self, key, info):
-        """
-        Add entry to the cache.
-
-        :param key: Lookup key for entry
-        :param info: Value to be stored for 'key'
-        :return: None
-        """
-        raise NotImplementedError('add not implemented in subclass')
-
-    def get(self, key):
-        """
-        Fetch data from cache based on `key'.
-
-        :param key: hash key to use for lookup
-        :returns: Any data found matching `key', or None.
-        """
-        raise NotImplementedError('get not implemented in subclass')
-
-    def update(self, key, info):
-        """
-        Update entry in the cache.
-
-        :param key: Lookup key for entry
-        :param info: Value to be stored for 'key'
-        :return: None
-        """
-        raise NotImplementedError('update not implemented in subclass')
-
-    def delete(self, key):
-        """
-        Delete an item from the cache.
-
-        :param key: hash key to delete
-        :return: True on success
-        """
-        raise NotImplementedError('delete not implemented in subclass')
-
-
-class ExpiringCacheMem(ExpiringCache):
+class ExpiringCacheMem:
     """
     Simplistic implementation of a cache that removes entrys as they become too old.
 
@@ -134,7 +68,9 @@ class ExpiringCacheMem(ExpiringCache):
     """
 
     def __init__(self, name, logger, ttl, lock = None):
-        super(ExpiringCacheMem, self).__init__(name, logger, ttl)
+        self.logger = logger
+        self.ttl = ttl
+        self.name = name
         self._data: dict = {}
         self._ages: Deque = deque()
         self.lock = lock
@@ -225,117 +161,6 @@ class ExpiringCacheMem(ExpiringCache):
         Return all items from cache.
         """
         return self._data
-
-
-class ExpiringCacheCommonSession(ExpiringCache):
-
-    def __init__(self, name: str, logger: logging.Logger, ttl: int, config: IdPConfig, secret: str):
-        super(ExpiringCacheCommonSession, self).__init__(name, logger, ttl, lock=None)
-
-        redis_cfg = {'REDIS_PORT': config.redis_port,
-                     'REDIS_DB': config.redis_db,
-                     }
-        if config.redis_sentinel_hosts:
-            redis_cfg.update({'REDIS_SENTINEL_HOSTS': config.redis_sentinel_hosts,
-                              'REDIS_SENTINEL_SERVICE_NAME': config.redis_sentinel_service_name,
-                              })
-        else:
-            redis_cfg['REDIS_HOST'] = config.redis_host
-        self._debug = config.debug
-        self._redis_cfg = redis_cfg
-        self._manager = SessionManager(redis_cfg, ttl=ttl, secret=secret)
-
-    def __repr__(self):
-        return '<{!s}: {!s}>'.format(self.__class__.__name__, self)
-
-    def __str__(self):
-        if 'REDIS_SENTINEL_HOSTS' in self._redis_cfg:
-            return 'redis sentinel={!r}'.format(','.join(self._redis_cfg['REDIS_SENTINEL_HOSTS']))
-        else:
-            return 'redis host={!r}'.format(self._redis_cfg['REDIS_HOST'])
-
-    def add(self, key: str, info) -> RedisEncryptedSession:
-        """
-        Add entry to the cache.
-
-        :param key: Lookup key for entry
-        :param info: Value to be stored for 'key'
-
-        :type key: str | unicode
-        :type info: SSOLoginData | dict
-
-        :return: New session
-        """
-        if not isinstance(info, dict):
-            data = info.to_dict()
-            data['req_info'] = None  # can't serialize this - will be re-created from SAMLRequest
-        else:
-            data = info
-        if len(key) == _SHA1_HEXENCODED_SIZE:
-            # hex-encoded sha1
-            _session_id = unhexlify(key)
-            session = self._manager.get_session(session_id=_session_id, data=data, debug=self._debug)
-        else:
-            session = self._manager.get_session(token=key, data=data, debug=self._debug)
-        session.commit()
-        return session
-
-    def get(self, key: str) -> RedisEncryptedSession:
-        """
-        Fetch data from cache based on `key'.
-
-        :param key: hash key to use for lookup
-
-        :returns: The previously added session
-        """
-        try:
-            if len(key) == _SHA1_HEXENCODED_SIZE:
-                _session_id = unhexlify(key)
-                session = self._manager.get_session(session_id = _session_id, debug=self._debug)
-            else:
-                session = self._manager.get_session(token=key, debug=self._debug)
-            return session
-        except KeyError:
-            pass
-
-    def new_common_session(self) -> RedisEncryptedSession:
-        """Create a new eduid common session for use in the old CherryPy IdP."""
-        session = self._manager.get_session(data={}, debug=self._debug)
-        return session
-
-    def update(self, key, info):
-        """
-        Update entry in the cache.
-
-        :param key: Lookup key for entry
-        :param info: Value to be stored for 'key'
-
-        :type key: str | unicode
-        :type info: SSOLoginData | dict
-
-        :rtype: None
-        """
-        self.add(key, info)
-
-    def delete(self, key):
-        """
-        Delete an item from the cache.
-
-        :param key: hash key to delete
-
-        :type key: str | unicode
-
-        :return: True on success
-        """
-        if len(key) == _SHA1_HEXENCODED_SIZE:
-            _session_id = unhexlify(key)
-            session = self._manager.get_session(session_id=_session_id, debug=self._debug)
-        else:
-            session = self._manager.get_session(token=key, debug=self._debug)
-        if not session:
-            return False
-        session.clear()
-        return True
 
 
 # A distinct type for session ids

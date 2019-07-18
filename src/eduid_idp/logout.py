@@ -16,7 +16,7 @@ import pprint
 import eduid_idp
 import saml2.request
 import saml2.samlp
-from eduid_idp.cache import ExpiringCache
+from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.service import Service
 from saml2 import BINDING_HTTP_POST
 from saml2 import BINDING_HTTP_REDIRECT
@@ -83,7 +83,7 @@ class SLO(Service):
             raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
 
         request = info["SAMLRequest"]
-        req_key = ExpiringCache.key(request)
+        req_key = gen_key(request)
 
         try:
             req_info = self.context.idp.parse_logout_request(request, binding)

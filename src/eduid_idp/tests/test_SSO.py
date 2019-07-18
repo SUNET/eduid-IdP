@@ -37,10 +37,11 @@ import datetime
 
 import eduid_idp
 import saml2.time_util
-from eduid_idp.authn import AuthnData, ExternalMfaData
+from eduid_idp.authn import AuthnData
+from eduid_common.session.logindata import ExternalMfaData
 from eduid_idp.error import Forbidden
-from eduid_idp.idp_saml import parse_SAMLRequest
-from eduid_idp.loginstate import SSOLoginData
+from eduid_common.authn.idp_saml import parse_SAMLRequest
+from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode
 from eduid_userdb.credentials import METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI, Password, U2F, u2f_from_dict
@@ -120,7 +121,9 @@ def make_login_ticket(req_class_ref, context, key=None) -> SSOLoginData:
     saml_req = parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
                                  context.config.debug, context.config.verify_request_signatures)
     #context.idp.parse_authn_request(xmlstr, binding)
-    return SSOLoginData(key, saml_req, xmlstr)
+    ticket = SSOLoginData(key, xmlstr, binding)
+    ticket.saml_req = saml_req
+    return ticket
 
 
 # noinspection PyProtectedMember

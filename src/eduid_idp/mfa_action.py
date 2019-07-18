@@ -29,7 +29,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-from eduid_idp.authn import ExternalMfaData
+from eduid_common.session.logindata import ExternalMfaData
 from eduid_idp.util import get_requested_authn_context
 
 __author__ = 'ft'
@@ -39,7 +39,7 @@ from typing import List
 
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_user import IdPUser
-from eduid_idp.loginstate import SSOLoginData
+from eduid_common.session.logindata import SSOLoginData
 from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.actions import Action
 

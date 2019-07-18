@@ -32,13 +32,12 @@
 #
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
+import six
 import base64
 from logging import Logger
 from typing import Optional
 
-import six
-
-from eduid_idp.idp_saml import IdP_SAMLRequest
+from eduid_common.authn.idp_saml import IdP_SAMLRequest
 from saml2.server import Server as Saml2Server
 
 

@@ -24,12 +24,12 @@ from defusedxml import ElementTree as DefusedElementTree
 
 import eduid_idp
 from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_idp.cache import ExpiringCache
+from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_idp.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
+from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
 from eduid_idp.idp_user import IdPUser
-from eduid_idp.loginstate import SSOLoginData
+from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
 from eduid_idp.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context
@@ -78,15 +78,10 @@ class SSO(Service):
 
         resp_args = self._validate_login_request(ticket)
 
-        if self.context.common_sessions is not None:
-            cherrypy.session['user_eppn'] = user.eppn
+        cherrypy.session['user_eppn'] = user.eppn
 
         check_for_pending_actions(self.context, user, ticket, self.sso_session)
         # We won't get here until the user has completed all login actions
-
-        #  if self.context.common_sessions is not None:
-        #      cherrypy.request.session['is_logged_in'] = True
-        #      cherrypy.request.session.commit()
 
         response_authn = self._get_login_response_authn(ticket, user)
 
@@ -305,6 +300,7 @@ class SSO(Service):
         _info = self.unpack_either()
 
         ticket = _get_ticket(self.context, _info, BINDING_HTTP_POST)
+        cherrypy.session.sso_ticket = ticket
         return self._redirect_or_post(ticket)
 
     def _redirect_or_post(self, ticket: SSOLoginData) -> bytes:
@@ -460,7 +456,7 @@ def do_verify(context: IdPContext):
 
     if not authninfo:
         _ticket.FailCount += 1
-        context.ticket_sessions.store_ticket(_ticket)
+        cherrypy.session.sso_ticket = _ticket
         lox = f'{query["redirect_uri"]}?{_ticket.query_string}'
         context.logger.debug(f'Unknown user or wrong password. Redirect => {lox}')
         raise eduid_idp.mischttp.Redirect(lox)
@@ -493,9 +489,20 @@ def do_verify(context: IdPContext):
     raise eduid_idp.mischttp.Redirect(lox)
 
 
+def _ticket_from_session(ticket, binding, context):
+    if ticket:
+        saml_req = IdP_SAMLRequest(ticket.SAMLRequest, binding or ticket.binding,
+                context.idp, context.logger, context.config['debug'])
+        ticket.saml_req = saml_req
+    return ticket
+
+
 # ----------------------------------------------------------------------------
 def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
+
+    ticket = _ticket_from_session(cherrypy.session.sso_ticket, binding, context)
+
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
     _key = info.get('key')
@@ -503,28 +510,25 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
         if 'SAMLRequest' not in info:
             raise eduid_idp.error.BadRequest('Missing SAMLRequest, please re-initiate login',
                                              logger = logger, extra = {'info': info, 'binding': binding})
-        _key = ExpiringCache.key(info['SAMLRequest'])
+        _key = gen_key(info['SAMLRequest'])
         logger.debug(f"No 'key' in info, hashed SAMLRequest into key {_key}")
 
-    ticket = context.ticket_sessions.get_ticket(_key)
-    if ticket:
-        if not isinstance(ticket, SSOLoginData):
-            # If context.ticket_sessions is ExpiringCacheCommonSession, this will be an
-            # RedisEncryptedSession dict-like object. Need to re-create an SSOLoginData from
-            # it using _create_ticket() below.
-            if binding is None:
-                binding = ticket.get('binding')
-            if binding is None:
-                raise eduid_idp.error.BadRequest('Bad request, no binding')
-            return _create_ticket(context, ticket, binding, _key)
-        return ticket
-    # cache miss, parse SAMLRequest
-    if binding is None:
-        binding = info['binding']
-    if binding is None:
-        raise eduid_idp.error.BadRequest('Bad request, no binding')
-    ticket = _create_ticket(context, info, binding, _key)
-    context.ticket_sessions.store_ticket(ticket)
+        if ticket and info['SAMLRequest'] != ticket.SAMLRequest:
+            ticket = cherrypy.session.sso_ticket = None
+
+        if ticket and _key != ticket.key:
+            raise eduid_idp.error.BadRequest('Corrupted SAMLRequest, please re-initiate login',
+                                             logger = logger, extra = {'info': info, 'binding': binding})
+
+    if not ticket:
+        # cache miss, parse SAMLRequest
+        if binding is None:
+            binding = info['binding']
+        if binding is None:
+            raise eduid_idp.error.BadRequest('Bad request, no binding')
+        ticket = _create_ticket(context, info, binding, _key)
+        ticket = _ticket_from_session(ticket, binding, context)
+        cherrypy.session.sso_ticket = ticket
 
     return ticket
 
@@ -546,12 +550,17 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -
     """
     if not binding:
         raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = context.logger)
-    saml_req = _parse_SAMLRequest(context, info, binding)
-    ticket = SSOLoginData(key, saml_req,
+    ticket = SSOLoginData(key,
+                          info.get('SAMLRequest', ''),
+                          binding,
                           info.get('RelayState', ''),
                           int(info.get('FailCount', 0)),
                           )
+    ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, ticket.binding,
+            context.idp, context.logger, context.config['debug'])
+
     context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
+    cherrypy.session.sso_ticket = ticket
     return ticket
 
 
