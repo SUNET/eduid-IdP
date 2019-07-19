@@ -92,7 +92,6 @@ class TestActions(MongoTestCase):
                         'content_packages': [('eduid_idp', 'tests/static')],
                         'action_plugins': ['tou', 'mfa'],
                         'insecure_cookies': False,
-                        'default_eppn_scope': 'local.eduid.se',
                         'debug': True
                         }
 
