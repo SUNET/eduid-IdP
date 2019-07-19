@@ -123,11 +123,12 @@ from typing import Optional, Any
 from eduid_common.authn import idp_authn
 from eduid_common.config.idp import IdPConfig
 from eduid_common.authn.utils import init_pysaml2
-from eduid_idp.cache import SSOSessionCache
-import eduid_idp.cache
+from eduid_common.session.sso_cache import SSOSessionCache
+from eduid_common.session import sso_cache
 import eduid_idp.mischttp
 import eduid_idp.authn
-import eduid_idp.sso_session
+import eduid_common.session.sso_session
+from eduid_common.session.sso_session import SSOSession
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
 from eduid_idp.context import IdPContext
@@ -196,10 +197,10 @@ class IdPApplication(object):
         _session_ttl = self.config.sso_session_lifetime * 60
         _SSOSessions: SSOSessionCache
         if self.config.sso_session_mongo_uri:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
+            _SSOSessions = sso_cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
                                                               self.logger, _session_ttl)
         else:
-            _SSOSessions = eduid_idp.cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
+            _SSOSessions = sso_cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
         _login_state_ttl = (self.config.login_state_ttl + 1) * 60
         self.authn_info_db = None
@@ -446,7 +447,7 @@ class IdPApplication(object):
                 _age, self.config.sso_session_lifetime))
         return session
 
-    def _lookup_sso_session2(self) -> Optional[eduid_idp.sso_session.SSOSession]:
+    def _lookup_sso_session2(self) -> Optional[SSOSession]:
         """
         See if a SSO session exists for this request, and return the data about
         the currently logged in user from the session store.
@@ -456,7 +457,7 @@ class IdPApplication(object):
         _data = None
         _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         if _session_id:
-            _data = self.context.sso_sessions.get_session(eduid_idp.cache.SSOSessionId(_session_id))
+            _data = self.context.sso_sessions.get_session(sso_cache.SSOSessionId(_session_id))
             self.logger.debug("Looked up SSO session using idpauthn cookie :\n{!s}".format(_data))
         else:
             query = eduid_idp.mischttp.parse_query_string(self.logger)
@@ -472,7 +473,7 @@ class IdPApplication(object):
         if not _data:
             self.logger.debug("SSO session not found using 'id' parameter or 'idpauthn' cookie")
             return None
-        _sso = eduid_idp.sso_session.from_dict(_data)
+        _sso = eduid_common.session.sso_session.from_dict(_data)
         self.logger.debug("Re-created SSO session {!r}".format(_sso))
         return _sso
 

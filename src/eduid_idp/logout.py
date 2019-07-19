@@ -16,6 +16,8 @@ import pprint
 import eduid_idp
 import saml2.request
 import saml2.samlp
+from eduid_common.session import sso_session
+from eduid_common.session.sso_cache import SSOSessionId
 from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.service import Service
 from saml2 import BINDING_HTTP_POST
@@ -112,7 +114,7 @@ class SLO(Service):
         if _session_id:
             # If the binding is REDIRECT, we can get the SSO session to log out from the
             # client idpauthn cookie
-            session_ids = [eduid_idp.cache.SSOSessionId(_session_id)]
+            session_ids = [SSOSessionId(_session_id)]
         else:
             # For SOAP binding, no cookie is sent - only NameID. Have to figure out
             # the user based on NameID and then destroy *all* the users SSO sessions
@@ -152,7 +154,7 @@ class SLO(Service):
                 _data = self.context.sso_sessions.get_session(this)
                 if not _data:
                     raise KeyError('Session not found')
-                _sso = eduid_idp.sso_session.from_dict(_data)
+                _sso = sso_session.from_dict(_data)
                 res = self.context.sso_sessions.remove_session(this)
                 self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
                     req_key, _sso.public_id, _sso.minutes_old, bool(res)))

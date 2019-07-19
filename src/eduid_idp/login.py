@@ -32,7 +32,7 @@ from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
 from eduid_common.idp.user import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
-from eduid_idp.sso_session import SSOSession
+from eduid_common.session.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
@@ -73,7 +73,7 @@ class SSO(Service):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
+        assert isinstance(self.sso_session, SSOSession)
 
         user = self.sso_session.idp_user
 
