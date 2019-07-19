@@ -27,7 +27,7 @@ from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMul
 from eduid_common.authn.idp_saml import gen_key
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs, parse_SAMLRequest
+from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
 from eduid_idp.idp_user import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
@@ -562,8 +562,3 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -
     context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
     cherrypy.session.sso_ticket = ticket
     return ticket
-
-
-def _parse_SAMLRequest(context: IdPContext, info: Mapping, binding: str) -> IdP_SAMLRequest:
-    return parse_SAMLRequest(info, binding, context.logger, context.idp, eduid_idp.error.BadRequest,
-                             context.config.debug, context.config.verify_request_signatures)

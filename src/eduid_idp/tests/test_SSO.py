@@ -35,13 +35,17 @@
 
 import datetime
 
+from typing import Mapping, NewType, Optional, AnyStr
+import logging
 import eduid_idp
+import saml2.server
 import saml2.time_util
+from saml2.s_utils import UnravelError
 from eduid_idp.authn import AuthnData
 from eduid_common.session.logindata import ExternalMfaData
-from eduid_idp.error import Forbidden
-from eduid_common.authn.idp_saml import parse_SAMLRequest
 from eduid_common.session.logindata import SSOLoginData
+from eduid_common.authn.idp_saml import IdP_SAMLRequest
+from eduid_idp.error import Forbidden
 from eduid_idp.testing import IdPSimpleTestCase
 from eduid_idp.util import b64encode
 from eduid_userdb.credentials import METHOD_SWAMID_AL2_MFA, METHOD_SWAMID_AL2_MFA_HI, Password, U2F, u2f_from_dict
@@ -124,6 +128,47 @@ def make_login_ticket(req_class_ref, context, key=None) -> SSOLoginData:
     ticket = SSOLoginData(key, xmlstr, binding)
     ticket.saml_req = saml_req
     return ticket
+
+
+def parse_SAMLRequest(info: Mapping, binding: str, logger: logging.Logger, idp: saml2.server.Server,
+                      bad_request,
+                      debug: bool = False, verify_request_signatures=True) -> IdP_SAMLRequest:
+
+    """
+    Parse a SAMLRequest query parameter (base64 encoded) into an AuthnRequest
+    instance.
+
+    If the SAMLRequest is signed, the signature is validated and a BadRequest()
+    returned on failure.
+
+    :param info: dict with keys 'SAMLRequest' and possibly 'SigAlg' and 'Signature'
+    :param binding: SAML binding
+    :returns: pysaml2 interface class IdP_SAMLRequest
+    :raise: BadRequest if request signature validation fails
+    """
+    try:
+        saml_req = IdP_SAMLRequest(info['SAMLRequest'], binding, idp, logger, debug=debug)
+    except UnravelError:
+        raise bad_request('No valid SAMLRequest found', logger=logger)
+    except ValueError:
+        raise bad_request('No valid SAMLRequest found', logger=logger)
+
+    if 'SigAlg' in info and 'Signature' in info:  # Signed request
+        if verify_request_signatures:
+            if not saml_req.verify_signature(info['SigAlg'], info['Signature']):
+                raise bad_request('SAML request signature verification failure',
+                                  logger=logger)
+        else:
+            logger.debug('Ignoring existing request signature, verify_request_signature is False')
+    else:
+        # XXX check if metadata says request should be signed ???
+        # Leif says requests are typically not signed, and that verifying signatures
+        # on SAML requests is considered a possible DoS attack vector, so it is typically
+        # not done.
+        # XXX implement configuration flag to disable signature verification
+        logger.debug('No signature in SAMLRequest')
+
+    return saml_req
 
 
 # noinspection PyProtectedMember
