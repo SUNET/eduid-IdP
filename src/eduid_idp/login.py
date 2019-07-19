@@ -23,15 +23,17 @@ import cherrypy
 from defusedxml import ElementTree as DefusedElementTree
 
 import eduid_idp
-from eduid_idp.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
+from eduid_common.authn import assurance
+from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
 from eduid_common.authn.idp_saml import gen_key
+from eduid_idp.shared_session import _UCAdapter
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
-from eduid_idp.idp_user import IdPUser
+from eduid_userdb.idp import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
-from eduid_idp.sso_session import SSOSession
+from eduid_common.session.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
@@ -72,7 +74,7 @@ class SSO(Service):
         self.logger.debug("\n\n---\n\n")
         self.logger.debug("--- In SSO.perform_login() ---")
 
-        assert isinstance(self.sso_session, eduid_idp.sso_session.SSOSession)
+        assert isinstance(self.sso_session, SSOSession)
 
         user = self.sso_session.idp_user
 
@@ -113,7 +115,8 @@ class SSO(Service):
 
         :return: SAML response in lxml format
         """
-        attributes = user.to_saml_attributes(self.config, self.logger)
+        dbconfig = _UCAdapter(self.config.to_dict())
+        attributes = user.to_saml_attributes(dbconfig, self.logger)
         # Add a list of credentials used in a private attribute that will only be
         # released to the eduID authn component
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
@@ -253,7 +256,7 @@ class SSO(Service):
         req_authn_context = get_requested_authn_context(self.context.idp, ticket.saml_req, self.logger)
 
         try:
-            resp_authn = eduid_idp.assurance.response_authn(req_authn_context, user, self.sso_session, self.logger)
+            resp_authn = assurance.response_authn(req_authn_context, user, self.sso_session, self.logger)
         except WrongMultiFactor as exc:
             self.logger.info('Assurance not possible: {!r}'.format(exc))
             raise eduid_idp.error.Forbidden('SWAMID_MFA_REQUIRED')

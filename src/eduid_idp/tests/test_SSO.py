@@ -41,7 +41,8 @@ import eduid_idp
 import saml2.server
 import saml2.time_util
 from saml2.s_utils import UnravelError
-from eduid_idp.authn import AuthnData
+from eduid_common.authn.idp_authn import AuthnData
+from eduid_common.session.sso_session import SSOSession
 from eduid_common.session.logindata import ExternalMfaData
 from eduid_common.session.logindata import SSOLoginData
 from eduid_common.authn.idp_saml import IdP_SAMLRequest
@@ -210,9 +211,7 @@ class TestSSO(IdPSimpleTestCase):
             user = self.get_user_set_nins('test1@eduid.se', [])
         ticket = make_login_ticket(req_class_ref, self.context)
 
-        sso_session_1 = eduid_idp.sso_session.SSOSession(user_id=user.eppn,
-                                                         authn_request_id='some-unique-id-1'
-                                                         )
+        sso_session_1 = SSOSession(user_id=user.eppn, authn_request_id='some-unique-id-1')
         if 'u2f' in credentials and not user.credentials.filter(U2F).to_list():
             # add a U2F credential to the user
             user.credentials.add(_U2F)
