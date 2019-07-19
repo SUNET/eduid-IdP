@@ -26,10 +26,11 @@ import eduid_idp
 from eduid_common.authn import assurance
 from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
 from eduid_common.authn.idp_saml import gen_key
+from eduid_idp.shared_session import _UCAdapter
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
-from eduid_common.idp.user import IdPUser
+from eduid_userdb.idp import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
 from eduid_common.session.sso_session import SSOSession
@@ -114,7 +115,8 @@ class SSO(Service):
 
         :return: SAML response in lxml format
         """
-        attributes = user.to_saml_attributes(self.config, self.logger)
+        dbconfig = _UCAdapter(self.config.to_dict())
+        attributes = user.to_saml_attributes(dbconfig, self.logger)
         # Add a list of credentials used in a private attribute that will only be
         # released to the eduID authn component
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]

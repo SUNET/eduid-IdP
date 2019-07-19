@@ -33,7 +33,7 @@
 __author__ = 'eperez'
 
 from eduid_idp.context import IdPContext
-from eduid_common.idp.user import IdPUser
+from eduid_userdb.idp import IdPUser
 from eduid_common.session.logindata import SSOLoginData
 
 
