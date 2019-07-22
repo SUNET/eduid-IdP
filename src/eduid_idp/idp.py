@@ -128,7 +128,6 @@ from eduid_common.session.sso_cache import SSOSessionCache
 from eduid_common.session import sso_cache
 from eduid_idp.shared_session import _UCAdapter
 import eduid_idp.mischttp
-import eduid_idp.authn
 import eduid_common.session.sso_session
 from eduid_common.session.sso_session import SSOSession
 from eduid_idp.login import SSO
@@ -221,7 +220,7 @@ class IdPApplication(object):
             dbconfig = _UCAdapter(config.to_dict())
             userdb = IdPUserDb(logger, dbconfig)
         self.userdb = userdb
-        self.authn = eduid_idp.authn.IdPAuthn(logger, config, self.userdb)
+        self.authn = idp_authn.IdPAuthn(logger, config, self.userdb)
 
         cherrypy.config.update({'request.error_response': self.handle_error,
                                 'error_page.default': self.error_page_default,

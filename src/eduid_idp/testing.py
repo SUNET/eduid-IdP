@@ -39,6 +39,7 @@ from unittest import TestCase
 from eduid_common.config.idp import IdPConfig
 import eduid_idp
 from eduid_userdb.idp import IdPUser, IdPUserDb
+from eduid_common.authn import idp_authn
 from eduid_idp.idp import IdPApplication
 
 from vccs_client import VCCSPasswordFactor
@@ -155,5 +156,5 @@ class IdPSimpleTestCase(TestCase):
         self.context = _idp_app.context
         #noinspection PyTypeChecker
         self.idp_userdb = IdPUserDb(logger, _config, userdb=_userdb)
-        self.authn = eduid_idp.authn.IdPAuthn(logger, _config, self.idp_userdb,
+        self.authn = idp_authn.IdPAuthn(logger, _config, self.idp_userdb,
                                               auth_client = FakeAuthClient())
