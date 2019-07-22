@@ -43,6 +43,7 @@ import eduid_idp
 import eduid_userdb
 import eduid_common.authn
 import vccs_client
+from eduid_common.api import exceptions
 
 from eduid_userdb.testing import MongoTestCase
 from eduid_common.session.testing import RedisTemporaryInstance
@@ -155,10 +156,10 @@ class TestAuthentication(MongoTestCase):
         # Store a successful authentication using this credential three year ago
         three_years_ago = datetime.datetime.now() - datetime.timedelta(days = 3 * 365)
         self.idp_app.authn.authn_store.credential_success([passwords[0].key], three_years_ago)
-        with self.assertRaises(eduid_idp.error.Forbidden):
+        with self.assertRaises(exceptions.EduidForbidden):
             self.assertTrue(self.idp_app.authn.password_authn(data))
         # Do the same thing again to make sure we didn't accidentally update the
         # 'last successful login' timestamp when it was a successful login with an
         # expired credential.
-        with self.assertRaises(eduid_idp.error.Forbidden):
+        with self.assertRaises(exceptions.EduidForbidden):
             self.assertTrue(self.idp_app.authn.password_authn(data))
