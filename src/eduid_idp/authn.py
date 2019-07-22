@@ -40,8 +40,8 @@ such as rate limiting.
 import datetime
 from typing import Optional
 
-import eduid_idp.error
 import vccs_client
+from eduid_common.api import exceptions
 from eduid_common.authn.idp_authn import AuthnData, AuthnInfoStoreMDB
 from eduid_common.authn import get_vccs_client
 from eduid_userdb.credentials import Password
@@ -118,7 +118,7 @@ class IdPAuthn(object):
             if authn_info.failures_this_month() > self.config.max_authn_failures_per_month:
                 self.logger.info("User {!r} AuthN failures this month {!r} > {!r}".format(
                     user, authn_info.failures_this_month(), self.config.max_authn_failures_per_month))
-                raise eduid_idp.error.TooManyRequests("Too Many Requests")
+                raise exceptions.EduidTooManyRequests("Too Many Requests")
 
             # Optimize list of credentials to try based on which credentials the
             # user used in the last successful authentication. This optimization
@@ -164,7 +164,7 @@ class IdPAuthn(object):
                     # (Kantara AL2_CM_CSM#050).
                     if self.credential_expired(cred):
                         self.logger.info('User {} credential {!r} has expired'.format(user, cred.key))
-                        raise eduid_idp.error.Forbidden('CREDENTIAL_EXPIRED')
+                        raise exceptions.EduidForbidden('CREDENTIAL_EXPIRED')
                     self.log_authn(user, success=[cred.credential_id], failure=[])
                     return cred
             except vccs_client.VCCSClientHTTPError as exc:

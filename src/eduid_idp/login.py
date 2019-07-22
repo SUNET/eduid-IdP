@@ -23,6 +23,8 @@ import cherrypy
 from defusedxml import ElementTree as DefusedElementTree
 
 import eduid_idp
+from eduid_common.api import exceptions
+import eduid_idp.error
 from eduid_common.authn import assurance
 from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
 from eduid_common.authn.idp_saml import gen_key
@@ -455,7 +457,12 @@ def do_verify(context: IdPContext):
                   'password': password,
                   }
     del password  # keep out of any exception logs
-    authninfo = context.authn.password_authn(login_data)
+    try:
+        authninfo = context.authn.password_authn(login_data)
+    except exceptions.EduidTooManyRequests as e:
+        raise eduid_idp.error.TooManyRequests(e.args)
+    except exceptions.EduidForbidden as e:
+        raise eduid_idp.error.Forbidden(e.args)
 
     if not authninfo:
         _ticket.FailCount += 1
