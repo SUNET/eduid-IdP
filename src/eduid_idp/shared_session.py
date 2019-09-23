@@ -8,18 +8,18 @@
 # See the file eduid-IdP/LICENSE.txt for license statement.
 
 import datetime
-from typing import Optional, Tuple
 from random import random
+from typing import Optional, Tuple
 
 import cherrypy
 from cherrypy.lib.sessions import Session
 
-from eduid_common.session.logindata import SSOLoginData
-from eduid_common.api.exceptions import BadConfiguration
-from eduid_common.session.redis_session import SessionManager
-from eduid_common.session.redis_session import RedisEncryptedSession
-from eduid_common.session.namespaces import Common, Actions
 import eduid_idp.mischttp
+from eduid_common.config.exceptions import BadConfiguration
+from eduid_common.session.logindata import SSOLoginData
+from eduid_common.session.namespaces import Actions, Common
+from eduid_common.session.redis_session import RedisEncryptedSession
+from eduid_common.session.redis_session import SessionManager
 
 
 class EduidSession(Session):
