@@ -271,7 +271,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.mfa_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
 
     def test_add_mfa_action_no_key_required_mfa(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -279,7 +279,7 @@ class TestActions(MongoTestCase):
         mock_ticket = make_login_ticket(req_class_ref=CONTEXTCLASSREFS['REFEDS_MFA'], context=self.idp_app.context,
                                         key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_old_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -295,7 +295,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.mfa_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_new_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -310,7 +310,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.mfa_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_no_db(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -326,7 +326,7 @@ class TestActions(MongoTestCase):
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         with self.assertRaises(AttributeError):
             add_actions(self.idp_app, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
 
     def _test_add_2nd_mfa_action(self, success=True, authn_context=True, cred_key=None, actions=0):
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -356,7 +356,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.mfa_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), actions)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), actions)
         return mock_ticket
 
     def test_add_mfa_action_already_authn(self):
@@ -364,22 +364,22 @@ class TestActions(MongoTestCase):
 
     def test_add_mfa_action_already_authn_not(self):
         ticket = self._test_add_2nd_mfa_action(success=False, actions=2)
-        self.assertEquals(len(ticket.mfa_action_creds), 0)
+        self.assertEqual(len(ticket.mfa_action_creds), 0)
 
     def test_add_2nd_mfa_action_no_context(self):
         ticket = self._test_add_2nd_mfa_action(authn_context=False, actions=0)
-        self.assertEquals(len(ticket.mfa_action_creds), 1)
+        self.assertEqual(len(ticket.mfa_action_creds), 1)
 
     def test_add_2nd_mfa_action_no_context_wrong_key(self):
         ticket = self._test_add_2nd_mfa_action(authn_context=False, cred_key='wrong key', actions=2)
-        self.assertEquals(len(ticket.mfa_action_creds), 0)
+        self.assertEqual(len(ticket.mfa_action_creds), 0)
 
     def test_add_tou_action(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_tou_action_already_accepted(self):
         event_id = bson.ObjectId()
@@ -393,7 +393,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
 
     def test_add_tou_action_already_accepted_other_version(self):
         event_id = bson.ObjectId()
@@ -407,7 +407,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_tou_action_already_action(self):
         self.idp_app.context.actions_db.add_action(
@@ -420,7 +420,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_tou_action_already_action_other_version(self):
         self.idp_app.context.actions_db.add_action(
@@ -433,7 +433,7 @@ class TestActions(MongoTestCase):
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 2)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 2)
 
     def test_add_tou_action_should_reaccept(self):
         event_id = bson.ObjectId()
@@ -448,4 +448,4 @@ class TestActions(MongoTestCase):
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
-        self.assertEquals(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
+        self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
