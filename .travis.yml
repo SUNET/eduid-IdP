@@ -19,5 +19,5 @@ install:
   - python setup.py testing
 # command to run tests
 script:
-  - nosetests
+  - pytest
   - mypy --ignore-missing-imports src/eduid_idp
