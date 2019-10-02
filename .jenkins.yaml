@@ -20,7 +20,7 @@ script:
   - ". venv/bin/activate"
   - "pip install --upgrade setuptools pip wheel mypy"
   - "pip install --index-url https://pypi.sunet.se -r test_requirements.txt"
-  - "nosetests"
+  - "pytest"
   - "mypy --ignore-missing-imports src/eduid_idp"
   - "python setup.py sdist bdist_wheel --universal"
 

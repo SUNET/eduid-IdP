@@ -97,7 +97,7 @@ class TestSessions(unittest.TestCase):
 
     def test_session(self):
         cherrypy.session['test'] = 'test'
-        self.assertEquals(cherrypy.session._session._data['test'], 'test')
+        self.assertEqual(cherrypy.session._session._data['test'], 'test')
         self.assertTrue(isinstance(cherrypy.session._session, RedisEncryptedSession))
         cherrypy.session.load()
         cherrypy.session.save()
@@ -106,7 +106,7 @@ class TestSessions(unittest.TestCase):
         session_id, sig = RedisEncryptedSession.decode_token(token)
         encrypted_session = cherrypy.session._session.conn.get(session_id.hex())
         session_data = cherrypy.session._session.verify_data(encrypted_session)
-        self.assertEquals(session_data['test'], 'test')
+        self.assertEqual(session_data['test'], 'test')
 
     def test_session_namespace(self):
         cherrypy.session.common = Common(eppn='hubba-dubba',
@@ -119,4 +119,4 @@ class TestSessions(unittest.TestCase):
         session_id, sig = RedisEncryptedSession.decode_token(token)
         encrypted_session = cherrypy.session._session.conn.get(session_id.hex())
         session_data = cherrypy.session._session.verify_data(encrypted_session)
-        self.assertEquals(session_data['_common']['eppn'], 'hubba-dubba')
+        self.assertEqual(session_data['_common']['eppn'], 'hubba-dubba')
