@@ -126,7 +126,10 @@ class EduidSession(Session):
 
 class _UCAdapter(dict):
     def __getitem__(self, key):
-        return dict.__getitem__(self, key.lower())
+        return super(_UCAdapter, self).__getitem__(key.lower())
+
+    def get(self, key, default=None):
+        return super(_UCAdapter, self).get(key.lower(), default)
 
 
 class SessionFactory:
