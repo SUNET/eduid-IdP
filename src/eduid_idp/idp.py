@@ -651,6 +651,11 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
         else:
             root_logger.warning("Config option raven_dsn set, but raven not available")
 
+    if os.getenv('EDUID_APP_DEBUG'):
+        pprint.pprint(('CONFIGURATION', 'app.config'), stream=sys.stderr)
+        for key, value in sorted(config.to_dict().items()):
+            pprint.pprint((key, value), stream=sys.stderr)
+
     cherry_conf = {'server.thread_pool': config.num_threads,
                    'server.socket_host': config.listen_addr,
                    'server.socket_port': config.listen_port,
