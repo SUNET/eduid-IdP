@@ -42,8 +42,8 @@ class EduidSession(Session):
 
     def __init__(self, id: str = None, **kwargs):
         self._session = self.session_factory.get_base_session(token=id)
-        if not id:
-            id = self._session.token
+        # In case no session was found, a new ID will have been generated and we need to tell it to CherryPy
+        id = self._session.token
         if isinstance(id, bytes):
             id = id.decode('ascii')
         super(EduidSession, self).__init__(id=id, **kwargs)
