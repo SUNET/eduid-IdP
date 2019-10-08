@@ -566,6 +566,12 @@ def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -
                           info.get('RelayState', ''),
                           int(info.get('FailCount', 0)),
                           )
+    if not ticket.SAMLRequest:
+        context.logger.error(f'IdP ticket without SAML request: {ticket}')
+        context.logger.error(f'Request info: {info}')
+        context.logger.error(f'Binding: {binding}')
+        context.logger.error(f'Key: {key}')
+        raise eduid_idp.error.ServiceError("Can't create IdP ticket with no SAML request", logger=context.logger)
     ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, ticket.binding,
             context.idp, context.logger, context.config['debug'])
 
