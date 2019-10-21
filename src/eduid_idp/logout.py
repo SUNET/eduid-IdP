@@ -250,6 +250,6 @@ class SLO(Service):
         # it would be more correct to look at bindings[0] here, since `bindings' is what was used
         # with create_logout_response() and apply_binding().
         if req_info.binding != bindings[0]:
-            self.logger.debug("Creating response with binding {!r] instead of {!r} used before".format(
+            self.logger.debug("Creating response with binding {!r} instead of {!r} used before".format(
                 bindings[0], req_info.binding))
         return eduid_idp.mischttp.create_html_response(bindings[0], ht_args, self.start_response, self.logger)
