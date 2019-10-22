@@ -59,6 +59,7 @@ SWAMID_AL2_MFA_HI = 'http://www.swamid.se/policy/authentication/swamid-al2-mfa-h
 
 cc = {'REFEDS_MFA': 'https://refeds.org/profile/mfa',
       'REFEDS_SFA': 'https://refeds.org/profile/sfa',
+      'EDUID_MFA':   'https://eduid.se/specs/mfa',
       'FIDO_U2F': 'https://www.swamid.se/specs/id-fido-u2f-ce-transports',
       'PASSWORD_PT': 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
       }
@@ -397,3 +398,86 @@ class TestSSO(IdPSimpleTestCase):
                                              credentials = ['pw'],
                                              )
         self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+
+    def test__get_login_eduid_mfa_fido_al1(self):
+        """
+        Test login with password and fido for not verified user, request EDUID_MFA.
+
+        Expect the response Authn to be EDUID_MFA, eduPersonAssurance AL1
+        """
+        out = self._get_login_response_authn(req_class_ref=cc['EDUID_MFA'],
+                                             credentials=['pw', 'u2f'],
+                                             )
+        self.assertEqual(out.class_ref, cc['EDUID_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1])
+
+    def test__get_login_eduid_mfa_fido_al2(self):
+        """
+        Test login with password and fido for verified user, request EDUID_MFA.
+
+        Expect the response Authn to be EDUID_MFA, eduPersonAssurance AL1,Al2
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        user.credentials.add(_U2F)
+        out = self._get_login_response_authn(user=user,
+                                             req_class_ref=cc['EDUID_MFA'],
+                                             credentials=['pw', _U2F],
+                                             )
+        self.assertEqual(out.class_ref, cc['EDUID_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+
+    def test__get_login_eduid_mfa_fido_swamid_al2(self):
+        """
+        Test login with password and fido_swamid_al2 for verified user, request EDUID_MFA.
+
+        Expect the response Authn to be EDUID_MFA, eduPersonAssurance AL1,Al2
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        user.credentials.add(_U2F_SWAMID_AL2)
+        out = self._get_login_response_authn(user=user,
+                                             req_class_ref=cc['EDUID_MFA'],
+                                             credentials=['pw', _U2F_SWAMID_AL2],
+                                             )
+        self.assertEqual(out.class_ref, cc['EDUID_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+
+    def test__get_login_eduid_mfa_fido_swamid_al2_hi(self):
+        """
+        Test login with password and fido_swamid_al2_hi for verified user, request EDUID_MFA.
+
+        Expect the response Authn to be EDUID_MFA, eduPersonAssurance AL1,Al2
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        user.credentials.add(_U2F_SWAMID_AL2_HI)
+        out = self._get_login_response_authn(user=user,
+                                             req_class_ref=cc['EDUID_MFA'],
+                                             credentials=['pw', _U2F_SWAMID_AL2_HI],
+                                             )
+        self.assertEqual(out.class_ref, cc['EDUID_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+
+    def test__get_login_eduid_mfa_external_mfa_al2(self):
+        """
+        Test login with password and external mfa for verified user, request EDUID_MFA.
+
+        Expect the response Authn to be EDUID_MFA.
+        """
+        user = self.get_user_set_nins('test1@eduid.se', ['190101011234'])
+        external_mfa = ExternalMfaData(issuer='issuer.example.com',
+                                       authn_context='http://id.elegnamnden.se/loa/1.0/loa3',
+                                       timestamp=datetime.datetime.utcnow())
+        out = self._get_login_response_authn(user=user,
+                                             req_class_ref=cc['EDUID_MFA'],
+                                             credentials=['pw', external_mfa],
+                                             )
+        self.assertEqual(out.class_ref, cc['EDUID_MFA'])
+        self.assertEqual(out.authn_attributes['eduPersonAssurance'], [SWAMID_AL1, SWAMID_AL2])
+
+    def test__get_login_response_eduid_mfa_no_multifactor(self):
+        """
+        Test login with password, request EDUID_MFA.
+
+        Expect a failure because MFA is needed for  EDUID_MFA.
+        """
+        with self.assertRaises(Forbidden):
+            self._get_login_response_authn(req_class_ref=cc['EDUID_MFA'], credentials=['pw'])
