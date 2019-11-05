@@ -124,6 +124,13 @@ class EduidSession(Session):
             self._session._data['_sso_ticket'] = value.to_dict()
         self['flag'] = f'dirty session to force saving to redis {random()}'
 
+class _UCAdapter(dict):
+    def __getitem__(self, key):
+        return super(_UCAdapter, self).__getitem__(key.lower())
+
+    def get(self, key, default=None):
+        return super(_UCAdapter, self).get(key.lower(), default)
+
 
 class SessionFactory:
     """
@@ -137,7 +144,8 @@ class SessionFactory:
         if secret is None:
             cherrypy.config['logger'].error('shared_session_secret_key not set in config')
             raise BadConfiguration('shared_session_secret_key not set in config')
-        self.manager = SessionManager(cherrypy.config, ttl=ttl, secret=secret)
+        uc_config = _UCAdapter(cherrypy.config)
+        self.manager = SessionManager(uc_config, ttl=ttl, secret=secret)
 
     def get_base_session(self, token: str = None) -> RedisEncryptedSession:
         logger = cherrypy.config.logger
