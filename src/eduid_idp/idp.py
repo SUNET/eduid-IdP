@@ -126,7 +126,6 @@ from eduid_common.config.idp import IdPConfig
 from eduid_common.authn.utils import init_pysaml2
 from eduid_common.session.sso_cache import SSOSessionCache
 from eduid_common.session import sso_cache
-from eduid_idp.shared_session import _UCAdapter
 import eduid_idp.mischttp
 import eduid_common.session.sso_session
 from eduid_common.session.sso_session import SSOSession
@@ -217,8 +216,7 @@ class IdPApplication(object):
             self.logger.debug("NOT configured to redirect users with pending actions")
 
         if userdb is None:
-            dbconfig = _UCAdapter(config.to_dict())
-            userdb = IdPUserDb(logger, dbconfig)
+            userdb = IdPUserDb(logger, config)
         self.userdb = userdb
         self.authn = idp_authn.IdPAuthn(logger, config, self.userdb)
 
