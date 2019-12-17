@@ -130,6 +130,15 @@ class SSO(Service):
             else:
                 self.logger.debug('Adding attribute {} with value from authn process: {}'.format(k, v))
             attributes[k] = v
+        # Pick best signing and digest algorithms
+        for digest_alg in self.config.supported_digest_algorithms:
+            if digest_alg in ticket.saml_req.sp_digest_algs:
+                resp_args['digest_alg'] = digest_alg
+                break
+        for sign_alg in self.config.supported_signing_algorithms:
+            if sign_alg in ticket.saml_req.sp_sign_algs:
+                resp_args['sign_alg'] = sign_alg
+                break
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
