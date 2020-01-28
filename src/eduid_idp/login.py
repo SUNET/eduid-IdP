@@ -478,9 +478,9 @@ def do_verify(context: IdPContext):
     try:
         authninfo = context.authn.password_authn(login_data)
     except exceptions.EduidTooManyRequests as e:
-        raise eduid_idp.error.TooManyRequests(e.args)
+        raise eduid_idp.error.TooManyRequests(e.args[0])
     except exceptions.EduidForbidden as e:
-        raise eduid_idp.error.Forbidden(e.args)
+        raise eduid_idp.error.Forbidden(e.args[0])
 
     if not authninfo:
         _ticket.FailCount += 1
