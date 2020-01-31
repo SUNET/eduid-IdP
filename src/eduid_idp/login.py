@@ -554,6 +554,7 @@ def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[
             binding = info['binding']
         if binding is None:
             raise eduid_idp.error.BadRequest('Bad request, no binding')
+        assert _key  # please mypy
         ticket = _create_ticket(context, info, binding, _key)
         ticket = _ticket_from_session(ticket, binding, context)
         cherrypy.session.sso_ticket = ticket
