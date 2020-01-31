@@ -498,7 +498,7 @@ def do_verify(context: IdPContext):
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = context.sso_sessions.add_session(user.user_id, _sso_session.to_dict())
+    _session_id = context.sso_sessions.add_session(user.eppn, _sso_session.to_dict())
     eduid_idp.mischttp.set_cookie('idpauthn', '/', context.logger, context.config, _session_id.decode('utf-8'))
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id
@@ -524,7 +524,7 @@ def _ticket_from_session(ticket, binding, context):
 
 
 # ----------------------------------------------------------------------------
-def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> SSOLoginData:
+def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
 
     ticket = _ticket_from_session(cherrypy.session.sso_ticket, binding, context)
@@ -552,6 +552,7 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
             binding = info['binding']
         if binding is None:
             raise eduid_idp.error.BadRequest('Bad request, no binding')
+        assert _key  # please mypy
         ticket = _create_ticket(context, info, binding, _key)
         ticket = _ticket_from_session(ticket, binding, context)
         cherrypy.session.sso_ticket = ticket
@@ -559,7 +560,7 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
     return ticket
 
 
-def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -> SSOLoginData:
+def _create_ticket(context: IdPContext, info: Mapping[str, str], binding: str, key: str) -> SSOLoginData:
     """
     Create an SSOLoginData instance from a dict.
 
