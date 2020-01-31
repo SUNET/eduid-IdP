@@ -526,7 +526,7 @@ def _ticket_from_session(ticket, binding, context):
 
 
 # ----------------------------------------------------------------------------
-def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> SSOLoginData:
+def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
 
     ticket = _ticket_from_session(cherrypy.session.sso_ticket, binding, context)
@@ -561,7 +561,7 @@ def _get_ticket(context: IdPContext, info: Mapping, binding: Optional[str]) -> S
     return ticket
 
 
-def _create_ticket(context: IdPContext, info: Mapping, binding: str, key: str) -> SSOLoginData:
+def _create_ticket(context: IdPContext, info: Mapping[str, str], binding: str, key: str) -> SSOLoginData:
     """
     Create an SSOLoginData instance from a dict.
 
