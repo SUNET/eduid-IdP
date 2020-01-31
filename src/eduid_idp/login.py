@@ -500,7 +500,7 @@ def do_verify(context: IdPContext):
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
     # period of time, by storing the session-id in a browser cookie.
-    _session_id = context.sso_sessions.add_session(user.user_id, _sso_session.to_dict())
+    _session_id = context.sso_sessions.add_session(user.eppn, _sso_session.to_dict())
     eduid_idp.mischttp.set_cookie('idpauthn', '/', context.logger, context.config, _session_id.decode('utf-8'))
     # knowledge of the _session_id enables impersonation, so get rid of it as soon as possible
     del _session_id
