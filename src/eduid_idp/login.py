@@ -531,7 +531,7 @@ def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[
 
     ticket: Optional[SSOLoginData] = cherrypy.session.sso_ticket
     if ticket:
-        _update_ticket_samlrequest(cherrypy.session.sso_ticket, binding, context)
+        _update_ticket_samlrequest(ticket, binding, context)
 
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
