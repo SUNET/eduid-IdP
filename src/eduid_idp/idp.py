@@ -508,7 +508,8 @@ class IdPApplication(object):
         except (ValueError, AttributeError, IndexError):
             pass
 
-        pages = {401: 'unauthorized.html',
+        pages = {400: 'bad_request.html',
+                 401: 'unauthorized.html',
                  403: 'forbidden.html',
                  429: 'toomany.html',
                  440: 'session_timeout.html',
@@ -570,15 +571,8 @@ class IdPApplication(object):
 
         # Return before logging the error for errors that are not failures in the IdP
         # (avoids sentry reports)
-        if status_code in [401, 403, 404, 440]:
+        if status_code in [400, 401, 403, 404, 440]:
             return res
-
-        if status_code == 400:
-            if str(reason) in [
-                'Bad request, please re-initiate login',
-                'No valid SAMLRequest found',
-            ]:
-                return res
 
         self.logger.exception("Error in IdP application",
                               extra={'data': {'request': cherrypy.request,
