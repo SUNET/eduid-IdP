@@ -558,7 +558,6 @@ def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[
             raise eduid_idp.error.BadRequest('Bad request, no binding')
         assert _key  # please mypy
         ticket = _create_ticket(context, info, binding, _key)
-        _update_ticket_samlrequest(ticket, binding, context)
         cherrypy.session.sso_ticket = ticket
 
     return ticket
@@ -593,8 +592,7 @@ def _create_ticket(context: IdPContext, info: Mapping[str, str], binding: str, k
         context.logger.error(f'Binding: {binding}')
         context.logger.error(f'Key: {key}')
         raise eduid_idp.error.ServiceError("Can't create IdP ticket with no SAML request", logger=context.logger)
-    ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, ticket.binding,
-            context.idp, context.logger, context.config['debug'])
+    _update_ticket_samlrequest(ticket, binding, context)
 
     context.logger.debug("Created new login state (IdP ticket) for request {!s}".format(key))
     cherrypy.session.sso_ticket = ticket
