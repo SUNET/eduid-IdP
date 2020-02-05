@@ -515,7 +515,7 @@ def do_verify(context: IdPContext):
     raise eduid_idp.mischttp.Redirect(lox)
 
 
-def _update_ticket_samlrequest(ticket: SSOLoginData, binding: str, context: IdPContext) -> None:
+def _update_ticket_samlrequest(ticket: SSOLoginData, binding: Optional[str], context: IdPContext) -> None:
     try:
         ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, binding or ticket.binding,
                 context.idp, context.logger, context.config['debug'])
