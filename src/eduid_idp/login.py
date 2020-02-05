@@ -21,22 +21,22 @@ from typing import Callable, Mapping, Optional
 
 import cherrypy
 from defusedxml import ElementTree as DefusedElementTree
+from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
 import eduid_idp
-from eduid_common.api import exceptions
 import eduid_idp.error
+from eduid_common.api import exceptions
 from eduid_common.authn import assurance
 from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_common.authn.idp_saml import gen_key
+from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
+from eduid_common.authn.idp_saml import SAMLParseError, SAMLValidationError, gen_key
+from eduid_common.session.logindata import SSOLoginData
+from eduid_common.session.sso_session import SSOSession
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
-from eduid_userdb.idp import IdPUser
-from eduid_common.session.logindata import SSOLoginData
 from eduid_idp.service import Service
-from eduid_common.session.sso_session import SSOSession
 from eduid_idp.util import get_requested_authn_context
-from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
+from eduid_userdb.idp import IdPUser
 
 
 class MustAuthenticate(Exception):
@@ -515,19 +515,23 @@ def do_verify(context: IdPContext):
     raise eduid_idp.mischttp.Redirect(lox)
 
 
-def _ticket_from_session(ticket, binding, context):
-    if ticket:
-        saml_req = IdP_SAMLRequest(ticket.SAMLRequest, binding or ticket.binding,
+def _update_ticket_samlrequest(ticket: SSOLoginData, binding: Optional[str], context: IdPContext) -> None:
+    try:
+        ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, binding or ticket.binding,
                 context.idp, context.logger, context.config['debug'])
-        ticket.saml_req = saml_req
-    return ticket
+    except (SAMLParseError, SAMLValidationError):
+        context.logger.exception('Failed updating SAML request in SSOLoginData (ticket)')
+        raise eduid_idp.error.BadRequest('Invalid login request. Try emptying browser cache and re-initiate login.',
+                                         logger=context.logger, extra={'binding': binding})
 
 
 # ----------------------------------------------------------------------------
 def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[str]) -> SSOLoginData:
     logger = context.logger
 
-    ticket = _ticket_from_session(cherrypy.session.sso_ticket, binding, context)
+    ticket: Optional[SSOLoginData] = cherrypy.session.sso_ticket
+    if ticket:
+        _update_ticket_samlrequest(ticket, binding, context)
 
     if not info:
         raise eduid_idp.error.BadRequest('Bad request, please re-initiate login', logger=logger)
@@ -554,7 +558,7 @@ def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[
             raise eduid_idp.error.BadRequest('Bad request, no binding')
         assert _key  # please mypy
         ticket = _create_ticket(context, info, binding, _key)
-        ticket = _ticket_from_session(ticket, binding, context)
+        _update_ticket_samlrequest(ticket, binding, context)
         cherrypy.session.sso_ticket = ticket
 
     return ticket
