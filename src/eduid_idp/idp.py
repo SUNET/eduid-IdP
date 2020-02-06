@@ -241,6 +241,10 @@ class IdPApplication(object):
                                   )
 
     @cherrypy.expose
+    def index(self):
+        raise eduid_idp.mischttp.Redirect(self.config.eduid_site_url)
+
+    @cherrypy.expose
     def sso(self, *_args, **_kwargs):
         self.logger.debug("\n\n")
         self.logger.debug("--- SSO ---")
