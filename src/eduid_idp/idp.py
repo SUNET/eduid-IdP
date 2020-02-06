@@ -511,6 +511,7 @@ class IdPApplication(object):
         pages = {400: 'bad_request.html',
                  401: 'unauthorized.html',
                  403: 'forbidden.html',
+                 404: 'not_found.html',
                  429: 'toomany.html',
                  440: 'session_timeout.html',
                  }
