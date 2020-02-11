@@ -17,6 +17,7 @@ import pprint
 import time
 from dataclasses import replace
 from hashlib import sha256
+from html import escape, unescape
 from typing import Callable, Mapping, Optional
 
 import cherrypy
@@ -407,9 +408,9 @@ class SSO(Service):
             "sp_entity_id": "",
             "failcount": ticket.FailCount,
             # SAMLRequest, RelayState and binding are used to re-create the ticket state if not found using `key'
-            "SAMLRequest": ticket.SAMLRequest,
-            "RelayState": ticket.RelayState,
-            "binding": ticket.binding,
+            "SAMLRequest": escape(ticket.SAMLRequest, quote=True),
+            "RelayState": escape(ticket.RelayState, quote=True),
+            "binding": escape(ticket.binding, quote=True),
         })
 
         # Set alert msg if FailCount is greater than zero
@@ -459,7 +460,12 @@ def do_verify(context: IdPContext):
         query['password'] = '<redacted>'
     context.logger.debug("do_verify parsed query :\n{!s}".format(pprint.pformat(query)))
 
-    _ticket = _get_ticket(context, query, None)
+    _info = {}
+    for this in ['SAMLRequest', 'binding', 'RelayState']:
+        if this not in query:
+            raise eduid_idp.error.BadRequest(f'Missing parameter {this} - please re-initiate login')
+        _info[this] = unescape(query[this])
+    _ticket = _get_ticket(context, _info, None)
 
     authn_ref = _ticket.saml_req.get_requested_authn_context()
     context.logger.debug("Authenticating with {!r}".format(authn_ref))
