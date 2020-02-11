@@ -466,6 +466,8 @@ class IdPApplication(object):
         else:
             query = eduid_idp.mischttp.parse_query_string(self.logger)
             if query:
+                if 'id' in query:
+                    self.logger.warning('Found "id" in query string - this was thought to be obsolete')
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
                     _data = self.context.sso_sessions.get_session(query['id'])

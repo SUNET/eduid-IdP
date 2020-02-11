@@ -112,7 +112,11 @@ class EduidSession(Session):
     @property
     def sso_ticket(self) -> Optional[SSOLoginData]:
         if not self._sso_ticket and '_sso_ticket' in self._session:
-            self._sso_ticket = SSOLoginData.from_dict(self._session['_sso_ticket'])
+            try:
+                self._sso_ticket = SSOLoginData.from_dict(self._session['_sso_ticket'])
+            except Exception:
+                cherrypy.config['logger'].exception('Failed loading SSOLoginData')
+                self._sso_ticket = None
         return self._sso_ticket
 
     @sso_ticket.setter
