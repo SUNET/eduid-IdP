@@ -16,6 +16,9 @@ metadata=${metadata-"${state_dir}/metadata.xml"}
 pysaml2_settings=${pysaml2_settings-"${cfg_dir}/idp_pysaml2_settings.py"}
 run=${run-'/opt/eduid/bin/eduid_idp'}
 extra_args=${extra_args-''}
+# etcd config namespaces
+config_common_ns="/eduid/webapp/common/"
+config_ns="/eduid/webapp/idp/"
 
 chown eduid: "${log_dir}" "${state_dir}"
 
@@ -49,6 +52,9 @@ if [ ! -s "${metadata}" ]; then
 	/opt/eduid/bin/make_metadata.py "${pysaml2_settings}" | \
 	xmllint --format - > "${metadata}"
 fi
+
+export EDUID_CONFIG_COMMON_NS=${EDUID_CONFIG_COMMON_NS-${config_common_ns}}
+export EDUID_CONFIG_NS=${EDUID_CONFIG_NS-${config_ns}}
 
 echo ""
 echo "$0: Starting ${run}"
