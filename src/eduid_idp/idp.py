@@ -610,7 +610,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     if not args:
         args = parse_args()
 
-    config = IdPConfig.init_config(debug=args.debug)
+    config = IdPConfig.init_config(ns='webapp', app_name='idp', debug=args.debug)
 
     # This is the root log level
     level = logging.INFO
