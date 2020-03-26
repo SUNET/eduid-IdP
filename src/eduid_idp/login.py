@@ -35,6 +35,7 @@ from eduid_common.session.logindata import SSOLoginData
 from eduid_common.session.sso_session import SSOSession
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
+from eduid_idp.logout import SLO
 from eduid_idp.service import Service
 from eduid_idp.util import get_requested_authn_context
 from eduid_userdb.idp import IdPUser
@@ -327,10 +328,13 @@ class SSO(Service):
 
     def _redirect_or_post(self, ticket: SSOLoginData) -> bytes:
         """ Common code for redirect() and post() endpoints. """
-        _force_authn = self._should_force_authn(ticket)
 
         if self.sso_session and hasattr(self.sso_session, 'idp_user') and self.sso_session.idp_user.terminated:
+            name_id = 'XXX Where to get it from?'
+            SLO(self.sso_session, lambda: None, self.context).logout_sessions(name_id, gen_key(ticket['SAMLRequest']))
             raise eduid_idp.error.Forbidden('USER_TERMINATED')
+
+        _force_authn = self._should_force_authn(ticket)
 
         if self.sso_session and not _force_authn:
             _ttl = self.context.config.sso_session_lifetime - self.sso_session.minutes_old

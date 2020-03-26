@@ -109,6 +109,19 @@ class SLO(Service):
         self.logger.debug("Logout request sender : {!s}".format(req_info.sender()))
 
         _name_id = req_info.message.name_id
+        status_code = self.logout_sessions(_name_id, req_key)
+
+        return self._logout_response(req_info, status_code, req_key)
+
+    def logout_sessions(self, name_id, req_key):
+        """
+        Terminate one or more specific SSO sessions.
+
+        :param session_ids: List of db keys in SSO session database
+        :param req_key: Logging id of request
+        :return: SAML StatusCode
+        :rtype: string
+        """
         _session_id = eduid_idp.mischttp.get_idpauthn_cookie(self.logger)
         _username = None
         if _session_id:
@@ -119,24 +132,25 @@ class SLO(Service):
             # For SOAP binding, no cookie is sent - only NameID. Have to figure out
             # the user based on NameID and then destroy *all* the users SSO sessions
             # unfortunately.
-            _username = self.context.idp.ident.find_local_id(_name_id)
+            _username = self.context.idp.ident.find_local_id(name_id)
             self.logger.debug("Logout message name_id: {!r} found username {!r}".format(
-                _name_id, _username))
+                name_id, _username))
             session_ids = self.context.sso_sessions.get_sessions_for_user(_username)
 
         self.logger.debug("Logout resources: name_id {!r} username {!r}, session_ids {!r}".format(
-            _name_id, _username, session_ids))
+            name_id, _username, session_ids))
 
         if session_ids:
             status_code = self._logout_session_ids(session_ids, req_key)
         else:
             # No specific SSO session(s) were found, we have no choice but to logout ALL
             # the sessions for this NameID.
-            status_code = self._logout_name_id(_name_id, req_key)
+            status_code = self._logout_name_id(name_id, req_key)
 
         self.logger.debug("Logout of sessions {!r} / NameID {!r} result : {!r}".format(
-            session_ids, _name_id, status_code))
-        return self._logout_response(req_info, status_code, req_key)
+            session_ids, name_id, status_code))
+
+        return status_code
 
     def _logout_session_ids(self, session_ids, req_key):
         """
