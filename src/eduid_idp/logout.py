@@ -115,7 +115,7 @@ class SLO(Service):
 
     def logout_sessions(self, name_id, req_key):
         """
-        Terminate one or more specific SSO sessions.
+        Terminate SSO sessions.
 
         :param name_id: NameID
         :param req_key: Logging id of request
