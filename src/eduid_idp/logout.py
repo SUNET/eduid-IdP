@@ -117,7 +117,7 @@ class SLO(Service):
         """
         Terminate one or more specific SSO sessions.
 
-        :param session_ids: List of db keys in SSO session database
+        :param name_id: NameID
         :param req_key: Logging id of request
         :return: SAML StatusCode
         :rtype: string
