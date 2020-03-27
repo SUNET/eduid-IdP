@@ -35,7 +35,6 @@ from eduid_common.session.logindata import SSOLoginData
 from eduid_common.session.sso_session import SSOSession
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
-from eduid_idp.logout import SLO
 from eduid_idp.service import Service
 from eduid_idp.util import get_requested_authn_context
 from eduid_userdb.idp import IdPUser
@@ -91,6 +90,7 @@ class SSO(Service):
         response_authn = self._get_login_response_authn(ticket, user)
 
         saml_response = self._make_saml_response(response_authn, resp_args, user, ticket, self.sso_session)
+        breakpoint()
 
         binding_out = resp_args['binding_out']
         destination = resp_args['destination']
@@ -330,8 +330,6 @@ class SSO(Service):
         """ Common code for redirect() and post() endpoints. """
 
         if self.sso_session and hasattr(self.sso_session, 'idp_user') and self.sso_session.idp_user.terminated:
-            name_id = 'XXX Where to get it from?'
-            SLO(self.sso_session, lambda: None, self.context).logout_sessions(name_id, gen_key(ticket['SAMLRequest']))
             raise eduid_idp.error.Forbidden('USER_TERMINATED')
 
         _force_authn = self._should_force_authn(ticket)
