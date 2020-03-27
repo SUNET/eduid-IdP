@@ -90,7 +90,6 @@ class SSO(Service):
         response_authn = self._get_login_response_authn(ticket, user)
 
         saml_response = self._make_saml_response(response_authn, resp_args, user, ticket, self.sso_session)
-        breakpoint()
 
         binding_out = resp_args['binding_out']
         destination = resp_args['destination']
