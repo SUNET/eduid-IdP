@@ -529,6 +529,8 @@ class IdPApplication(object):
                 fn = 'swamid_mfa_required.html'
             elif 'MFA_REQUIRED' in message:
                 fn = 'mfa_required.html'
+            elif 'USER_TERMINATED' in message:
+                fn = 'user_terminated.html'
         if fn is None:
             fn = 'error.html'
 
