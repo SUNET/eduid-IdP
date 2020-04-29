@@ -328,8 +328,15 @@ class SSO(Service):
     def _redirect_or_post(self, ticket: SSOLoginData) -> bytes:
         """ Common code for redirect() and post() endpoints. """
 
-        if self.sso_session and hasattr(self.sso_session, 'idp_user') and self.sso_session.idp_user.terminated:
-            raise eduid_idp.error.Forbidden('USER_TERMINATED')
+        if self.sso_session:
+            sso_session: SSOSession = self.sso_session  # Please mypy
+            if hasattr(sso_session, 'idp_user') and sso_session.idp_user.terminated:
+                self.logger.info(f'User {sso_session.idp_user} is terminated')
+                self.logger.debug(f'User terminated: {sso_session.idp_user.terminated}')
+                # Delete the SSO session cookie in the browser
+                self.logger.info(f'Removing sso session cookie for user {sso_session.idp_user}')
+                eduid_idp.mischttp.delete_cookie('idpauthn', self.logger, self.config)
+                raise eduid_idp.error.Forbidden('USER_TERMINATED')
 
         _force_authn = self._should_force_authn(ticket)
 
