@@ -329,12 +329,11 @@ class SSO(Service):
         """ Common code for redirect() and post() endpoints. """
 
         if self.sso_session:
-            sso_session: SSOSession = self.sso_session  # Please mypy
-            if hasattr(sso_session, 'idp_user') and sso_session.idp_user.terminated:
-                self.logger.info(f'User {sso_session.idp_user} is terminated')
-                self.logger.debug(f'User terminated: {sso_session.idp_user.terminated}')
+            if hasattr(self.sso_session, 'idp_user') and self.sso_session.idp_user.terminated:
+                self.logger.info(f'User {self.sso_session.idp_user} is terminated')
+                self.logger.debug(f'User terminated: {self.sso_session.idp_user.terminated}')
                 # Delete the SSO session cookie in the browser
-                self.logger.info(f'Removing sso session cookie for user {sso_session.idp_user}')
+                self.logger.info(f'Removing sso session cookie for user {self.sso_session.idp_user}')
                 eduid_idp.mischttp.delete_cookie('idpauthn', self.logger, self.config)
                 raise eduid_idp.error.Forbidden('USER_TERMINATED')
 
