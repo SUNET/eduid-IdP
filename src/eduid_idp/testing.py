@@ -101,7 +101,7 @@ class FakeUserDb(object):
     def get_user_by_field(self, field, username, raise_on_missing=True):
         for _user in _USERDB:
             if _user.get(field) == username:
-                res = IdPUser(data=_user)
+                res = IdPUser.from_dict(data=_user)
                 return res
             elif raise_on_missing:
                 raise Exception('No user with username {} found'.format(username))
