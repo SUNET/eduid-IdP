@@ -176,11 +176,11 @@ class TestActions(MongoTestCase):
             self.assertEqual(resp.status, '302 Found')
 
         # Register user acceptance for the ToU version in use
-        tou = ToUEvent(version = self.config.tou_version,
-                       application = 'unit test',
-                       created_ts = True,
-                       event_id = bson.ObjectId(),
-                       )
+        tou = ToUEvent.from_dict(dict(version=self.config.tou_version,
+                                      created_by='unit test',
+                                      created_ts=True,
+                                      event_id=bson.ObjectId())
+                                 )
         user = self.amdb.get_user_by_mail(_email)
         assert(isinstance(user, eduid_userdb.User))
         user.tou.add(tou)
@@ -283,13 +283,13 @@ class TestActions(MongoTestCase):
 
     def test_add_mfa_action_old_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        u2f = U2F(version='U2F_V2',
-                  app_id='https://dev.eduid.se/u2f-app-id.json',
-                  keyhandle='test_key_handle',
-                  public_key='test_public_key',
-                  attest_cert='test_attest_cert',
-                  description='test_description',
-        )
+        u2f = U2F.from_dict(dict(version='U2F_V2',
+                                 app_id='https://dev.eduid.se/u2f-app-id.json',
+                                 keyhandle='test_key_handle',
+                                 public_key='test_public_key',
+                                 attest_cert='test_attest_cert',
+                                 description='test_description')
+                            )
         self.test_user.credentials.add(u2f)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
@@ -299,12 +299,12 @@ class TestActions(MongoTestCase):
 
     def test_add_mfa_action_new_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        webauthn = Webauthn(keyhandle='test_key_handle',
-                    credential_data='test_credential_data',
-                    app_id='https://dev.eduid.se/u2f-app-id.json',
-                    attest_obj='test_attest_obj',
-                    description='test_description',
-        )
+        webauthn = Webauthn.from_dict(dict(keyhandle='test_key_handle',
+                                           credential_data='test_credential_data',
+                                           app_id='https://dev.eduid.se/u2f-app-id.json',
+                                           attest_obj='test_attest_obj',
+                                           description='test_description')
+                                      )
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
@@ -314,12 +314,12 @@ class TestActions(MongoTestCase):
 
     def test_add_mfa_action_no_db(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        webauthn = Webauthn(keyhandle='test_key_handle',
-                    credential_data='test_credential_data',
-                    app_id='https://dev.eduid.se/u2f-app-id.json',
-                    attest_obj='test_attest_obj',
-                    description='test_description',
-        )
+        webauthn = Webauthn.from_dict(dict(keyhandle='test_key_handle',
+                                           credential_data='test_credential_data',
+                                           app_id='https://dev.eduid.se/u2f-app-id.json',
+                                           attest_obj='test_attest_obj',
+                                           description='test_description')
+                                      )
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
@@ -330,12 +330,12 @@ class TestActions(MongoTestCase):
 
     def _test_add_2nd_mfa_action(self, success=True, authn_context=True, cred_key=None, actions=0):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        webauthn = Webauthn(keyhandle='test_key_handle',
-                    credential_data='test_credential_data',
-                    app_id='https://dev.eduid.se/u2f-app-id.json',
-                    attest_obj='test_attest_obj',
-                    description='test_description',
-        )
+        webauthn = Webauthn.from_dict(dict(keyhandle='test_key_handle',
+                                           credential_data='test_credential_data',
+                                           app_id='https://dev.eduid.se/u2f-app-id.json',
+                                           attest_obj='test_attest_obj',
+                                           description='test_description')
+                                      )
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         cred = self.test_user.credentials.filter(Webauthn).to_list()[0]
@@ -383,12 +383,12 @@ class TestActions(MongoTestCase):
 
     def test_add_tou_action_already_accepted(self):
         event_id = bson.ObjectId()
-        self.test_user.tou.add(ToUEvent(
-            version = 'mock-version',
-            application = 'test_tou_plugin',
-            created_ts = datetime.utcnow(),
-            event_id = event_id
-        ))
+        self.test_user.tou.add(ToUEvent.from_dict(dict(
+            version='mock-version',
+            created_by='test_tou_plugin',
+            created_ts=datetime.utcnow(),
+            event_id=event_id
+        )))
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
@@ -397,12 +397,12 @@ class TestActions(MongoTestCase):
 
     def test_add_tou_action_already_accepted_other_version(self):
         event_id = bson.ObjectId()
-        self.test_user.tou.add(ToUEvent(
-            version = 'mock-version-2',
-            application = 'test_tou_plugin',
-            created_ts = datetime.utcnow(),
-            event_id = event_id
-        ))
+        self.test_user.tou.add(ToUEvent.from_dict(dict(
+            version='mock-version-2',
+            created_by='test_tou_plugin',
+            created_ts=datetime.utcnow(),
+            event_id=event_id
+        )))
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
@@ -437,13 +437,13 @@ class TestActions(MongoTestCase):
 
     def test_add_tou_action_should_reaccept(self):
         event_id = bson.ObjectId()
-        self.test_user.tou.add(ToUEvent(
-            version = 'mock-version',
-            application = 'test_tou_plugin',
-            created_ts = datetime(2015, 9, 24, 1, 1, 1, 111111),
-            modified_ts = datetime(2015, 9, 24, 1, 1, 1, 111111),
-            event_id = event_id
-        ))
+        self.test_user.tou.add(ToUEvent.from_dict(dict(
+            version='mock-version',
+            created_by='test_tou_plugin',
+            created_ts=datetime(2015, 9, 24, 1, 1, 1, 111111),
+            modified_ts=datetime(2015, 9, 24, 1, 1, 1, 111111),
+            event_id=event_id
+        )))
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
