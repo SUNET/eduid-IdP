@@ -197,11 +197,11 @@ class TestSSO(IdPSimpleTestCase):
         user = self.idp_userdb.lookup_user(eppn)
         [user.nins.remove(x) for x in user.nins.to_list()]
         for number in ninlist:
-            this_nin = Nin(number = number,
-                           application = 'unittest',
-                           created_ts = True,
-                           verified = True,
-                           primary = user.nins.primary is None)
+            this_nin = Nin.from_dict(dict(number=number,
+                                         created_by='unittest',
+                                         created_ts=True,
+                                         verified=True,
+                                         primary=user.nins.primary is None))
             user.nins.add(this_nin)
         return user
 
