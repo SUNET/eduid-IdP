@@ -80,7 +80,8 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
         # eduid_action.mfa.idp.check_authn_result will have added the credential used
         # to the ticket.mfa_action_creds hash - transfer it to the session
         update = False
-        for cred, ts in ticket.mfa_action_creds.items():
+        for cred_key, ts in ticket.mfa_action_creds.items():
+            cred = user.credentials.find(cred_key)
             authn = AuthnData(user = user, credential = cred, timestamp = ts)
             sso_session.add_authn_credential(authn)
             update = True
