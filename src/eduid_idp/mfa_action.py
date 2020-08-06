@@ -83,7 +83,7 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
         context.logger.debug('User has existing MFA actions - checking them')
         if check_authn_result(context, user, ticket, existing_actions):
             for this in ticket.mfa_action_creds:
-                context.authn.log_authn(user, success=[this.key], failure=[])
+                context.authn.log_authn(user, success=[this], failure=[])
             # TODO: Should we persistently log external mfa usage?
             return
         context.logger.error('User returned without MFA credentials')
@@ -130,7 +130,7 @@ def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
             key = this.result.get(RESULT_CREDENTIAL_KEY_NAME)
             cred = user.credentials.find(key)
             if cred:
-                ticket.mfa_action_creds[cred] = utc_now
+                ticket.mfa_action_creds[cred.key] = utc_now
                 context.logger.debug('Removing MFA action completed with {}'.format(cred))
                 context.actions_db.remove_action_by_id(this.action_id)
                 return True
