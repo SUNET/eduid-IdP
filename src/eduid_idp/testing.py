@@ -32,19 +32,19 @@
 # Author : Fredrik Thulin <fredrik@thulin.net>
 #
 
+import logging
 import os
-import pkg_resources
 from unittest import TestCase
 
-from eduid_common.config.idp import IdPConfig
-import eduid_idp
-from eduid_userdb.idp import IdPUser, IdPUserDb
+import pkg_resources
 from eduid_common.authn import idp_authn
-from eduid_idp.idp import IdPApplication
-
+from eduid_common.config.idp import IdPConfig
+from eduid_userdb.idp import IdPUser, IdPUserDb
 from vccs_client import VCCSPasswordFactor
 
-import logging
+import eduid_idp
+from eduid_idp.idp import IdPApplication
+
 logger = logging.getLogger()
 
 __author__ = 'ft'
@@ -53,17 +53,17 @@ PWHASHES = {}
 
 
 def _get_idpconfig(datadir, sso_config='test_SSO_conf.py'):
-    _defaults = {'mongo_uri': None,
-                 'pysaml2_config': os.path.join(datadir, sso_config)}
+    _defaults = {'mongo_uri': None, 'pysaml2_config': os.path.join(datadir, sso_config)}
     return IdPConfig.init_config(test_config=_defaults, debug=True)
 
 
 def _create_passwords(username, factors):
     res = []
     for _f in factors:
-        _this = {'credential_id': str(_f.credential_id),
-                 'salt': _f.salt,
-                 }
+        _this = {
+            'credential_id': str(_f.credential_id),
+            'salt': _f.salt,
+        }
         res.append(_this)
         # remember the hash for the correct password 'out-of-band' since the User
         # object will reject any unknown data in _this
@@ -71,30 +71,38 @@ def _create_passwords(username, factors):
     return res
 
 
-_PASSWORDS = [VCCSPasswordFactor("foo", "a" * 24),
-              VCCSPasswordFactor("bar", "b" * 24),
-              VCCSPasswordFactor("baz", "c" * 24),
-              ]
+_PASSWORDS = [
+    VCCSPasswordFactor("foo", "a" * 24),
+    VCCSPasswordFactor("bar", "b" * 24),
+    VCCSPasswordFactor("baz", "c" * 24),
+]
 
 _USERDB = [
-    {'_id': '0' * 24,
-     'eduPersonPrincipalName': 'test1@eduid.se',
-     'mail': 'test@example.com',
-     'mailAliases': [{
-                         'email': 'test@example.com',
-                         'verified': True,
-                         }],
-     'passwords': _create_passwords('user1', [_PASSWORDS[0], _PASSWORDS[1]])
+    {
+        '_id': '0' * 24,
+        'eduPersonPrincipalName': 'test1@eduid.se',
+        'mail': 'test@example.com',
+        'mailAliases': [
+            {
+                'email': 'test@example.com',
+                'verified': True,
+            }
+        ],
+        'passwords': _create_passwords('user1', [_PASSWORDS[0], _PASSWORDS[1]]),
     },
-    {'_id': '1' * 24,
-     'eduPersonPrincipalName': 'test2@eduid.se',
-     'mail': 'test2@example.com',
-     'mailAliases': [{
-                         'email': 'test2@example.com',
-                         'verified': True,
-                         }],
-     'passwords': _create_passwords('user2', [_PASSWORDS[2]]),
-     }]
+    {
+        '_id': '1' * 24,
+        'eduPersonPrincipalName': 'test2@eduid.se',
+        'mail': 'test2@example.com',
+        'mailAliases': [
+            {
+                'email': 'test2@example.com',
+                'verified': True,
+            }
+        ],
+        'passwords': _create_passwords('user2', [_PASSWORDS[2]]),
+    },
+]
 
 
 class FakeUserDb(object):
@@ -117,11 +125,12 @@ class FakeAuthClient(object):
     userdb = FakeUserDb()
 
     def authenticate(self, username, factors):
-        assert (len(factors) == 1)
+        assert len(factors) == 1
         _f = factors[0]
-        _expect = {'credential_id': str(_f.credential_id),
-                   'salt': _f.salt,
-                   'hash': _f.hash,
+        _expect = {
+            'credential_id': str(_f.credential_id),
+            'salt': _f.salt,
+            'hash': _f.hash,
         }
         for field in ['_id', 'eduPersonPrincipalName']:
             _user = self.userdb.get_user_by_field(field, username, raise_on_missing=False)
@@ -143,6 +152,7 @@ class IdPSimpleTestCase(TestCase):
     For simple test cases that do not need a real mongodb, but rather work with the
     in-memory FakeUserDb().
     """
+
     def setUp(self):
         # load the IdP configuration
 
@@ -154,7 +164,6 @@ class IdPSimpleTestCase(TestCase):
         # Create the IdP app
         _idp_app = IdPApplication(logger, _config, userdb=_userdb)
         self.context = _idp_app.context
-        #noinspection PyTypeChecker
+        # noinspection PyTypeChecker
         self.idp_userdb = IdPUserDb(logger, _config, userdb=_userdb)
-        self.authn = idp_authn.IdPAuthn(logger, _config, self.idp_userdb,
-                                              auth_client = FakeAuthClient())
+        self.authn = idp_authn.IdPAuthn(logger, _config, self.idp_userdb, auth_client=FakeAuthClient())

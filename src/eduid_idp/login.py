@@ -22,22 +22,28 @@ from typing import Callable, Mapping, Optional
 
 import cherrypy
 from defusedxml import ElementTree as DefusedElementTree
+from eduid_common.api import exceptions
+from eduid_common.authn import assurance
+from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
+from eduid_common.authn.idp_saml import (
+    AuthnInfo,
+    IdP_SAMLRequest,
+    ResponseArgs,
+    SAMLParseError,
+    SAMLValidationError,
+    gen_key,
+)
+from eduid_common.session.logindata import SSOLoginData
+from eduid_common.session.sso_session import SSOSession
+from eduid_userdb.idp import IdPUser
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
 import eduid_idp
 import eduid_idp.error
-from eduid_common.api import exceptions
-from eduid_common.authn import assurance
-from eduid_common.authn.assurance import AssuranceException, MissingMultiFactor, WrongMultiFactor
-from eduid_common.authn.idp_saml import AuthnInfo, IdP_SAMLRequest, ResponseArgs
-from eduid_common.authn.idp_saml import SAMLParseError, SAMLValidationError, gen_key
-from eduid_common.session.logindata import SSOLoginData
-from eduid_common.session.sso_session import SSOSession
 from eduid_idp.context import IdPContext
 from eduid_idp.idp_actions import check_for_pending_actions
 from eduid_idp.service import Service
 from eduid_idp.util import get_requested_authn_context
-from eduid_userdb.idp import IdPUser
 
 
 class MustAuthenticate(Exception):
@@ -96,18 +102,18 @@ class SSO(Service):
         http_args = ticket.saml_req.apply_binding(resp_args, ticket.RelayState, str(saml_response))
 
         # INFO-Log the SSO session id and the AL and destination
-        self.logger.info('{!s}: response authn={!s}, dst={!s}'.format(ticket.key,
-                                                                      response_authn,
-                                                                      destination))
-        self._fticks_log(relying_party = resp_args.get('sp_entity_id', destination),
-                         authn_method = response_authn.class_ref,
-                         user_id = str(user.user_id),
-                         )
+        self.logger.info('{!s}: response authn={!s}, dst={!s}'.format(ticket.key, response_authn, destination))
+        self._fticks_log(
+            relying_party=resp_args.get('sp_entity_id', destination),
+            authn_method=response_authn.class_ref,
+            user_id=str(user.user_id),
+        )
 
         return eduid_idp.mischttp.create_html_response(binding_out, http_args, self.start_response, self.logger)
 
-    def _make_saml_response(self, response_authn: AuthnInfo, resp_args: ResponseArgs,
-                            user: IdPUser, ticket: SSOLoginData, sso_session):
+    def _make_saml_response(
+        self, response_authn: AuthnInfo, resp_args: ResponseArgs, user: IdPUser, ticket: SSOLoginData, sso_session
+    ):
         """
         Create the SAML response using pysaml2 create_authn_response().
 
@@ -123,9 +129,9 @@ class SSO(Service):
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
         for k, v in response_authn.authn_attributes.items():
             if k in attributes:
-                self.logger.debug('Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(
-                    k, attributes[k], v
-                ))
+                self.logger.debug(
+                    'Overwriting user attribute {} ({!r}) with authn attribute value {!r}'.format(k, attributes[k], v)
+                )
             else:
                 self.logger.debug('Adding attribute {} with value from authn process: {}'.format(k, v))
             attributes[k] = v
@@ -149,16 +155,16 @@ class SSO(Service):
                 break
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
-            self.logger.debug("Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
-                              "Response args:\n{!s},\n\nAuthn:\n{!s}\n".format(
-                user,
-                pprint.pformat(attributes),
-                pprint.pformat(resp_args),
-                pprint.pformat(response_authn)))
+            self.logger.debug(
+                "Creating an AuthnResponse: user {!r}\n\nAttributes:\n{!s},\n\n"
+                "Response args:\n{!s},\n\nAuthn:\n{!s}\n".format(
+                    user, pprint.pformat(attributes), pprint.pformat(resp_args), pprint.pformat(response_authn)
+                )
+            )
 
-#        saml_response = self.context.idp.create_authn_response(attributes, userid = user.eppn,
-#                                                               authn = response_authn, sign_response = True,
-#                                                               **resp_args)
+        #        saml_response = self.context.idp.create_authn_response(attributes, userid = user.eppn,
+        #                                                               authn = response_authn, sign_response = True,
+        #                                                               **resp_args)
         saml_response = ticket.saml_req.make_saml_response(attributes, user.eppn, response_authn, resp_args)
         self._kantara_log_assertion_id(saml_response, ticket)
 
@@ -187,8 +193,11 @@ class SSO(Service):
 
             attrs = xml.attrib
             assertion = xml.find('{urn:oasis:names:tc:SAML:2.0:assertion}Assertion')
-            self.logger.info('{!s}: id={!s}, in_response_to={!s}, assertion_id={!s}'.format(
-                ticket.key, attrs['ID'], attrs['InResponseTo'], assertion.get('ID')))
+            self.logger.info(
+                '{!s}: id={!s}, in_response_to={!s}, assertion_id={!s}'.format(
+                    ticket.key, attrs['ID'], attrs['InResponseTo'], assertion.get('ID')
+                )
+            )
 
             return DefusedElementTree.tostring(xml)
         except Exception as exc:
@@ -215,14 +224,16 @@ class SSO(Service):
         # Default format string:
         #   'F-TICKS/SWAMID/2.0#TS={ts}#RP={rp}#AP={ap}#PN={pn}#AM={am}#',
         _timestamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        _anon_userid = hmac.new(self.config.fticks_secret_key.encode('ascii'),
-                                msg=user_id.encode('ascii'), digestmod=sha256).hexdigest()
-        msg = self.config.fticks_format_string.format(ts=_timestamp,
-                                                      rp=relying_party,
-                                                      ap=self.context.idp.config.entityid,
-                                                      pn=_anon_userid,
-                                                      am=authn_method,
-                                                      )
+        _anon_userid = hmac.new(
+            self.config.fticks_secret_key.encode('ascii'), msg=user_id.encode('ascii'), digestmod=sha256
+        ).hexdigest()
+        msg = self.config.fticks_format_string.format(
+            ts=_timestamp,
+            rp=relying_party,
+            ap=self.context.idp.config.entityid,
+            pn=_anon_userid,
+            am=authn_method,
+        )
         self.logger.info(msg)
 
     def _validate_login_request(self, ticket: SSOLoginData) -> ResponseArgs:
@@ -289,17 +300,15 @@ class SSO(Service):
         self.logger.debug("Response Authn context class: {!r}".format(resp_authn))
 
         try:
-            self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(
-                resp_authn, req_authn_context))
+            self.logger.debug("Asserting AuthnContext {!r} (requested: {!r})".format(resp_authn, req_authn_context))
         except AttributeError:
             self.logger.debug("Asserting AuthnContext {!r} (none requested)".format(resp_authn))
 
         # Augment the AuthnInfo with the authn_timestamp before returning it
         return replace(resp_authn, instant=self.sso_session.authn_timestamp)
 
-
     def redirect(self) -> bytes:
-        """ This is the HTTP-redirect endpoint.
+        """This is the HTTP-redirect endpoint.
 
         :return: HTTP response
         :rtype: string
@@ -341,8 +350,9 @@ class SSO(Service):
 
         if self.sso_session and not _force_authn:
             _ttl = self.context.config.sso_session_lifetime - self.sso_session.minutes_old
-            self.logger.info("{!s}: proceeding sso_session={!s}, ttl={:}m".format(
-                ticket.key, self.sso_session.public_id, _ttl))
+            self.logger.info(
+                "{!s}: proceeding sso_session={!s}, ttl={:}m".format(ticket.key, self.sso_session.public_id, _ttl)
+            )
             self.logger.debug(f'Continuing with Authn request {repr(ticket.saml_req.request_id)}')
             try:
                 return self.perform_login(ticket)
@@ -352,8 +362,7 @@ class SSO(Service):
         if not self.sso_session:
             self.logger.info("{!s}: authenticate ip={!s}".format(ticket.key, eduid_idp.mischttp.get_remote_ip()))
         elif _force_authn:
-            self.logger.info("{!s}: force_authn sso_session={!s}".format(
-                ticket.key, self.sso_session.public_id))
+            self.logger.info("{!s}: force_authn sso_session={!s}".format(ticket.key, self.sso_session.public_id))
 
         return self._not_authn(ticket)
 
@@ -370,12 +379,16 @@ class SSO(Service):
                 self.logger.debug("Force authn without session - ignoring")
                 return True
             if ticket.saml_req.request_id != self.sso_session.user_authn_request_id:
-                self.logger.debug("Forcing authentication because of ForceAuthn with "
-                                  "SSO session id {!r} != {!r}".format(
-                    self.sso_session.user_authn_request_id, ticket.saml_req.request_id))
+                self.logger.debug(
+                    "Forcing authentication because of ForceAuthn with "
+                    "SSO session id {!r} != {!r}".format(
+                        self.sso_session.user_authn_request_id, ticket.saml_req.request_id
+                    )
+                )
                 return True
-            self.logger.debug("Ignoring ForceAuthn, authn already performed for SAML request {!r}".format(
-                ticket.saml_req.request_id))
+            self.logger.debug(
+                "Ignoring ForceAuthn, authn already performed for SAML request {!r}".format(ticket.saml_req.request_id)
+            )
         return False
 
     def _not_authn(self, ticket: SSOLoginData) -> bytes:
@@ -386,7 +399,7 @@ class SSO(Service):
         :returns: HTTP response
         """
         assert isinstance(ticket, SSOLoginData)
-        redirect_uri = eduid_idp.mischttp.geturl(self.config, query = False)
+        redirect_uri = eduid_idp.mischttp.geturl(self.config, query=False)
 
         req_authn_context = get_requested_authn_context(self.context.idp, ticket.saml_req, self.logger)
         self.logger.debug("Do authentication, requested auth context : {!r}".format(req_authn_context))
@@ -408,21 +421,23 @@ class SSO(Service):
         :return: HTTP response
         """
         argv = eduid_idp.mischttp.get_default_template_arguments(self.context.config)
-        argv.update({
-            "action": "/verify",
-            "username": "",
-            "password": "",
-            "key": ticket.key,
-            "authn_reference": requested_authn_context,
-            "redirect_uri": redirect_uri,
-            "alert_msg": "",
-            "sp_entity_id": "",
-            "failcount": ticket.FailCount,
-            # SAMLRequest, RelayState and binding are used to re-create the ticket state if not found using `key'
-            "SAMLRequest": escape(ticket.SAMLRequest, quote=True),
-            "RelayState": escape(ticket.RelayState, quote=True),
-            "binding": escape(ticket.binding, quote=True),
-        })
+        argv.update(
+            {
+                "action": "/verify",
+                "username": "",
+                "password": "",
+                "key": ticket.key,
+                "authn_reference": requested_authn_context,
+                "redirect_uri": redirect_uri,
+                "alert_msg": "",
+                "sp_entity_id": "",
+                "failcount": ticket.FailCount,
+                # SAMLRequest, RelayState and binding are used to re-create the ticket state if not found using `key'
+                "SAMLRequest": escape(ticket.SAMLRequest, quote=True),
+                "RelayState": escape(ticket.RelayState, quote=True),
+                "binding": escape(ticket.binding, quote=True),
+            }
+        )
 
         # Set alert msg if FailCount is greater than zero
         if ticket.FailCount:
@@ -486,9 +501,10 @@ def do_verify(context: IdPContext):
         context.logger.debug(f'Credentials not supplied. Redirect => {lox}')
         raise eduid_idp.mischttp.Redirect(lox)
 
-    login_data = {'username': query['username'].strip(),
-                  'password': password,
-                  }
+    login_data = {
+        'username': query['username'].strip(),
+        'password': password,
+    }
     del password  # keep out of any exception logs
     try:
         authninfo = context.authn.password_authn(login_data)
@@ -507,10 +523,11 @@ def do_verify(context: IdPContext):
     # Create SSO session
     user = authninfo.user
     context.logger.debug("User {} authenticated OK".format(user))
-    _sso_session = SSOSession(user_id = user.user_id,
-                              authn_request_id = _ticket.saml_req.request_id,
-                              authn_credentials = [authninfo],
-                              )
+    _sso_session = SSOSession(
+        user_id=user.user_id,
+        authn_request_id=_ticket.saml_req.request_id,
+        authn_credentials=[authninfo],
+    )
 
     # This session contains information about the fact that the user was authenticated. It is
     # used to avoid requiring subsequent authentication for the same user during a limited
@@ -521,8 +538,11 @@ def do_verify(context: IdPContext):
     del _session_id
 
     # INFO-Log the request id (sha1 of SAMLrequest) and the sso_session
-    context.logger.info("{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
-        _ticket.key, _sso_session.public_id, authn_ref, user))
+    context.logger.info(
+        "{!s}: login sso_session={!s}, authn={!s}, user={!s}".format(
+            _ticket.key, _sso_session.public_id, authn_ref, user
+        )
+    )
 
     # Now that an SSO session has been created, redirect the users browser back to
     # the main entry point of the IdP (the 'redirect_uri'). The ticket reference `key'
@@ -534,12 +554,16 @@ def do_verify(context: IdPContext):
 
 def _update_ticket_samlrequest(ticket: SSOLoginData, binding: Optional[str], context: IdPContext) -> None:
     try:
-        ticket.saml_req = IdP_SAMLRequest(ticket.SAMLRequest, binding or ticket.binding,
-                context.idp, context.logger, context.config['debug'])
+        ticket.saml_req = IdP_SAMLRequest(
+            ticket.SAMLRequest, binding or ticket.binding, context.idp, context.logger, context.config['debug']
+        )
     except (SAMLParseError, SAMLValidationError):
         context.logger.exception('Failed updating SAML request in SSOLoginData (ticket)')
-        raise eduid_idp.error.BadRequest('Invalid login request. Try emptying browser cache and re-initiate login.',
-                                         logger=context.logger, extra={'binding': binding})
+        raise eduid_idp.error.BadRequest(
+            'Invalid login request. Try emptying browser cache and re-initiate login.',
+            logger=context.logger,
+            extra={'binding': binding},
+        )
 
 
 # ----------------------------------------------------------------------------
@@ -555,8 +579,9 @@ def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[
     _key = info.get('key')
     if not _key:
         if 'SAMLRequest' not in info:
-            raise eduid_idp.error.BadRequest('Missing SAMLRequest, please re-initiate login',
-                                             logger = logger, extra = {'info': info, 'binding': binding})
+            raise eduid_idp.error.BadRequest(
+                'Missing SAMLRequest, please re-initiate login', logger=logger, extra={'info': info, 'binding': binding}
+            )
         _key = gen_key(info['SAMLRequest'])
         logger.debug(f"No 'key' in info, hashed SAMLRequest into key {_key}")
 
@@ -564,8 +589,11 @@ def _get_ticket(context: IdPContext, info: Mapping[str, str], binding: Optional[
             ticket = cherrypy.session.sso_ticket = None
 
         if ticket and _key != ticket.key:
-            raise eduid_idp.error.BadRequest('Corrupted SAMLRequest, please re-initiate login',
-                                             logger = logger, extra = {'info': info, 'binding': binding})
+            raise eduid_idp.error.BadRequest(
+                'Corrupted SAMLRequest, please re-initiate login',
+                logger=logger,
+                extra={'info': info, 'binding': binding},
+            )
 
     if not ticket:
         # cache miss, parse SAMLRequest
@@ -596,13 +624,14 @@ def _create_ticket(context: IdPContext, info: Mapping[str, str], binding: str, k
     :returns: SSOLoginData instance
     """
     if not binding:
-        raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger = context.logger)
-    ticket = SSOLoginData(key,
-                          info.get('SAMLRequest', ''),
-                          binding,
-                          info.get('RelayState', ''),
-                          int(info.get('FailCount', 0)),
-                          )
+        raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger=context.logger)
+    ticket = SSOLoginData(
+        key,
+        info.get('SAMLRequest', ''),
+        binding,
+        info.get('RelayState', ''),
+        int(info.get('FailCount', 0)),
+    )
     if not ticket.SAMLRequest:
         context.logger.error(f'IdP ticket without SAML request: {ticket}')
         context.logger.error(f'Request info: {info}')

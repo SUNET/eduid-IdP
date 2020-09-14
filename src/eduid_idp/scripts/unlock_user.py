@@ -3,11 +3,13 @@
 # Small CLI used to manually unlock users that have reached the Kantara imposed limit
 # (such as the monitoring user after certain failures).
 #
+import logging
 import os
 import sys
-import logging
+
 from eduid_common.authn import idp_authn
 from eduid_common.config.idp import IdPConfig
+
 import eduid_idp
 import eduid_idp.idp
 
@@ -24,8 +26,7 @@ def main(myname='unlock_user', cfgfile=default_config_file, debug=default_debug)
     user = idp_userdb.lookup_user(sys.argv[1])
     info = authn_info_db.get_user_authn_info(user)
 
-    print ('User {!r} failed logins this month before unlocking: {!r}'.format(
-        user, info.failures_this_month(ts=None)))
+    print('User {!r} failed logins this month before unlocking: {!r}'.format(user, info.failures_this_month(ts=None)))
     authn_info_db.unlock_user(user.user_id)
 
 

@@ -33,11 +33,11 @@
 #
 
 import inspect
+
 import cherrypy
 
 
 class HTTPError(cherrypy.HTTPError):
-
     def __init__(self, status=500, message=None, logger=None, extra=None):
         if logger:
             caller = None

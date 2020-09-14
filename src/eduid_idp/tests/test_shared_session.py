@@ -32,55 +32,52 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-import os
 import logging
+import os
 import unittest
 
 import cherrypy
-from cherrypy.lib.sessions import init, expire
-
-from eduid_common.session.testing import RedisTemporaryInstance
-from eduid_common.session.redis_session import RedisEncryptedSession
-from eduid_common.session.namespaces import Common, LoginApplication
-
+from cherrypy.lib.sessions import expire, init
 from eduid_common.config.idp import IdPConfig
-from eduid_idp.shared_session import EduidSession
+from eduid_common.session.namespaces import Common, LoginApplication
+from eduid_common.session.redis_session import RedisEncryptedSession
+from eduid_common.session.testing import RedisTemporaryInstance
 
+from eduid_idp.shared_session import EduidSession
 
 logger = logging.getLogger(__name__)
 
 
 # noinspection PyProtectedMember
 class TestSessions(unittest.TestCase):
-
     def setUp(self):
         # load the IdP configuration
         self.redis_instance = RedisTemporaryInstance.get_instance()
         _defaults = {
-                'environment': 'test_suite',
-                'tou_version': 'mock-version',
-                'shared_session_secret_key': 'shared-session-secret-key',
-                'redis_host': 'localhost',
-                'redis_port': str(self.redis_instance.port),
-                'redis_db': '0',
-                'insecure_cookies': False,
-                'listen_addr': 'unittest-idp.example.edu',
-                'listen_port': 443,
-                'base_url': 'https://unittest-idp.example.edu/',
-                'content_packages': [('eduid_idp', 'tests/static')],
-                'debug': False
+            'environment': 'test_suite',
+            'tou_version': 'mock-version',
+            'shared_session_secret_key': 'shared-session-secret-key',
+            'redis_host': 'localhost',
+            'redis_port': str(self.redis_instance.port),
+            'redis_db': '0',
+            'insecure_cookies': False,
+            'listen_addr': 'unittest-idp.example.edu',
+            'listen_port': 443,
+            'base_url': 'https://unittest-idp.example.edu/',
+            'content_packages': [('eduid_idp', 'tests/static')],
+            'debug': False,
         }
         self.config = IdPConfig.init_config(test_config=_defaults)
         cherrypy.config['logger'] = logger
         # mount the IdP app in the cherrypy app server
         cherry_conf = {
-                'tools.sessions.on': True,
-                'tools.sessions.storage_class': EduidSession,
-                'tools.sessions.name': 'sessid',
-                'tools.sessions.domain': 'unittest-idp.example.edu',
-                'tools.sessions.secure': True,
-                'tools.sessions.httponly': False,
-                }
+            'tools.sessions.on': True,
+            'tools.sessions.storage_class': EduidSession,
+            'tools.sessions.name': 'sessid',
+            'tools.sessions.domain': 'unittest-idp.example.edu',
+            'tools.sessions.secure': True,
+            'tools.sessions.httponly': False,
+        }
         cherry_conf.update(self.config.to_dict())
         cherrypy.config.update(cherry_conf)
 
@@ -88,8 +85,7 @@ class TestSessions(unittest.TestCase):
 
         if hasattr(cherrypy.request, '_session_init_flag'):
             del cherrypy.request._session_init_flag
-        init(storage_class=EduidSession, path='/', name=name,
-             domain="unittest-idp.example.edu")
+        init(storage_class=EduidSession, path='/', name=name, domain="unittest-idp.example.edu")
 
     def tearDown(self):
         cherrypy.session.delete()
@@ -109,9 +105,9 @@ class TestSessions(unittest.TestCase):
         self.assertEqual(session_data['test'], 'test')
 
     def test_session_namespace(self):
-        cherrypy.session.common = Common(eppn='hubba-dubba',
-                                         is_logged_in=True,
-                                         login_source=LoginApplication(value='idp'))
+        cherrypy.session.common = Common(
+            eppn='hubba-dubba', is_logged_in=True, login_source=LoginApplication(value='idp')
+        )
         cherrypy.session.load()
         cherrypy.session.save()
 

@@ -15,9 +15,10 @@ Common code for SSO login/logout requests.
 
 from typing import Callable
 
+from eduid_common.session.sso_session import SSOSession
+
 import eduid_idp.mischttp
 from eduid_idp.context import IdPContext
-from eduid_common.session.sso_session import SSOSession
 
 
 class Service(object):
@@ -29,8 +30,7 @@ class Service(object):
     :param context: IdP context
     """
 
-    def __init__(self, sso_session: SSOSession,
-                 start_response: Callable, context: IdPContext):
+    def __init__(self, sso_session: SSOSession, start_response: Callable, context: IdPContext):
         self.context = context
         self.start_response = start_response
         self.sso_session = sso_session

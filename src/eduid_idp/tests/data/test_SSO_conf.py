@@ -1,11 +1,7 @@
 import os
 
-from saml2 import BINDING_HTTP_REDIRECT
-from saml2 import BINDING_HTTP_POST
-from saml2 import BINDING_SOAP
-from saml2.saml import NAME_FORMAT_URI
-from saml2.saml import NAMEID_FORMAT_TRANSIENT
-from saml2.saml import NAMEID_FORMAT_PERSISTENT
+from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT, BINDING_SOAP
+from saml2.saml import NAME_FORMAT_URI, NAMEID_FORMAT_PERSISTENT, NAMEID_FORMAT_TRANSIENT
 
 try:
     from saml2.sigver import get_xmlsec_binary
@@ -43,7 +39,7 @@ CONFIG = {
                 "single_logout_service": [
                     ("%s/slo/soap" % BASE, BINDING_SOAP),
                     ("%s/slo/post" % BASE, BINDING_HTTP_POST),
-                    ("%s/slo/redirect" % BASE, BINDING_HTTP_REDIRECT)
+                    ("%s/slo/redirect" % BASE, BINDING_HTTP_REDIRECT),
                 ],
             },
             "policy": {
@@ -52,12 +48,11 @@ CONFIG = {
                     "attribute_restrictions": None,  # means all I have
                     "name_form": NAME_FORMAT_URI,
                     "nameid_format": NAMEID_FORMAT_PERSISTENT,
-                    #"entity_categories": ["swamid", "edugain"]
+                    # "entity_categories": ["swamid", "edugain"]
                     "entity_categories": [],
                 },
             },
-            "name_id_format": [NAMEID_FORMAT_TRANSIENT,
-                               NAMEID_FORMAT_PERSISTENT],
+            "name_id_format": [NAMEID_FORMAT_TRANSIENT, NAMEID_FORMAT_PERSISTENT],
         },
     },
     "debug": 1,
@@ -66,7 +61,6 @@ CONFIG = {
     "key_file": key_path,
     "cert_file": cert_path,
     "xmlsec_binary": xmlsec_path,
-
     "organization": {
         "display_name": "eduID UNITTEST",
         "name": "eduID UNITTEST",

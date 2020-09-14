@@ -25,22 +25,23 @@ from typing import Callable, Optional
 import cherrypy
 import pkg_resources
 import six
+from eduid_common.api.sanitation import SanitationProblem, Sanitizer
+from eduid_common.config.idp import IdPConfig
+from saml2 import BINDING_HTTP_REDIRECT
 from six import string_types
 from six.moves.urllib.parse import parse_qs
 
 import eduid_idp
 import eduid_idp.thirdparty
-from eduid_common.api.sanitation import SanitationProblem, Sanitizer
-from eduid_common.config.idp import IdPConfig
 from eduid_idp.error import BadRequest
 from eduid_idp.util import b64encode
-from saml2 import BINDING_HTTP_REDIRECT
 
 
 class Redirect(cherrypy.HTTPRedirect):
     """
     Class 'copy' just to avoid having references to CherryPy in other modules.
     """
+
     pass
 
 
@@ -78,8 +79,7 @@ def create_html_response(binding: str, http_args: dict, start_response: Callable
         headers.append(('Content-Type', _content_type))
 
     if http_args != {}:
-        logger.debug('Unknown HTTP args when creating {!r} response :\n{!s}'.format(
-            status, pprint.pformat(http_args)))
+        logger.debug('Unknown HTTP args when creating {!r} response :\n{!s}'.format(status, pprint.pformat(http_args)))
 
     start_response(status, headers)
     if not isinstance(message, six.binary_type):
@@ -87,7 +87,7 @@ def create_html_response(binding: str, http_args: dict, start_response: Callable
     return message
 
 
-def geturl(config, query = True, path = True):
+def geturl(config, query=True, path=True):
     """Rebuilds a request URL (from PEP 333).
 
     :param config: IdP config
@@ -100,10 +100,15 @@ def geturl(config, query = True, path = True):
     if not url[0]:
         # For some reason, cherrypy.request.base always have host 127.0.0.1 -
         # work around that with much more elaborate code, based on pysaml2.
-        #return cherrypy.request.base + cherrypy.request.path_info
-        url = [cherrypy.request.scheme, '://',
-               cherrypy.request.headers['Host'], ':',
-               str(cherrypy.request.local.port), '/']
+        # return cherrypy.request.base + cherrypy.request.path_info
+        url = [
+            cherrypy.request.scheme,
+            '://',
+            cherrypy.request.headers['Host'],
+            ':',
+            str(cherrypy.request.local.port),
+            '/',
+        ]
     if path:
         url.append(cherrypy.request.path_info.lstrip('/'))
     if query:
@@ -129,12 +134,10 @@ def get_post(logger):
     san = Sanitizer()
     for k, v in body_params.items():
         try:
-            safe_k = san.sanitize_input(k, logger=logger,
-                                        content_type='text/plain')
+            safe_k = san.sanitize_input(k, logger=logger, content_type='text/plain')
             if safe_k != k:
                 raise BadRequest()
-            safe_v = san.sanitize_input(v, logger=logger,
-                                        content_type='text/plain')
+            safe_v = san.sanitize_input(v, logger=logger, content_type='text/plain')
         except SanitationProblem as sp:
             logger.info("There was a problem sanitizing inputs: {!r}".format(sp))
             raise BadRequest()
@@ -232,8 +235,9 @@ def static_file(start_response, filename, logger, fp=None, status=None):
     finally:
         fp.close()
 
-    logger.debug("Serving {!s}, status={!r} content-type {!s}, length={!r}".format(
-        filename, status, content_type, len(text)))
+    logger.debug(
+        "Serving {!s}, status={!r} content-type {!s}, length={!r}".format(filename, status, content_type, len(text))
+    )
 
     start_response(status, [('Content-Type', content_type)])
     return text
@@ -249,18 +253,19 @@ def get_content_type(filename):
     :type filename: string
     :rtype: string
     """
-    types = {'ico': 'image/x-icon',
-             'png': 'image/png',
-             'html': 'text/html',
-             'css': 'text/css',
-             'js': 'application/javascript',
-             'txt': 'text/plain',
-             'xml': 'text/xml',
-             'svg': 'image/svg+xml',
-             'woff': 'application/font-woff',
-             'eot': 'application/vnd.ms-fontobject',
-             'ttf': 'application/x-font-ttf',
-             }
+    types = {
+        'ico': 'image/x-icon',
+        'png': 'image/png',
+        'html': 'text/html',
+        'css': 'text/css',
+        'js': 'application/javascript',
+        'txt': 'text/plain',
+        'xml': 'text/xml',
+        'svg': 'image/svg+xml',
+        'woff': 'application/font-woff',
+        'eot': 'application/vnd.ms-fontobject',
+        'ttf': 'application/x-font-ttf',
+    }
     ext = filename.rsplit('.', 1)[-1]
     if ext not in types:
         return None
@@ -341,7 +346,7 @@ def set_cookie(name: str, path: str, logger: logging.Logger, config: IdPConfig, 
     cookie[name]['path'] = path
     if not config.insecure_cookies:
         cookie[name]['secure'] = True  # ask browser to only send cookie using SSL/TLS
-    cookie[name]['httponly'] = True # protect against common XSS vulnerabilities
+    cookie[name]['httponly'] = True  # protect against common XSS vulnerabilities
     logger.debug("Set cookie {!r} : {}".format(name, cookie))
 
 
@@ -369,12 +374,10 @@ def parse_query_string(logger):
         san = Sanitizer()
         for k, v in parse_qs(_qs).items():
             try:
-                safe_k = san.sanitize_input(k, logger=logger,
-                                            content_type='text/plain')
+                safe_k = san.sanitize_input(k, logger=logger, content_type='text/plain')
                 if safe_k != k:
                     raise BadRequest()
-                safe_v = san.sanitize_input(v[0], logger=logger,
-                                            content_type='text/plain')
+                safe_v = san.sanitize_input(v[0], logger=logger, content_type='text/plain')
             except SanitationProblem as sp:
                 logger.info("There was a problem sanitizing inputs: {!r}".format(sp))
                 raise BadRequest()
@@ -437,9 +440,11 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
     :rtype: string
     """
     _LANGUAGE_RE = re.compile(
-            r'''
+        r'''
             ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|)      # "en", "en-au", "x-y-z", "es-419", NOT the "*"
-            ''', re.VERBOSE)
+            ''',
+        re.VERBOSE,
+    )
 
     # Look for some static page in user preferred language
     languages = eduid_idp.mischttp.parse_accept_lang_header(cherrypy.request.headers.get('Accept-Language', ''))
@@ -456,8 +461,9 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
                 for (package, path) in config.content_packages:
                     langfile = path + '/' + lang.lower() + '/' + filename  # pkg_resources paths do not use os.path.join
                     if logger:
-                        logger.debug('Looking for package {!r}, language {!r}, path: {!r}'.format(
-                            package, lang, langfile))
+                        logger.debug(
+                            'Looking for package {!r}, language {!r}, path: {!r}'.format(package, lang, langfile)
+                        )
                     try:
                         _res = pkg_resources.resource_stream(package, langfile)
                         res = eduid_idp.mischttp.static_file(start_response, langfile, logger, fp=_res, status=status)
@@ -469,8 +475,9 @@ def localized_resource(start_response, filename, config, logger=None, status=Non
 
     # default language file
     static_fn = eduid_idp.mischttp.static_filename(config, filename, logger)
-    logger.debug("Looking for {!r} at default location (static_dir {!r}): {!r}".format(
-        filename, config.static_dir, static_fn))
+    logger.debug(
+        "Looking for {!r} at default location (static_dir {!r}): {!r}".format(filename, config.static_dir, static_fn)
+    )
     if not static_fn:
         logger.warning("Failed locating page {!r} in an accepted language or the default location".format(filename))
         return None

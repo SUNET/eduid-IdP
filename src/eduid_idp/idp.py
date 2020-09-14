@@ -104,45 +104,43 @@ the SSO session using the `idpauthn' cookie sent by the users browser and only s
 5 from above will be executed.
 """
 
-import os
-import sys
-import time
-import pprint
-import logging
 import argparse
-import threading
-
-import six
-import cherrypy
-import simplejson
-
+import logging
 import logging.handlers
+import os
+import pprint
+import sys
+import threading
+import time
 from logging import Logger
-from typing import Optional, Any
+from typing import Any, Optional
 
-from eduid_userdb.idp import IdPUserDb
-from eduid_common.authn import idp_authn
-from eduid_common.config.idp import IdPConfig
-from eduid_common.authn.utils import init_pysaml2
-from eduid_common.session.sso_cache import SSOSessionCache
-from eduid_common.session import sso_cache
-import eduid_idp.mischttp
+import cherrypy
 import eduid_common.session.sso_session
+import simplejson
+import six
+from bson import ObjectId
+from eduid_common.authn import idp_authn
+from eduid_common.authn.utils import init_pysaml2
+from eduid_common.config.idp import IdPConfig
+from eduid_common.session import sso_cache
+from eduid_common.session.sso_cache import SSOSessionCache
 from eduid_common.session.sso_session import SSOSession
+from eduid_userdb.actions import ActionDB
+from eduid_userdb.idp import IdPUserDb
+
+import eduid_idp.mischttp
+from eduid_idp.context import IdPContext
 from eduid_idp.login import SSO
 from eduid_idp.logout import SLO
-from eduid_idp.context import IdPContext
 from eduid_idp.shared_session import EduidSession
-
-from eduid_userdb.actions import ActionDB
-
-from bson import ObjectId
 
 # Load Raven (exception logging to Sentry), if available.
 try:
-    #noinspection PyPackageRequirements
+    # noinspection PyPackageRequirements
     import raven
-    #noinspection PyPackageRequirements
+
+    # noinspection PyPackageRequirements
     from raven.handlers.logging import SentryHandler
 except ImportError:
     raven = None
@@ -156,17 +154,21 @@ def parse_args():
     """
     Parse the command line arguments
     """
-    parser = argparse.ArgumentParser(description = "eduID Identity Provider application",
-                                     add_help = True,
-                                     formatter_class = argparse.ArgumentDefaultsHelpFormatter,
-                                     )
-    parser.add_argument('--debug',
-                        dest = 'debug',
-                        action = 'store_true', default = default_debug,
-                        help = 'Enable debug operation',
-                        )
+    parser = argparse.ArgumentParser(
+        description="eduID Identity Provider application",
+        add_help=True,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        '--debug',
+        dest='debug',
+        action='store_true',
+        default=default_debug,
+        help='Enable debug operation',
+    )
 
     return parser.parse_args()
+
 
 # -----------------------------------------------------------------------------
 
@@ -197,8 +199,7 @@ class IdPApplication(object):
         _session_ttl = self.config.sso_session_lifetime * 60
         _SSOSessions: SSOSessionCache
         if self.config.sso_session_mongo_uri:
-            _SSOSessions = sso_cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri,
-                                                              self.logger, _session_ttl)
+            _SSOSessions = sso_cache.SSOSessionCacheMDB(self.config.sso_session_mongo_uri, self.logger, _session_ttl)
         else:
             _SSOSessions = sso_cache.SSOSessionCacheMem(self.logger, _session_ttl, threading.Lock())
 
@@ -220,9 +221,12 @@ class IdPApplication(object):
         self.userdb = userdb
         self.authn = idp_authn.IdPAuthn(logger, config, self.userdb)
 
-        cherrypy.config.update({'request.error_response': self.handle_error,
-                                'error_page.default': self.error_page_default,
-                                })
+        cherrypy.config.update(
+            {
+                'request.error_response': self.handle_error,
+                'error_page.default': self.error_page_default,
+            }
+        )
         listen_str = 'http://'
         if self.config.server_key:
             listen_str = 'https://'
@@ -232,13 +236,14 @@ class IdPApplication(object):
             listen_str += self.config.listen_addr + ':' + str(self.config.listen_port)
         self.logger.info("eduid-IdP server started, listening on {!s}".format(listen_str))
 
-        self.context = IdPContext(config=self.config,
-                                  idp=self.IDP,
-                                  logger=self.logger,
-                                  sso_sessions=_SSOSessions,
-                                  actions_db=_actions_db,
-                                  authn=self.authn,
-                                  )
+        self.context = IdPContext(
+            config=self.config,
+            idp=self.IDP,
+            logger=self.logger,
+            sso_sessions=_SSOSessions,
+            actions_db=_actions_db,
+            authn=self.authn,
+        )
 
     @cherrypy.expose
     def index(self):
@@ -258,7 +263,7 @@ class IdPApplication(object):
         if path[1] == 'redirect':
             return SSO(sso_session, self._my_start_response, self.context).redirect()
 
-        raise eduid_idp.error.NotFound(logger = self.logger)
+        raise eduid_idp.error.NotFound(logger=self.logger)
 
     @cherrypy.expose
     def slo(self, *_args, **_kwargs):
@@ -277,7 +282,7 @@ class IdPApplication(object):
             # SOAP is commonly used for SLO
             return SLO(sso_session, self._my_start_response, self.context).soap()
 
-        raise eduid_idp.error.NotFound(logger = self.logger)
+        raise eduid_idp.error.NotFound(logger=self.logger)
 
     @cherrypy.expose
     def verify(self, *_args, **_kwargs):
@@ -288,7 +293,7 @@ class IdPApplication(object):
             # manage to log them in again (think OTPs) and just continue 'back' to the SP.
             # However, with forceAuthn, this is exactly what happens so maybe it isn't really
             # an error case.
-            #raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
+            # raise eduid_idp.error.LoginTimeout("Already logged in - can't verify credentials again",
             #                                   logger = self.logger)
             self.logger.debug("User is already logged in - verifying credentials again might not work")
         return eduid_idp.login.do_verify(self.context)
@@ -304,7 +309,7 @@ class IdPApplication(object):
         if static_fn:
             return eduid_idp.mischttp.static_file(self._my_start_response, static_fn, self.logger)
 
-        raise eduid_idp.error.NotFound(logger = self.logger)
+        raise eduid_idp.error.NotFound(logger=self.logger)
 
     @cherrypy.expose
     def status(self, request=None):
@@ -321,17 +326,17 @@ class IdPApplication(object):
         try:
             parsed = simplejson.loads(request)
         except simplejson.JSONDecodeError:
-            raise eduid_idp.error.BadRequest(logger = self.logger)
+            raise eduid_idp.error.BadRequest(logger=self.logger)
 
         if 'username' not in parsed or 'password' not in parsed:
-            raise eduid_idp.error.BadRequest(logger = self.logger)
+            raise eduid_idp.error.BadRequest(logger=self.logger)
 
-        if parsed['username'] not in self.config.status_test_usernames \
-                and self.config.status_test_usernames != ['*']:
-            self.logger.debug("Username {!r} in status request is not on the list "
-                              "of permitted usernames : {!r}".format(parsed['username'],
-                                                                     self.config.status_test_usernames))
-            raise eduid_idp.error.Forbidden(logger = self.logger)
+        if parsed['username'] not in self.config.status_test_usernames and self.config.status_test_usernames != ['*']:
+            self.logger.debug(
+                "Username {!r} in status request is not on the list "
+                "of permitted usernames : {!r}".format(parsed['username'], self.config.status_test_usernames)
+            )
+            raise eduid_idp.error.Forbidden(logger=self.logger)
 
         response = {'status': 'FAIL'}
 
@@ -342,9 +347,10 @@ class IdPApplication(object):
             if health['status'] != 'STATUS_OK':
                 response['reason'] = 'Health check failed: {}'.format(health.get('reason'))
             else:
-                response = {'status': 'OK',
-                            'testuser_name': user.display_name,
-                            }
+                response = {
+                    'status': 'OK',
+                    'testuser_name': user.display_name,
+                }
 
         return "{}\n".format(simplejson.dumps(response))
 
@@ -422,8 +428,11 @@ class IdPApplication(object):
         """
         self.logger.debug("Initiating HTTP response {!r}, headers {!s}".format(status, pprint.pformat(headers)))
         if hasattr(cherrypy.response, 'idp_response_status') and cherrypy.response.idp_response_status:
-            self.logger.warning("start_response called twice (now {!r}, previous {!r})".format(
-                status, cherrypy.response.idp_response_status))
+            self.logger.warning(
+                "start_response called twice (now {!r}, previous {!r})".format(
+                    status, cherrypy.response.idp_response_status
+                )
+            )
         cherrypy.response.idp_response_status = status
         cherrypy.response.status = status
         for (k, v) in headers:
@@ -444,11 +453,13 @@ class IdPApplication(object):
                 return None
             _age = session.minutes_old
             if _age > self.config.sso_session_lifetime:
-                self.logger.debug("SSO session expired (age {!r} minutes > {!r})".format(
-                    _age, self.config.sso_session_lifetime))
+                self.logger.debug(
+                    "SSO session expired (age {!r} minutes > {!r})".format(_age, self.config.sso_session_lifetime)
+                )
                 return None
-            self.logger.debug("SSO session is still valid (age {!r} minutes <= {!r})".format(
-                _age, self.config.sso_session_lifetime))
+            self.logger.debug(
+                "SSO session is still valid (age {!r} minutes <= {!r})".format(_age, self.config.sso_session_lifetime)
+            )
         return session
 
     def _lookup_sso_session2(self) -> Optional[SSOSession]:
@@ -471,8 +482,9 @@ class IdPApplication(object):
                 self.logger.debug("Parsed query string :\n{!s}".format(pprint.pformat(query)))
                 try:
                     _data = self.context.sso_sessions.get_session(query['id'])
-                    self.logger.debug("Looked up SSO session using query 'id' parameter :\n{!s}".format(
-                        pprint.pformat(_data)))
+                    self.logger.debug(
+                        "Looked up SSO session using query 'id' parameter :\n{!s}".format(pprint.pformat(_data))
+                    )
                 except KeyError:
                     # no 'id', or not found in cache
                     pass
@@ -514,13 +526,14 @@ class IdPApplication(object):
         except (ValueError, AttributeError, IndexError):
             pass
 
-        pages = {400: 'bad_request.html',
-                 401: 'unauthorized.html',
-                 403: 'forbidden.html',
-                 404: 'not_found.html',
-                 429: 'toomany.html',
-                 440: 'session_timeout.html',
-                 }
+        pages = {
+            400: 'bad_request.html',
+            401: 'unauthorized.html',
+            403: 'forbidden.html',
+            404: 'not_found.html',
+            429: 'toomany.html',
+            440: 'session_timeout.html',
+        }
         fn = pages.get(status_code)
         if status_code == 403:
             if 'CREDENTIAL_EXPIRED' in message:
@@ -534,9 +547,9 @@ class IdPApplication(object):
         if fn is None:
             fn = 'error.html'
 
-        return self._render_error_page(status, message, traceback = traceback, filename = fn)
+        return self._render_error_page(status, message, traceback=traceback, filename=fn)
 
-    def _render_error_page(self, status: str, reason: str, filename: str, traceback: Optional[str]=None) -> bytes:
+    def _render_error_page(self, status: str, reason: str, filename: str, traceback: Optional[str] = None) -> bytes:
         # Look for error page in user preferred language
         """
         Render localized error page `error.html' or a default string based one if
@@ -549,11 +562,13 @@ class IdPApplication(object):
         :return: HTML
         """
         res = eduid_idp.mischttp.localized_resource(
-            self._my_start_response, filename, self.config, logger=self.logger, status=status)
+            self._my_start_response, filename, self.config, logger=self.logger, status=status
+        )
         if not res:
             # default error message
             res = "<html><body>Sorry, an error occured.<p>{status} {reason}</body></html>".format(
-                status=status, reason=reason)
+                status=status, reason=reason
+            )
 
         status_code = -1
         try:
@@ -561,21 +576,24 @@ class IdPApplication(object):
         except (ValueError, AttributeError, IndexError):
             pass
 
-        messages = {'SAML_UNKNOWN_SP': 'SAML error: Unknown Service Provider',
-                    }
+        messages = {
+            'SAML_UNKNOWN_SP': 'SAML error: Unknown Service Provider',
+        }
         error_details = ''
         if reason in messages:
             error_details = '<p>' + messages[reason] + '</p>'
 
         # apply simplistic HTML formatting to template in 'res'
         argv = eduid_idp.mischttp.get_default_template_arguments(self.config)
-        argv.update({
-            'error_status': str(status),
-            'error_code': str(status_code),
-            'error_reason': str(reason),
-            'error_traceback': str(traceback),
-            'error_details': str(error_details),
-        })
+        argv.update(
+            {
+                'error_status': str(status),
+                'error_code': str(status_code),
+                'error_reason': str(reason),
+                'error_traceback': str(traceback),
+                'error_details': str(error_details),
+            }
+        )
         res = res.format(**argv).encode('utf-8')
 
         # Return before logging the error for errors that are not failures in the IdP
@@ -583,20 +601,24 @@ class IdPApplication(object):
         if status_code in [400, 401, 403, 404, 440]:
             return res
 
-        self.logger.exception("Error in IdP application",
-                              extra={'data': {'request': cherrypy.request,
-                                              'traceback': traceback,
-                                              'status': status,
-                                              'reason': reason,
-                                              },
-                                     })
+        self.logger.exception(
+            "Error in IdP application",
+            extra={
+                'data': {
+                    'request': cherrypy.request,
+                    'traceback': traceback,
+                    'status': status,
+                    'reason': reason,
+                },
+            },
+        )
         return res
 
 
 # ----------------------------------------------------------------------------
 
 
-def main(myname = 'eduid-IdP', args = None, logger = None):
+def main(myname='eduid-IdP', args=None, logger=None):
     """
     Initialize everything and start the IdP application.
 
@@ -623,8 +645,9 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
 
     # initialize various components
     if not logger:
-        logging.basicConfig(level = level, stream = sys.stderr,
-                            format='%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s')
+        logging.basicConfig(
+            level=level, stream=sys.stderr, format='%(asctime)s %(name)s %(threadName)s: %(levelname)s %(message)s'
+        )
         logger = logging.getLogger(myname)
         # If stderr is not a TTY, change the log level of the StreamHandler (stream = sys.stderr above) to WARNING
         if not sys.stderr.isatty():
@@ -657,20 +680,22 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
         for key, value in sorted(config.to_dict().items()):
             pprint.pprint((key, value), stream=sys.stderr)
 
-    cherry_conf = {'server.thread_pool': config.num_threads,
-                   'server.socket_host': config.listen_addr,
-                   'server.socket_port': config.listen_port,
-                   # enables X-Forwarded-For, since BCP is to run this server
-                   # behind a webserver that handles TLS
-                   'tools.proxy.on': True,
-                   'request.show_tracebacks': config.debug,
-                   }
+    cherry_conf = {
+        'server.thread_pool': config.num_threads,
+        'server.socket_host': config.listen_addr,
+        'server.socket_port': config.listen_port,
+        # enables X-Forwarded-For, since BCP is to run this server
+        # behind a webserver that handles TLS
+        'tools.proxy.on': True,
+        'request.show_tracebacks': config.debug,
+    }
     if config.server_cert and config.server_key:
-        _tls_opts = {'server.ssl_module': config.ssl_adapter,
-                     'server.ssl_certificate': config.server_cert,
-                     'server.ssl_private_key': config.server_key,
-                     #'server.ssl_certificate_chain':
-                     }
+        _tls_opts = {
+            'server.ssl_module': config.ssl_adapter,
+            'server.ssl_certificate': config.server_cert,
+            'server.ssl_private_key': config.server_key,
+            #'server.ssl_certificate_chain':
+        }
         cherry_conf.update(_tls_opts)
 
     if config.logdir:
@@ -697,6 +722,7 @@ def main(myname = 'eduid-IdP', args = None, logger = None):
     cherrypy.config.logger = logger
 
     cherrypy.quickstart(IdPApplication(logger, config))
+
 
 if __name__ == '__main__':
     try:

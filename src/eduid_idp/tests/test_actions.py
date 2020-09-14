@@ -33,32 +33,30 @@
 # Author : Enrique Perez <enrique@cazalla.net>
 #
 
-import os
 import logging
-import pkg_resources
+import os
 from datetime import datetime
 
-import six
 import bson
-import webtest
 import cherrypy
-
+import eduid_userdb
+import pkg_resources
+import six
+import webtest
+from cherrypy.lib.sessions import init
+from eduid_common.config.idp import IdPConfig
+from eduid_common.session.testing import RedisTemporaryInstance
+from eduid_userdb.credentials import U2F, Webauthn
+from eduid_userdb.testing import MongoTestCase
+from eduid_userdb.tou import ToUEvent
 from mock import patch
 from saml2.authn_context import PASSWORDPROTECTEDTRANSPORT
-from cherrypy.lib.sessions import init
 
-import eduid_userdb
-from eduid_userdb.credentials import U2F, Webauthn
-from eduid_userdb.tou import ToUEvent
-from eduid_userdb.testing import MongoTestCase
-from eduid_common.session.testing import RedisTemporaryInstance
-from eduid_common.config.idp import IdPConfig
-
-from eduid_idp.tests.test_SSO import make_SAML_request, make_login_ticket, SWAMID_AL2
-from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
 from eduid_idp.idp import IdPApplication
 from eduid_idp.shared_session import EduidSession
-
+from eduid_idp.tests.test_SSO import SWAMID_AL2
+from eduid_idp.tests.test_SSO import cc as CONTEXTCLASSREFS
+from eduid_idp.tests.test_SSO import make_login_ticket, make_SAML_request
 
 logger = logging.getLogger(__name__)
 
@@ -68,42 +66,42 @@ remote = cherrypy.lib.httputil.Host('127.0.0.1', 50001, "")
 
 # noinspection PyProtectedMember
 class TestActions(MongoTestCase):
-
     def setUp(self):
         MongoTestCase.setUp(self)
         datadir = pkg_resources.resource_filename(__name__, 'data')
         staticdir = pkg_resources.resource_filename(__name__, 'static/en')
         self.redis_instance = RedisTemporaryInstance.get_instance()
         # load the IdP configuration
-        _test_config = {'mongo_uri': self.tmp_db.uri,
-                        'environment': 'test_suite',
-                        'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
-                        'static_dir': staticdir,
-                        'tou_version': 'mock-version',
-                        'shared_session_secret_key': 'shared-session-secret-key',
-                        'shared_session_ttl': 30,
-                        'redis_host': 'localhost',
-                        'redis_port': str(self.redis_instance.port),
-                        'redis_db': '0',
-                        'insecure_cookies': 1,
-                        'listen_addr': 'unittest-idp.example.edu',
-                        'listen_port': 443,
-                        'base_url': 'https://unittest-idp.example.edu/',
-                        'content_packages': [('eduid_idp', 'tests/static')],
-                        'action_plugins': ['tou', 'mfa'],
-                        'insecure_cookies': False,
-                        'debug': True
-                        }
+        _test_config = {
+            'mongo_uri': self.tmp_db.uri,
+            'environment': 'test_suite',
+            'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
+            'static_dir': staticdir,
+            'tou_version': 'mock-version',
+            'shared_session_secret_key': 'shared-session-secret-key',
+            'shared_session_ttl': 30,
+            'redis_host': 'localhost',
+            'redis_port': str(self.redis_instance.port),
+            'redis_db': '0',
+            'insecure_cookies': 1,
+            'listen_addr': 'unittest-idp.example.edu',
+            'listen_port': 443,
+            'base_url': 'https://unittest-idp.example.edu/',
+            'content_packages': [('eduid_idp', 'tests/static')],
+            'action_plugins': ['tou', 'mfa'],
+            'insecure_cookies': False,
+            'debug': True,
+        }
 
         cherry_conf = {
-                'tools.sessions.on': True,
-                'tools.sessions.storage_class': EduidSession,
-                'tools.sessions.name': 'sessid',
-                'tools.sessions.domain': 'unittest-idp.example.edu',
-                'tools.sessions.secure': True,
-                'tools.sessions.persistent': True,
-                'tools.sessions.httponly': False,
-                }
+            'tools.sessions.on': True,
+            'tools.sessions.storage_class': EduidSession,
+            'tools.sessions.name': 'sessid',
+            'tools.sessions.domain': 'unittest-idp.example.edu',
+            'tools.sessions.secure': True,
+            'tools.sessions.persistent': True,
+            'tools.sessions.httponly': False,
+        }
 
         self.config = IdPConfig.init_config(test_config=_test_config, debug=False)
         cherry_conf.update(self.config.to_dict())
@@ -112,8 +110,7 @@ class TestActions(MongoTestCase):
 
         if hasattr(cherrypy.request, '_session_init_flag'):
             del cherrypy.request._session_init_flag
-        init(storage_class=EduidSession, path='/', name='sessid',
-             domain="unittest-idp.example.edu")
+        init(storage_class=EduidSession, path='/', name='sessid', domain="unittest-idp.example.edu")
         # Create the IdP app
         self.idp_app = IdPApplication(logger, self.config)
 
@@ -122,11 +119,7 @@ class TestActions(MongoTestCase):
         # setup some test data
         _email = 'johnsmith@example.com'
         self.test_user = self.amdb.get_user_by_mail(_email)
-        self.test_action = self.actions.add_action(self.test_user.eppn,
-                                                   action_type = 'dummy',
-                                                   preference = 100,
-                                                   params = {})
-
+        self.test_action = self.actions.add_action(self.test_user.eppn, action_type='dummy', preference=100, params={})
 
         # prevent the HTTP server from ever starting
         cherrypy.server.unsubscribe()
@@ -135,9 +128,8 @@ class TestActions(MongoTestCase):
 
         # create a webtest testing environment
         from six.moves.http_cookiejar import CookieJar
-        self.http = webtest.TestApp(cherrypy.tree,
-                                    extra_environ={'wsgi.url_scheme': 'https'},
-                                    cookiejar=CookieJar())
+
+        self.http = webtest.TestApp(cherrypy.tree, extra_environ={'wsgi.url_scheme': 'https'}, cookiejar=CookieJar())
 
     def tearDown(self):
         # reset the testing environment
@@ -168,6 +160,7 @@ class TestActions(MongoTestCase):
 
         # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient
+
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
 
@@ -176,13 +169,11 @@ class TestActions(MongoTestCase):
             self.assertEqual(resp.status, '302 Found')
 
         # Register user acceptance for the ToU version in use
-        tou = ToUEvent.from_dict(dict(version=self.config.tou_version,
-                                      created_by='unit test',
-                                      created_ts=True,
-                                      event_id=bson.ObjectId())
-                                 )
+        tou = ToUEvent.from_dict(
+            dict(version=self.config.tou_version, created_by='unit test', created_ts=True, event_id=bson.ObjectId())
+        )
         user = self.amdb.get_user_by_mail(_email)
-        assert(isinstance(user, eduid_userdb.User))
+        assert isinstance(user, eduid_userdb.User)
         user.tou.add(tou)
         self.amdb.save(user)
 
@@ -214,6 +205,7 @@ class TestActions(MongoTestCase):
 
         # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient
+
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
 
@@ -248,6 +240,7 @@ class TestActions(MongoTestCase):
 
         # Patch the VCCSClient so we do not need a vccs server
         from vccs_client import VCCSClient
+
         with patch.object(VCCSClient, 'authenticate'):
             VCCSClient.authenticate.return_value = True
 
@@ -269,6 +262,7 @@ class TestActions(MongoTestCase):
     def test_add_mfa_action_no_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.mfa_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
@@ -276,53 +270,67 @@ class TestActions(MongoTestCase):
     def test_add_mfa_action_no_key_required_mfa(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.mfa_action import add_actions
-        mock_ticket = make_login_ticket(req_class_ref=CONTEXTCLASSREFS['REFEDS_MFA'], context=self.idp_app.context,
-                                        key='mock-session')
+
+        mock_ticket = make_login_ticket(
+            req_class_ref=CONTEXTCLASSREFS['REFEDS_MFA'], context=self.idp_app.context, key='mock-session'
+        )
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_old_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        u2f = U2F.from_dict(dict(version='U2F_V2',
-                                 app_id='https://dev.eduid.se/u2f-app-id.json',
-                                 keyhandle='test_key_handle',
-                                 public_key='test_public_key',
-                                 attest_cert='test_attest_cert',
-                                 description='test_description')
-                            )
+        u2f = U2F.from_dict(
+            dict(
+                version='U2F_V2',
+                app_id='https://dev.eduid.se/u2f-app-id.json',
+                keyhandle='test_key_handle',
+                public_key='test_public_key',
+                attest_cert='test_attest_cert',
+                description='test_description',
+            )
+        )
         self.test_user.credentials.add(u2f)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_new_key(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        webauthn = Webauthn.from_dict(dict(keyhandle='test_key_handle',
-                                           credential_data='test_credential_data',
-                                           app_id='https://dev.eduid.se/u2f-app-id.json',
-                                           attest_obj='test_attest_obj',
-                                           description='test_description')
-                                      )
+        webauthn = Webauthn.from_dict(
+            dict(
+                keyhandle='test_key_handle',
+                credential_data='test_credential_data',
+                app_id='https://dev.eduid.se/u2f-app-id.json',
+                attest_obj='test_attest_obj',
+                description='test_description',
+            )
+        )
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_mfa_action_no_db(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        webauthn = Webauthn.from_dict(dict(keyhandle='test_key_handle',
-                                           credential_data='test_credential_data',
-                                           app_id='https://dev.eduid.se/u2f-app-id.json',
-                                           attest_obj='test_attest_obj',
-                                           description='test_description')
-                                      )
+        webauthn = Webauthn.from_dict(
+            dict(
+                keyhandle='test_key_handle',
+                credential_data='test_credential_data',
+                app_id='https://dev.eduid.se/u2f-app-id.json',
+                attest_obj='test_attest_obj',
+                description='test_description',
+            )
+        )
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         from eduid_idp.mfa_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         with self.assertRaises(AttributeError):
             add_actions(self.idp_app, self.test_user, mock_ticket)
@@ -330,30 +338,32 @@ class TestActions(MongoTestCase):
 
     def _test_add_2nd_mfa_action(self, success=True, authn_context=True, cred_key=None, actions=0):
         self.actions.remove_action_by_id(self.test_action.action_id)
-        webauthn = Webauthn.from_dict(dict(keyhandle='test_key_handle',
-                                           credential_data='test_credential_data',
-                                           app_id='https://dev.eduid.se/u2f-app-id.json',
-                                           attest_obj='test_attest_obj',
-                                           description='test_description')
-                                      )
+        webauthn = Webauthn.from_dict(
+            dict(
+                keyhandle='test_key_handle',
+                credential_data='test_credential_data',
+                app_id='https://dev.eduid.se/u2f-app-id.json',
+                attest_obj='test_attest_obj',
+                description='test_description',
+            )
+        )
         self.test_user.credentials.add(webauthn)
         self.amdb.save(self.user, check_sync=False)
         cred = self.test_user.credentials.filter(Webauthn).to_list()[0]
         if cred_key is None:
             cred_key = cred.key
-        completed_action = self.actions.add_action(self.test_user.eppn,
-                                                   action_type = 'mfa',
-                                                   preference = 100,
-                                                   params = {},
-                                                   session='mock-session')
+        completed_action = self.actions.add_action(
+            self.test_user.eppn, action_type='mfa', preference=100, params={}, session='mock-session'
+        )
         completed_action.result = {
             'cred_key': cred_key,
             'issuer': 'dummy-issuer',
             'success': success,
-            'authn_context': authn_context
+            'authn_context': authn_context,
         }
         self.actions.update_action(completed_action)
         from eduid_idp.mfa_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), actions)
@@ -377,75 +387,87 @@ class TestActions(MongoTestCase):
     def test_add_tou_action(self):
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_tou_action_already_accepted(self):
         event_id = bson.ObjectId()
-        self.test_user.tou.add(ToUEvent.from_dict(dict(
-            version='mock-version',
-            created_by='test_tou_plugin',
-            created_ts=datetime.utcnow(),
-            event_id=event_id
-        )))
+        self.test_user.tou.add(
+            ToUEvent.from_dict(
+                dict(
+                    version='mock-version',
+                    created_by='test_tou_plugin',
+                    created_ts=datetime.utcnow(),
+                    event_id=event_id,
+                )
+            )
+        )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 0)
 
     def test_add_tou_action_already_accepted_other_version(self):
         event_id = bson.ObjectId()
-        self.test_user.tou.add(ToUEvent.from_dict(dict(
-            version='mock-version-2',
-            created_by='test_tou_plugin',
-            created_ts=datetime.utcnow(),
-            event_id=event_id
-        )))
+        self.test_user.tou.add(
+            ToUEvent.from_dict(
+                dict(
+                    version='mock-version-2',
+                    created_by='test_tou_plugin',
+                    created_ts=datetime.utcnow(),
+                    event_id=event_id,
+                )
+            )
+        )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_tou_action_already_action(self):
         self.idp_app.context.actions_db.add_action(
-            self.test_user.eppn,
-            action_type = 'tou',
-            preference = 100,
-            params = {'version': 'mock-version'}
+            self.test_user.eppn, action_type='tou', preference=100, params={'version': 'mock-version'}
         )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)
 
     def test_add_tou_action_already_action_other_version(self):
         self.idp_app.context.actions_db.add_action(
-            self.test_user.eppn,
-            action_type = 'tou',
-            preference = 100,
-            params = {'version': 'mock-version-2'}
+            self.test_user.eppn, action_type='tou', preference=100, params={'version': 'mock-version-2'}
         )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 2)
 
     def test_add_tou_action_should_reaccept(self):
         event_id = bson.ObjectId()
-        self.test_user.tou.add(ToUEvent.from_dict(dict(
-            version='mock-version',
-            created_by='test_tou_plugin',
-            created_ts=datetime(2015, 9, 24, 1, 1, 1, 111111),
-            modified_ts=datetime(2015, 9, 24, 1, 1, 1, 111111),
-            event_id=event_id
-        )))
+        self.test_user.tou.add(
+            ToUEvent.from_dict(
+                dict(
+                    version='mock-version',
+                    created_by='test_tou_plugin',
+                    created_ts=datetime(2015, 9, 24, 1, 1, 1, 111111),
+                    modified_ts=datetime(2015, 9, 24, 1, 1, 1, 111111),
+                    event_id=event_id,
+                )
+            )
+        )
         self.actions.remove_action_by_id(self.test_action.action_id)
         from eduid_idp.tou_action import add_actions
+
         mock_ticket = make_login_ticket(req_class_ref=SWAMID_AL2, context=self.idp_app.context, key='mock-session')
         add_actions(self.idp_app.context, self.test_user, mock_ticket)
         self.assertEqual(len(self.actions.get_actions(self.test_user.eppn, 'mock-session')), 1)

@@ -32,9 +32,10 @@
 
 __author__ = 'eperez'
 
-from eduid_idp.context import IdPContext
-from eduid_userdb.idp import IdPUser
 from eduid_common.session.logindata import SSOLoginData
+from eduid_userdb.idp import IdPUser
+
+from eduid_idp.context import IdPContext
 
 
 def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> None:
@@ -60,12 +61,6 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
         context.logger.warning('No actions_db - aborting ToU action')
         return None
 
-    if not context.actions_db.has_actions(user.eppn,
-                                          action_type = 'tou',
-                                          params = {'version': version}):
+    if not context.actions_db.has_actions(user.eppn, action_type='tou', params={'version': version}):
         context.logger.debug('User must accept ToU version {!r}'.format(version))
-        context.actions_db.add_action(
-            user.eppn,
-            action_type = 'tou',
-            preference = 100,
-            params = {'version': version})
+        context.actions_db.add_action(user.eppn, action_type='tou', preference=100, params={'version': version})

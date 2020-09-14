@@ -30,6 +30,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 from eduid_common.session.logindata import ExternalMfaData
+
 from eduid_idp.util import get_requested_authn_context
 
 __author__ = 'ft'
@@ -37,12 +38,12 @@ __author__ = 'ft'
 import datetime
 from typing import List
 
-from eduid_idp.context import IdPContext
-from eduid_userdb.idp.user import IdPUser
 from eduid_common.session.logindata import SSOLoginData
-from eduid_userdb.credentials import U2F, Webauthn
 from eduid_userdb.actions import Action
+from eduid_userdb.credentials import U2F, Webauthn
+from eduid_userdb.idp.user import IdPUser
 
+from eduid_idp.context import IdPContext
 
 RESULT_CREDENTIAL_KEY_NAME = 'cred_key'
 
@@ -65,8 +66,10 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
 
     require_mfa = False
     requested_authn_context = get_requested_authn_context(context.idp, ticket.saml_req, context.logger)
-    if requested_authn_context in ['https://refeds.org/profile/mfa',
-                                   'https://www.swamid.se/specs/id-fido-u2f-ce-transports']:
+    if requested_authn_context in [
+        'https://refeds.org/profile/mfa',
+        'https://www.swamid.se/specs/id-fido-u2f-ce-transports',
+    ]:
         require_mfa = True
 
     # Security Keys
@@ -78,7 +81,7 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
         context.logger.debug('User does not have any FIDO tokens registered and SP did not require MFA')
         return None
 
-    existing_actions = context.actions_db.get_actions(user.eppn, ticket.key, action_type = 'mfa')
+    existing_actions = context.actions_db.get_actions(user.eppn, ticket.key, action_type='mfa')
     if existing_actions and len(existing_actions) > 0:
         context.logger.debug('User has existing MFA actions - checking them')
         if check_authn_result(context, user, ticket, existing_actions):
@@ -91,10 +94,11 @@ def add_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData) -> Non
     context.logger.debug('User must authenticate with a token (has {} token(s))'.format(len(tokens)))
     context.actions_db.add_action(
         user.eppn,
-        action_type = 'mfa',
-        preference = 1,
-        session = ticket.key,  # XXX double-check that ticket.key is not sensitive to disclose to the user
-        params = {})
+        action_type='mfa',
+        preference=1,
+        session=ticket.key,  # XXX double-check that ticket.key is not sensitive to disclose to the user
+        params={},
+    )
 
 
 def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData, actions: List[Action]) -> bool:
@@ -120,11 +124,12 @@ def check_authn_result(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
         if this.result.get('success') is True:
             if this.result.get('issuer') and this.result.get('authn_context'):
                 # External MFA authentication
-                ticket.mfa_action_external = ExternalMfaData(issuer=this.result['issuer'],
-                                                             authn_context=this.result['authn_context'],
-                                                             timestamp=utc_now)
-                context.logger.debug('Removing MFA action completed with external issuer {}'.format(
-                    this.result.get('issuer')))
+                ticket.mfa_action_external = ExternalMfaData(
+                    issuer=this.result['issuer'], authn_context=this.result['authn_context'], timestamp=utc_now
+                )
+                context.logger.debug(
+                    'Removing MFA action completed with external issuer {}'.format(this.result.get('issuer'))
+                )
                 context.actions_db.remove_action_by_id(this.action_id)
                 return True
             key = this.result.get(RESULT_CREDENTIAL_KEY_NAME)

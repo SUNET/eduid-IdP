@@ -34,6 +34,7 @@
 #
 
 from unittest import TestCase
+
 import eduid_idp
 
 __author__ = 'ft'

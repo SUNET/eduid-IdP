@@ -38,13 +38,17 @@ from typing import List, Tuple
 #
 # Format of Accept-Language header values. From RFC 2616, section 14.4 and 3.9
 # and RFC 3066, section 2.1
-accept_language_re = re.compile(r'''
+accept_language_re = re.compile(
+    r'''
         ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|\*)      # "en", "en-au", "x-y-z", "es-419", "*"
         (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:.0{,3})?))?   # Optional "q=1.00", "q=0.8"
         (?:\s*,\s*|$)                                 # Multiple accepts per header.
-        ''', re.VERBOSE)
+        ''',
+    re.VERBOSE,
+)
 
 LangEntry = Tuple[str, float]
+
 
 def parse_accept_lang_header(lang_string: str) -> List[LangEntry]:
     """
@@ -60,7 +64,7 @@ def parse_accept_lang_header(lang_string: str) -> List[LangEntry]:
     if pieces[-1]:
         return []
     for i in range(0, len(pieces) - 1, 3):
-        first, lang, priority = pieces[i: i + 3]
+        first, lang, priority = pieces[i : i + 3]
         if first:
             return []
         _priority = 1.0

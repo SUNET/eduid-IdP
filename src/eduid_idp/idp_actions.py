@@ -32,27 +32,26 @@
 # Author : Enrique Perez <enrique@cazalla.net>
 #
 
-import cherrypy
-from time import time
 from datetime import datetime
+from time import time
 
+import cherrypy
+from eduid_common.authn.idp_authn import AuthnData
+from eduid_common.session.logindata import SSOLoginData
 from eduid_common.session.namespaces import Actions
-
-import eduid_idp.util
-import eduid_idp.mischttp
+from eduid_common.session.sso_session import SSOSession
+from eduid_userdb.idp import IdPUser
 
 import eduid_idp.mfa_action
+import eduid_idp.mischttp
 import eduid_idp.tou_action
-
-from eduid_common.authn.idp_authn import AuthnData
-from eduid_userdb.idp import IdPUser
+import eduid_idp.util
 from eduid_idp.context import IdPContext
-from eduid_common.session.logindata import SSOLoginData
-from eduid_common.session.sso_session import SSOSession
 
 
-def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLoginData,
-                              sso_session: SSOSession) -> None:
+def check_for_pending_actions(
+    context: IdPContext, user: IdPUser, ticket: SSOLoginData, sso_session: SSOSession
+) -> None:
     """
     Check whether there are any pending actions for the current user,
     and if there are, redirect to the actions app.
@@ -72,7 +71,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
     # Add any actions that may depend on the login data
     add_idp_initiated_actions(context, user, ticket)
 
-    actions_eppn = context.actions_db.get_actions(user.eppn, session = ticket.key)
+    actions_eppn = context.actions_db.get_actions(user.eppn, session=ticket.key)
 
     # Check for pending actions
     pending_actions = [a for a in actions_eppn if a.result is None]
@@ -82,7 +81,7 @@ def check_for_pending_actions(context: IdPContext, user: IdPUser, ticket: SSOLog
         update = False
         for cred_key, ts in ticket.mfa_action_creds.items():
             cred = user.credentials.find(cred_key)
-            authn = AuthnData(user = user, credential = cred, timestamp = ts)
+            authn = AuthnData(user=user, credential=cred, timestamp=ts)
             sso_session.add_authn_credential(authn)
             update = True
         # eduid_action.mfa.idp.check_authn_result will have added any external mfa used to

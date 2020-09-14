@@ -13,28 +13,27 @@ from typing import Optional, Tuple
 
 import cherrypy
 from cherrypy.lib.sessions import Session
-
-import eduid_idp.mischttp
 from eduid_common.config.exceptions import BadConfiguration
 from eduid_common.session.logindata import SSOLoginData
 from eduid_common.session.namespaces import Actions, Common
-from eduid_common.session.redis_session import RedisEncryptedSession
-from eduid_common.session.redis_session import SessionManager
+from eduid_common.session.redis_session import RedisEncryptedSession, SessionManager
+
+import eduid_idp.mischttp
 
 
 class EduidSession(Session):
-    '''
+    """
     Cherrypy session that keeps data encrypted in Redis,
     shared with the rest of the eduid apps by way of a
     shared encryption key.
-    '''
+    """
 
     @classmethod
     def setup(cls, **config):
-        '''
+        """
         Initialize Redis connection pool. Only called once per process.
         See cherrypy.lib.sessions.init
-        '''
+        """
         for k, v in config.items():
             setattr(cls, k, v)
 

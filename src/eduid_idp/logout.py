@@ -13,18 +13,16 @@ Code handling Single Log Out requests.
 """
 import pprint
 
-import eduid_idp
 import saml2.request
 import saml2.samlp
+from eduid_common.authn.idp_saml import gen_key
 from eduid_common.session import sso_session
 from eduid_common.session.sso_cache import SSOSessionId
-from eduid_common.authn.idp_saml import gen_key
-from eduid_idp.service import Service
-from saml2 import BINDING_HTTP_POST
-from saml2 import BINDING_HTTP_REDIRECT
-from saml2 import BINDING_SOAP
+from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT, BINDING_SOAP
 from saml2.s_utils import error_status_factory, exception_trace
 
+import eduid_idp
+from eduid_idp.service import Service
 
 # -----------------------------------------------------------------------------
 # === Single log out ===
@@ -62,9 +60,10 @@ class SLO(Service):
         :return: dict with 'SAMLRequest' and 'RelayState' items
         """
         query = eduid_idp.mischttp.get_request_body()
-        return {'SAMLRequest': query,
-                'RelayState': '',
-                }
+        return {
+            'SAMLRequest': query,
+            'RelayState': '',
+        }
 
     def perform_logout(self, info, binding):
         """
@@ -82,7 +81,7 @@ class SLO(Service):
         """
         self.logger.debug("--- Single Log Out Service ---")
         if not info:
-            raise eduid_idp.error.BadRequest('Error parsing request or no request', logger = self.logger)
+            raise eduid_idp.error.BadRequest('Error parsing request or no request', logger=self.logger)
 
         request = info["SAMLRequest"]
         req_key = gen_key(request)
@@ -95,7 +94,7 @@ class SLO(Service):
             self.logger.debug("_perform_logout {!s}:\n{!s}".format(binding, pprint.pformat(info)))
             self.logger.error("Bad request parsing logout request : {!r}".format(exc))
             self.logger.debug("Exception parsing logout request :\n{!s}".format(exception_trace(exc)))
-            raise eduid_idp.error.BadRequest("Failed parsing logout request", logger = self.logger)
+            raise eduid_idp.error.BadRequest("Failed parsing logout request", logger=self.logger)
 
         req_info.binding = binding
         if 'RelayState' in info:
@@ -120,12 +119,12 @@ class SLO(Service):
             # the user based on NameID and then destroy *all* the users SSO sessions
             # unfortunately.
             _username = self.context.idp.ident.find_local_id(_name_id)
-            self.logger.debug("Logout message name_id: {!r} found username {!r}".format(
-                _name_id, _username))
+            self.logger.debug("Logout message name_id: {!r} found username {!r}".format(_name_id, _username))
             session_ids = self.context.sso_sessions.get_sessions_for_user(_username)
 
-        self.logger.debug("Logout resources: name_id {!r} username {!r}, session_ids {!r}".format(
-            _name_id, _username, session_ids))
+        self.logger.debug(
+            "Logout resources: name_id {!r} username {!r}, session_ids {!r}".format(_name_id, _username, session_ids)
+        )
 
         if session_ids:
             status_code = self._logout_session_ids(session_ids, req_key)
@@ -134,8 +133,9 @@ class SLO(Service):
             # the sessions for this NameID.
             status_code = self._logout_name_id(_name_id, req_key)
 
-        self.logger.debug("Logout of sessions {!r} / NameID {!r} result : {!r}".format(
-            session_ids, _name_id, status_code))
+        self.logger.debug(
+            "Logout of sessions {!r} / NameID {!r} result : {!r}".format(session_ids, _name_id, status_code)
+        )
         return self._logout_response(req_info, status_code, req_key)
 
     def _logout_session_ids(self, session_ids, req_key):
@@ -156,8 +156,11 @@ class SLO(Service):
                     raise KeyError('Session not found')
                 _sso = sso_session.from_dict(_data)
                 res = self.context.sso_sessions.remove_session(this)
-                self.logger.info("{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
-                    req_key, _sso.public_id, _sso.minutes_old, bool(res)))
+                self.logger.info(
+                    "{!s}: logout sso_session={!r}, age={!r}m, result={!r}".format(
+                        req_key, _sso.public_id, _sso.minutes_old, bool(res)
+                    )
+                )
             except KeyError:
                 self.logger.info("{!s}: logout sso_key={!r}, result=not_found".format(req_key, this))
                 res = 0
@@ -192,7 +195,7 @@ class SLO(Service):
             self.logger.info("{!s}: logout name_id={!r}".format(req_key, name_id))
         except KeyError as exc:
             self.logger.error("ServiceError removing authn : %s" % exc)
-            raise eduid_idp.error.ServiceError(logger = self.logger)
+            raise eduid_idp.error.ServiceError(logger=self.logger)
         return saml2.samlp.STATUS_SUCCESS
 
     def _logout_response(self, req_info, status_code, req_key, sign_response=True):
@@ -211,13 +214,14 @@ class SLO(Service):
         :type sign_response: bool
         :rtype: string
         """
-        self.logger.debug("LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(),
-                                                                            req_info.sender(),
-                                                                            status_code))
+        self.logger.debug(
+            "LOGOUT of '{!s}' by '{!s}', success={!r}".format(req_info.subject_id(), req_info.sender(), status_code)
+        )
         if req_info.binding != BINDING_SOAP:
             bindings = [BINDING_HTTP_REDIRECT, BINDING_HTTP_POST]
-            binding, destination = self.context.idp.pick_binding("single_logout_service", bindings,
-                                                         entity_id = req_info.sender())
+            binding, destination = self.context.idp.pick_binding(
+                "single_logout_service", bindings, entity_id=req_info.sender()
+            )
             bindings = [binding]
         else:
             bindings = [BINDING_SOAP]
@@ -229,15 +233,17 @@ class SLO(Service):
             self.logger.debug("Created 'logout failed' status based on {!r} : {!r}".format(status_code, status))
 
         issuer = self.context.idp._issuer(self.context.idp.config.entityid)
-        response = self.context.idp.create_logout_response(req_info.message, bindings, status, sign = sign_response,
-                                                   issuer = issuer)
+        response = self.context.idp.create_logout_response(
+            req_info.message, bindings, status, sign=sign_response, issuer=issuer
+        )
         # Only perform expensive parse/pretty-print if debugging
         if self.config.debug:
             xmlstr = eduid_idp.util.maybe_xml_to_string(response, logger=self.logger)
             self.logger.debug("Logout SAMLResponse :\n\n{!s}\n\n".format(xmlstr))
 
-        ht_args = self.context.idp.apply_binding(bindings[0], str(response), destination, req_info.relay_state,
-                                         response = True)
+        ht_args = self.context.idp.apply_binding(
+            bindings[0], str(response), destination, req_info.relay_state, response=True
+        )
         # self.logger.debug("Apply bindings result :\n{!s}\n\n".format(pprint.pformat(ht_args)))
 
         # Delete the SSO session cookie in the browser
@@ -250,6 +256,7 @@ class SLO(Service):
         # it would be more correct to look at bindings[0] here, since `bindings' is what was used
         # with create_logout_response() and apply_binding().
         if req_info.binding != bindings[0]:
-            self.logger.debug("Creating response with binding {!r} instead of {!r} used before".format(
-                bindings[0], req_info.binding))
+            self.logger.debug(
+                "Creating response with binding {!r} instead of {!r} used before".format(bindings[0], req_info.binding)
+            )
         return eduid_idp.mischttp.create_html_response(bindings[0], ht_args, self.start_response, self.logger)
