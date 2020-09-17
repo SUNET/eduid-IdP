@@ -136,7 +136,7 @@ class TestActions(MongoTestCase):
         self.http.reset()
         MongoTestCase.tearDown(self)
 
-    def test_no_actions(self):
+    def _test_no_actions(self, tou):
 
         # Remove the standard test_action from the database
         self.actions.remove_action_by_id(self.test_action.action_id)
@@ -168,10 +168,6 @@ class TestActions(MongoTestCase):
             resp = form.submit(headers={'Cookie': cookies})
             self.assertEqual(resp.status, '302 Found')
 
-        # Register user acceptance for the ToU version in use
-        tou = ToUEvent.from_dict(
-            dict(version=self.config.tou_version, created_by='unit test', created_ts=True, event_id=bson.ObjectId())
-        )
         user = self.amdb.get_user_by_mail(_email)
         assert isinstance(user, eduid_userdb.User)
         user.tou.add(tou)
@@ -187,6 +183,23 @@ class TestActions(MongoTestCase):
         resp = self.http.get(resp.location, headers={'Cookie': cookie})
         self.assertEqual(resp.status, '200 Ok')
         self.assertIn(six.b('action="https://sp.example.edu/saml2/acs/"'), resp.body)
+
+    def test_no_actions_touevent_from_dict(self):
+        # Register user acceptance for the ToU version in use
+        tou = ToUEvent.from_dict(dict(version=self.config.tou_version,
+                                      created_by='unit test',
+                                      created_ts=datetime.utcnow(),
+                                      event_id=bson.ObjectId())
+                                 )
+        self._test_no_actions(tou)
+
+    def test_no_actions_touevent_init(self):
+        # Register user acceptance for the ToU version in use
+        tou = ToUEvent(version=self.config.tou_version,
+                       created_by='unit test',
+                       event_id=bson.ObjectId()
+                       )
+        self._test_no_actions(tou)
 
     def test_action_2(self):
 

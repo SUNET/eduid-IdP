@@ -134,7 +134,7 @@ class TestAuthentication(MongoTestCase):
         mock_add_credentials.return_value = True
         mock_authenticate.return_value = True
         assert isinstance(self.test_user, eduid_userdb.User)
-        passwords = self.test_user.passwords.to_list()
+        passwords = self.test_user.credentials.to_list()
         factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
         self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {
@@ -149,7 +149,7 @@ class TestAuthentication(MongoTestCase):
         mock_add_credentials.return_value = False
         mock_authenticate.return_value = True
         assert isinstance(self.test_user, eduid_userdb.User)
-        passwords = self.test_user.passwords.to_list()
+        passwords = self.test_user.credentials.to_list()
         factor = vccs_client.VCCSPasswordFactor('foo', str(passwords[0].key), salt=passwords[0].salt)
         self.idp_app.authn.auth_client.add_credentials(str(self.test_user.user_id), [factor])
         data = {

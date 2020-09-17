@@ -135,7 +135,7 @@ class FakeAuthClient(object):
         for field in ['_id', 'eduPersonPrincipalName']:
             _user = self.userdb.get_user_by_field(field, username, raise_on_missing=False)
             if _user:
-                for _cred in _user.passwords.to_list_of_dicts():
+                for _cred in _user.credentials.to_list_of_dicts():
                     # restore the expected hash from out-of-band memory
                     _cred['hash'] = PWHASHES[_cred['credential_id']]
                     # remove keys in _cred that are not in _expect
