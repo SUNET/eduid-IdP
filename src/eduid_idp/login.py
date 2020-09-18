@@ -36,6 +36,7 @@ from eduid_common.authn.idp_saml import (
 from eduid_common.session.logindata import SSOLoginData
 from eduid_common.session.sso_session import SSOSession
 from eduid_userdb.idp import IdPUser
+from eduid_userdb.idp.user import SAMLAttributeSettings
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
 
 import eduid_idp
@@ -123,7 +124,13 @@ class SSO(Service):
 
         :return: SAML response in lxml format
         """
-        attributes = user.to_saml_attributes(self.config.to_dict(), self.logger)
+        saml_attribute_settings = SAMLAttributeSettings(
+            default_eppn_scope=self.config.default_eppn_scope,
+            default_country=self.config.default_country,
+            default_country_code=self.config.default_country_code,
+            default_scoped_affiliation=self.config.default_scoped_affiliation,
+        )
+        attributes = user.to_saml_attributes(saml_attribute_settings, self.logger)
         # Add a list of credentials used in a private attribute that will only be
         # released to the eduID authn component
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
