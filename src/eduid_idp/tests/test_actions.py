@@ -73,6 +73,8 @@ class TestActions(MongoTestCase):
         self.redis_instance = RedisTemporaryInstance.get_instance()
         # load the IdP configuration
         _test_config = {
+            'debug': True,
+            'insecure_cookies': False,
             'mongo_uri': self.tmp_db.uri,
             'environment': 'test_suite',
             'pysaml2_config': os.path.join(datadir, 'test_SSO_conf.py'),
@@ -83,14 +85,12 @@ class TestActions(MongoTestCase):
             'redis_host': 'localhost',
             'redis_port': str(self.redis_instance.port),
             'redis_db': '0',
-            'insecure_cookies': 1,
             'listen_addr': 'unittest-idp.example.edu',
             'listen_port': 443,
             'base_url': 'https://unittest-idp.example.edu/',
             'content_packages': [('eduid_idp', 'tests/static')],
             'action_plugins': ['tou', 'mfa'],
-            'insecure_cookies': False,
-            'debug': True,
+            'default_eppn_scope': 'example.edu',
         }
 
         cherry_conf = {
@@ -186,19 +186,19 @@ class TestActions(MongoTestCase):
 
     def test_no_actions_touevent_from_dict(self):
         # Register user acceptance for the ToU version in use
-        tou = ToUEvent.from_dict(dict(version=self.config.tou_version,
-                                      created_by='unit test',
-                                      created_ts=datetime.utcnow(),
-                                      event_id=bson.ObjectId())
-                                 )
+        tou = ToUEvent.from_dict(
+            dict(
+                version=self.config.tou_version,
+                created_by='unit test',
+                created_ts=datetime.utcnow(),
+                event_id=bson.ObjectId(),
+            )
+        )
         self._test_no_actions(tou)
 
     def test_no_actions_touevent_init(self):
         # Register user acceptance for the ToU version in use
-        tou = ToUEvent(version=self.config.tou_version,
-                       created_by='unit test',
-                       event_id=bson.ObjectId()
-                       )
+        tou = ToUEvent(version=self.config.tou_version, created_by='unit test', event_id=bson.ObjectId())
         self._test_no_actions(tou)
 
     def test_action_2(self):
