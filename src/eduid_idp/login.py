@@ -123,7 +123,7 @@ class SSO(Service):
 
         :return: SAML response in lxml format
         """
-        attributes = user.to_saml_attributes(self.config, self.logger)
+        attributes = user.to_saml_attributes(self.config.to_dict(), self.logger)
         # Add a list of credentials used in a private attribute that will only be
         # released to the eduID authn component
         attributes['eduidIdPCredentialsUsed'] = [x['cred_id'] for x in sso_session.authn_credentials]
