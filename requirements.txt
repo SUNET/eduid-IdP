@@ -1,7 +1,6 @@
 cherrypy==15.0
 defusedxml>=0.5.0
 eduid_common[idp]==0.8.0
-eduid_userdb>=0.4.18
 eduid_userdb==0.6.1
 pysaml2==6.*
 six
