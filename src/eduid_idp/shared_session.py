@@ -8,6 +8,7 @@
 # See the file eduid-IdP/LICENSE.txt for license statement.
 
 import datetime
+import logging
 from random import random
 from typing import Optional, Tuple
 
@@ -135,14 +136,17 @@ class SessionFactory:
     def __init__(self):
         ttl = cherrypy.config['shared_session_ttl']
         secret = cherrypy.config['shared_session_secret_key']
+        self.logger = cherrypy.config.logger
+        if self.logger is None:
+            # this fails to be set up when running with pytest somehow
+            self.logger = logging.getLogger(__name__)
         if secret is None:
             cherrypy.config['logger'].error('shared_session_secret_key not set in config')
             raise BadConfiguration('shared_session_secret_key not set in config')
         self.manager = SessionManager(cherrypy.config, ttl=ttl, app_secret=secret)
 
     def get_base_session(self, cookie_val: str = None) -> RedisEncryptedSession:
-        logger = cherrypy.config.logger
-        debug = cherrypy.config['debug']
+        logger = self.logger
         if cookie_val is None:
             cookie_name = cherrypy.config['shared_session_cookie_name']
             # Load token from cookie

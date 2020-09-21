@@ -41,6 +41,7 @@ from cherrypy.lib.sessions import expire, init
 from eduid_common.config.idp import IdPConfig
 from eduid_common.session.namespaces import Common, LoginApplication
 from eduid_common.session.redis_session import RedisEncryptedSession
+from eduid_common.session.session_cookie import SessionCookie
 from eduid_common.session.testing import RedisTemporaryInstance
 
 from eduid_idp.shared_session import EduidSession
@@ -68,7 +69,6 @@ class TestSessions(unittest.TestCase):
             'debug': False,
         }
         self.config = IdPConfig.init_config(test_config=_defaults)
-        cherrypy.config['logger'] = logger
         # mount the IdP app in the cherrypy app server
         cherry_conf = {
             'tools.sessions.on': True,
@@ -80,6 +80,7 @@ class TestSessions(unittest.TestCase):
         }
         cherry_conf.update(self.config.to_dict())
         cherrypy.config.update(cherry_conf)
+        cherrypy.config.logger = logger
 
         name = 'sessid'
 
@@ -98,10 +99,10 @@ class TestSessions(unittest.TestCase):
         cherrypy.session.load()
         cherrypy.session.save()
 
-        token = cherrypy.session._session.token.encode('ascii')
-        session_id, sig = RedisEncryptedSession.decode_token(token)
-        encrypted_session = cherrypy.session._session.conn.get(session_id.hex())
-        session_data = cherrypy.session._session.verify_data(encrypted_session)
+        cookie_val = cherrypy.session._session.token.cookie_val
+        token = SessionCookie.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
+        encrypted_session = cherrypy.session._session.conn.get(token.session_id)
+        session_data = cherrypy.session._session.decrypt_data(encrypted_session)
         self.assertEqual(session_data['test'], 'test')
 
     def test_session_namespace(self):
@@ -111,8 +112,8 @@ class TestSessions(unittest.TestCase):
         cherrypy.session.load()
         cherrypy.session.save()
 
-        token = cherrypy.session._session.token.encode('ascii')
-        session_id, sig = RedisEncryptedSession.decode_token(token)
-        encrypted_session = cherrypy.session._session.conn.get(session_id.hex())
-        session_data = cherrypy.session._session.verify_data(encrypted_session)
+        cookie_val = cherrypy.session._session.token.cookie_val
+        token = SessionCookie.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
+        encrypted_session = cherrypy.session._session.conn.get(token.session_id)
+        session_data = cherrypy.session._session.decrypt_data(encrypted_session)
         self.assertEqual(session_data['_common']['eppn'], 'hubba-dubba')
