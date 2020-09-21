@@ -40,11 +40,9 @@ class EduidSession(Session):
         cls.session_factory = SessionFactory()
 
     def __init__(self, id: str = None, **kwargs):
-        self._session = self.session_factory.get_base_session(token=id)
+        self._session = self.session_factory.get_base_session(cookie_val=id)
         # In case no session was found, a new ID will have been generated and we need to tell it to CherryPy
-        id = self._session.token
-        if isinstance(id, bytes):
-            id = id.decode('ascii')
+        id = self._session.token.cookie_val
         super(EduidSession, self).__init__(id=id, **kwargs)
 
         # namespaces
@@ -53,7 +51,7 @@ class EduidSession(Session):
         self._sso_ticket: Optional[SSOLoginData] = None
 
     def _exists(self) -> bool:
-        return bool(self._session.token)
+        return bool(self._session.token.cookie_val)
 
     def _load(self) -> Tuple[dict, datetime.datetime]:
         ttl = cherrypy.config['shared_session_ttl']
@@ -69,7 +67,7 @@ class EduidSession(Session):
             self._data['_sso_ticket'] = self.sso_ticket.to_dict()  # type: ignore
         self._session._data.update(self._data)
         self._session.commit()
-        self._session.conn.expire(self._session.session_id, int(expiration_time.timestamp()))
+        self._session.conn.expire(self._session.token.session_id, int(expiration_time.timestamp()))
 
     def _delete(self):
         self._data = {}
@@ -140,19 +138,19 @@ class SessionFactory:
         if secret is None:
             cherrypy.config['logger'].error('shared_session_secret_key not set in config')
             raise BadConfiguration('shared_session_secret_key not set in config')
-        self.manager = SessionManager(cherrypy.config, ttl=ttl, secret=secret)
+        self.manager = SessionManager(cherrypy.config, ttl=ttl, app_secret=secret)
 
-    def get_base_session(self, token: str = None) -> RedisEncryptedSession:
+    def get_base_session(self, cookie_val: str = None) -> RedisEncryptedSession:
         logger = cherrypy.config.logger
         debug = cherrypy.config['debug']
-        if token is None:
+        if cookie_val is None:
             cookie_name = cherrypy.config['shared_session_cookie_name']
             # Load token from cookie
-            token = eduid_idp.mischttp.read_cookie(cookie_name, logger)
-        if token:
+            cookie_val = eduid_idp.mischttp.read_cookie(cookie_name, logger)
+        if cookie_val:
             try:
-                return self.manager.get_session(token=token, debug=debug)
+                return self.manager.get_session(cookie_val=cookie_val)
             except (KeyError, ValueError) as exc:
-                logger.warning(f'Failed to load session from token {token}: {exc}')
+                logger.warning(f'Failed to load session from token {cookie_val}: {exc}')
 
-        return self.manager.get_session(data={}, debug=debug)
+        return self.manager.get_session()
