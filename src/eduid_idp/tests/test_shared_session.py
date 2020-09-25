@@ -99,7 +99,7 @@ class TestSessions(unittest.TestCase):
         cherrypy.session.load()
         cherrypy.session.save()
 
-        cookie_val = cherrypy.session._session.token.cookie_val
+        cookie_val = cherrypy.session._session_cookie.cookie_val
         token = SessionCookie.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
         encrypted_session = cherrypy.session._session.conn.get(token.session_id)
         session_data = cherrypy.session._session.decrypt_data(encrypted_session)
@@ -112,7 +112,7 @@ class TestSessions(unittest.TestCase):
         cherrypy.session.load()
         cherrypy.session.save()
 
-        cookie_val = cherrypy.session._session.token.cookie_val
+        cookie_val = cherrypy.session._session_cookie.cookie_val
         token = SessionCookie.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
         encrypted_session = cherrypy.session._session.conn.get(token.session_id)
         session_data = cherrypy.session._session.decrypt_data(encrypted_session)
