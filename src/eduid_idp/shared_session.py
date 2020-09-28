@@ -16,9 +16,9 @@ import cherrypy
 from cherrypy.lib.sessions import Session
 from eduid_common.config.exceptions import BadConfiguration
 from eduid_common.session.logindata import SSOLoginData
+from eduid_common.session.meta import SessionMeta
 from eduid_common.session.namespaces import Actions, Common
 from eduid_common.session.redis_session import RedisEncryptedSession, SessionManager
-from eduid_common.session.session_cookie import SessionCookie
 
 import eduid_idp.mischttp
 
@@ -42,9 +42,9 @@ class EduidSession(Session):
         cls.session_factory = SessionFactory()
 
     def __init__(self, id: str = None, **kwargs):
-        self._session_cookie = self.session_factory.get_session_cookie(cookie_val=id)
-        self._session = self.session_factory.get_base_session(self._session_cookie)
-        super(EduidSession, self).__init__(id=self._session_cookie.cookie_val, **kwargs)
+        self._session_meta = self.session_factory.get_session_meta(cookie_val=id)
+        self._session = self.session_factory.get_base_session(self._session_meta)
+        super(EduidSession, self).__init__(id=self._session_meta.cookie_val, **kwargs)
 
         # namespaces
         self._common: Optional[Common] = None
@@ -52,7 +52,7 @@ class EduidSession(Session):
         self._sso_ticket: Optional[SSOLoginData] = None
 
     def _exists(self) -> bool:
-        return bool(self._session_cookie.cookie_val)
+        return bool(self._session_meta.cookie_val)
 
     def _load(self) -> Tuple[dict, datetime.datetime]:
         ttl = cherrypy.config['shared_session_ttl']
@@ -145,22 +145,22 @@ class SessionFactory:
             raise BadConfiguration('shared_session_secret_key not set in config')
         self.manager = SessionManager(cherrypy.config, ttl=ttl, app_secret=secret)
 
-    def get_session_cookie(self, cookie_val: Optional[str] = None) -> SessionCookie:
+    def get_session_meta(self, cookie_val: Optional[str] = None) -> SessionMeta:
         logger = self.logger
         if cookie_val is None:
             # Load token from cookie
             cookie_name = cherrypy.config['shared_session_cookie_name']
             cookie_val = eduid_idp.mischttp.read_cookie(cookie_name, logger)
         if cookie_val is not None:
-            return SessionCookie.from_cookie(
+            return SessionMeta.from_cookie(
                 cookie_val=cookie_val, app_secret=cherrypy.config['shared_session_secret_key']
             )
-        return SessionCookie.new(app_secret=cherrypy.config['shared_session_secret_key'])
+        return SessionMeta.new(app_secret=cherrypy.config['shared_session_secret_key'])
 
-    def get_base_session(self, session_cookie: SessionCookie) -> RedisEncryptedSession:
+    def get_base_session(self, session_meta: SessionMeta) -> RedisEncryptedSession:
         logger = self.logger
         try:
-            return self.manager.get_session(token=session_cookie, new=False)
+            return self.manager.get_session(meta=session_meta, new=False)
         except (KeyError, ValueError) as exc:
-            logger.warning(f'Failed to load session from token {session_cookie.cookie_val}: {exc}')
-        return self.manager.get_session(token=session_cookie, new=True)
+            logger.warning(f'Failed to load session from token {session_meta.cookie_val}: {exc}')
+        return self.manager.get_session(meta=session_meta, new=True)

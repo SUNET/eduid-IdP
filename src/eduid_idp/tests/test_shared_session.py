@@ -39,9 +39,9 @@ import unittest
 import cherrypy
 from cherrypy.lib.sessions import expire, init
 from eduid_common.config.idp import IdPConfig
+from eduid_common.session.meta import SessionMeta
 from eduid_common.session.namespaces import Common, LoginApplication
 from eduid_common.session.redis_session import RedisEncryptedSession
-from eduid_common.session.session_cookie import SessionCookie
 from eduid_common.session.testing import RedisTemporaryInstance
 
 from eduid_idp.shared_session import EduidSession
@@ -99,8 +99,8 @@ class TestSessions(unittest.TestCase):
         cherrypy.session.load()
         cherrypy.session.save()
 
-        cookie_val = cherrypy.session._session_cookie.cookie_val
-        token = SessionCookie.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
+        cookie_val = cherrypy.session._session_meta.cookie_val
+        token = SessionMeta.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
         encrypted_session = cherrypy.session._session.conn.get(token.session_id)
         session_data = cherrypy.session._session.decrypt_data(encrypted_session)
         self.assertEqual(session_data['test'], 'test')
@@ -112,8 +112,8 @@ class TestSessions(unittest.TestCase):
         cherrypy.session.load()
         cherrypy.session.save()
 
-        cookie_val = cherrypy.session._session_cookie.cookie_val
-        token = SessionCookie.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
+        cookie_val = cherrypy.session._session_meta.cookie_val
+        token = SessionMeta.from_cookie(cookie_val, app_secret=self.config.shared_session_secret_key)
         encrypted_session = cherrypy.session._session.conn.get(token.session_id)
         session_data = cherrypy.session._session.decrypt_data(encrypted_session)
         self.assertEqual(session_data['_common']['eppn'], 'hubba-dubba')
