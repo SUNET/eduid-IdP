@@ -82,24 +82,14 @@ _USERDB = [
         '_id': '0' * 24,
         'eduPersonPrincipalName': 'test1@eduid.se',
         'mail': 'test@example.com',
-        'mailAliases': [
-            {
-                'email': 'test@example.com',
-                'verified': True,
-            }
-        ],
+        'mailAliases': [{'email': 'test@example.com', 'verified': True,}],
         'passwords': _create_passwords('user1', [_PASSWORDS[0], _PASSWORDS[1]]),
     },
     {
         '_id': '1' * 24,
         'eduPersonPrincipalName': 'test2@eduid.se',
         'mail': 'test2@example.com',
-        'mailAliases': [
-            {
-                'email': 'test2@example.com',
-                'verified': True,
-            }
-        ],
+        'mailAliases': [{'email': 'test2@example.com', 'verified': True,}],
         'passwords': _create_passwords('user2', [_PASSWORDS[2]]),
     },
 ]

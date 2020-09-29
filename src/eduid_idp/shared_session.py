@@ -14,6 +14,7 @@ from typing import Optional, Tuple
 
 import cherrypy
 from cherrypy.lib.sessions import Session
+from eduid_common.config.base import RedisConfig
 from eduid_common.config.exceptions import BadConfiguration
 from eduid_common.session.logindata import SSOLoginData
 from eduid_common.session.meta import SessionMeta
@@ -143,7 +144,14 @@ class SessionFactory:
         if secret is None:
             cherrypy.config['logger'].error('shared_session_secret_key not set in config')
             raise BadConfiguration('shared_session_secret_key not set in config')
-        self.manager = SessionManager(cherrypy.config, ttl=ttl, app_secret=secret)
+        redis_cfg = RedisConfig(
+            port=cherrypy.config.get('redis_port'),
+            db=cherrypy.config.get('redis_db'),
+            host=cherrypy.config.get('redis_host'),
+            sentinel_hosts=cherrypy.config.get('redis_sentinel_hosts'),
+            sentinel_service_name=cherrypy.config.get('redis_sentinel_service_name'),
+        )
+        self.manager = SessionManager(redis_cfg, ttl=ttl, app_secret=secret)
 
     def get_session_meta(self, cookie_val: Optional[str] = None) -> SessionMeta:
         logger = self.logger
