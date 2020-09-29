@@ -235,11 +235,7 @@ class SSO(Service):
             self.config.fticks_secret_key.encode('ascii'), msg=user_id.encode('ascii'), digestmod=sha256
         ).hexdigest()
         msg = self.config.fticks_format_string.format(
-            ts=_timestamp,
-            rp=relying_party,
-            ap=self.context.idp.config.entityid,
-            pn=_anon_userid,
-            am=authn_method,
+            ts=_timestamp, rp=relying_party, ap=self.context.idp.config.entityid, pn=_anon_userid, am=authn_method,
         )
         self.logger.info(msg)
 
@@ -531,9 +527,7 @@ def do_verify(context: IdPContext):
     user = authninfo.user
     context.logger.debug("User {} authenticated OK".format(user))
     _sso_session = SSOSession(
-        user_id=user.user_id,
-        authn_request_id=_ticket.saml_req.request_id,
-        authn_credentials=[authninfo],
+        user_id=user.user_id, authn_request_id=_ticket.saml_req.request_id, authn_credentials=[authninfo],
     )
 
     # This session contains information about the fact that the user was authenticated. It is
@@ -633,11 +627,7 @@ def _create_ticket(context: IdPContext, info: Mapping[str, str], binding: str, k
     if not binding:
         raise eduid_idp.error.ServiceError("Can't create IdP ticket with unknown binding", logger=context.logger)
     ticket = SSOLoginData(
-        key,
-        info.get('SAMLRequest', ''),
-        binding,
-        info.get('RelayState', ''),
-        int(info.get('FailCount', 0)),
+        key, info.get('SAMLRequest', ''), binding, info.get('RelayState', ''), int(info.get('FailCount', 0)),
     )
     if not ticket.SAMLRequest:
         context.logger.error(f'IdP ticket without SAML request: {ticket}')

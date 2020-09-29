@@ -118,7 +118,6 @@ from typing import Any, Optional
 import cherrypy
 import eduid_common.session.sso_session
 import simplejson
-import six
 from bson import ObjectId
 from eduid_common.authn import idp_authn
 from eduid_common.authn.utils import init_pysaml2
@@ -160,11 +159,7 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        '--debug',
-        dest='debug',
-        action='store_true',
-        default=default_debug,
-        help='Enable debug operation',
+        '--debug', dest='debug', action='store_true', default=default_debug, help='Enable debug operation',
     )
 
     return parser.parse_args()
@@ -222,10 +217,7 @@ class IdPApplication(object):
         self.authn = idp_authn.IdPAuthn(logger, config, self.userdb)
 
         cherrypy.config.update(
-            {
-                'request.error_response': self.handle_error,
-                'error_page.default': self.error_page_default,
-            }
+            {'request.error_response': self.handle_error, 'error_page.default': self.error_page_default,}
         )
         listen_str = 'http://'
         if self.config.server_key:
@@ -603,14 +595,7 @@ class IdPApplication(object):
 
         self.logger.exception(
             "Error in IdP application",
-            extra={
-                'data': {
-                    'request': cherrypy.request,
-                    'traceback': traceback,
-                    'status': status,
-                    'reason': reason,
-                },
-            },
+            extra={'data': {'request': cherrypy.request, 'traceback': traceback, 'status': status, 'reason': reason,},},
         )
         return res
 
